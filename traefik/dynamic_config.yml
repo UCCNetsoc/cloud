@@ -1,0 +1,23 @@
+http:
+  routers:
+    router-ocanty-1:
+      rule: Host(`blog.ocanty.local`)
+      service: service-ocanty-1
+      middlewares:
+        - middlewares-ocanty-1a
+        - middlewares-ocanty-1b
+  middlewares:
+    middlewares-ocanty-1a:
+      headers:
+        customRequestHeaders:
+          X-User: ocanty
+    middlewares-ocanty-1b:
+      addPrefix:
+        prefix: /wordpress
+  services:
+    service-ocanty-1:
+      loadBalancer:
+        servers:
+          - url: 'http://user_websites.netsoc.local'
+      responseForwarding:
+        passHostHeader: false

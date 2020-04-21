@@ -1,0 +1,18 @@
+log:
+  level: DEBUG
+accessLog: {}
+entrypoints:
+  web:
+    address: ':80'
+  web-secure:
+    address: ':443'
+serversTransport:
+  insecureSkipVerify: true
+providers:
+  docker:
+    exposedByDefault: false
+  file:
+    filename: "/traefik/dynamic_config.yml"
+api:
+  dashboard: true
+  insecure: true
