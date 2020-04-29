@@ -4,7 +4,7 @@
       <v-card class="flex-grow-1 ma-1">
         <v-card-title>
           <v-img
-            alt="Vuetify Logo"
+            alt="netsocadmin3 logo"
             class="shrink"
             contain
             src="img/logo/nsa3-grey.svg"
@@ -12,6 +12,7 @@
             width="160"
           />
         </v-card-title>
+        <v-card-subtitle class="mt-0">netsocadmin3 pre-release</v-card-subtitle>
         <v-card-text>
           Having issues or unexpected errors?
           <a href="https://github.com/UCCNetsoc/netsocadmin2">
