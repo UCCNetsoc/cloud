@@ -4,88 +4,20 @@
       v-model="drawer"
       app
       clipped
+      style="background-color: rgba(37,37,37,0.8);"
     >
       <v-list dense>
-        <v-list-item link>
-          <v-list-item-action>
-            <v-icon>mdi-account-circle</v-icon>
-          </v-list-item-action>
-          <v-list-item-content>
-            <v-list-item-title>Account</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item link>
-          <v-list-item-action>
-            <v-icon>mdi-lifebuoy</v-icon>
-          </v-list-item-action>
-          <v-list-item-content>
-            <v-list-item-title>Getting Started</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item link>
-          <v-list-item-action>
-            <v-icon>mdi-backup-restore</v-icon>
-          </v-list-item-action>
-          <v-list-item-content>
-            <v-list-item-title>Backups</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item link>
-          <v-list-item-action>
-            <v-icon>mdi-cloud</v-icon>
-          </v-list-item-action>
-          <v-list-item-content>
-            <v-list-item-title>Cloud</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item link>
-          <v-list-item-action>
-            <v-icon>mdi-database</v-icon>
-          </v-list-item-action>
-          <v-list-item-content>
-            <v-list-item-title>Databases</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item link>
-          <v-list-item-action>
-            <v-icon>mdi-web</v-icon>
-          </v-list-item-action>
-          <v-list-item-content>
-            <v-list-item-title>Deploy</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item link>
-          <v-list-item-action>
-            <v-icon>mdi-gamepad-square</v-icon>
-          </v-list-item-action>
-          <v-list-item-content>
-            <v-list-item-title>Games</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item link>
-          <v-list-item-action>
-            <v-icon>mdi-help-circle</v-icon>
-          </v-list-item-action>
-          <v-list-item-content>
-            <v-list-item-title>Help</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item link>
-          <v-list-item-action>
-            <v-icon>mdi-alert</v-icon>
-          </v-list-item-action>
-          <v-list-item-content>
-            <v-list-item-title>Status</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
-        <v-list-item link>
-          <v-list-item-action>
-            <v-icon>mdi-information</v-icon>
-          </v-list-item-action>
-          <v-list-item-content>
-            <v-list-item-title>About &amp; Contributors</v-list-item-title>
-          </v-list-item-content>
-        </v-list-item>
+        <v-list-item-group v-model="selectedMenu">
+          <v-list-item link v-for="item in menu" v-bind:key="item.name" @click="$router.push(item.route)">
+            <v-list-item-action>
+              <v-icon>{{ item.icon }}</v-icon>
+            </v-list-item-action>
+            <v-list-item-content>
+              <v-list-item-title>{{ item.name }}</v-list-item-title>
+              <v-list-item-subtitle v-if="item.hasOwnProperty('subtitle')">{{ item.subtitle }}</v-list-item-subtitle>
+            </v-list-item-content>
+          </v-list-item>
+        </v-list-item-group>
       </v-list>
     </v-navigation-drawer>
 
@@ -108,12 +40,15 @@
       <v-toolbar-title>
         <div class="d-flex align-center">
           <v-img
-            alt="Vuetify Logo"
+            alt="netsocadmin3 logo"
             class="shrink mr-2"
             contain
             src="img/logo/nsa-white.svg"
             transition="scale-transition"
             width="90"
+            height="42"
+            @click="$router.push('/')"
+            style="cursor: pointer"
           />
         </div>
       </v-toolbar-title>
@@ -129,26 +64,26 @@
       <v-footer app>
         <span>&copy; 2020 UCC Networking Society</span>
         <v-spacer></v-spacer>
-          <a href="https://www.facebook.com/NetsocUCC/">
-            <v-icon>
-              mdi-facebook
-            </v-icon>
-          </a>
-          <a href="https://twitter.com/UCCNetsoc">
-            <v-icon>
-              mdi-twitter
-            </v-icon>
-          </a>
-          <a href="https://github.com/UCCNetsoc">
-            <v-icon>
-              mdi-github
-            </v-icon>
-          </a>
-          <a href="https://www.instagram.com/uccnetsoc/">
-            <v-icon>
-              mdi-instagram
-            </v-icon>
-          </a>
+        <a href="https://www.facebook.com/NetsocUCC/" class="ml-1">
+          <v-icon>
+            mdi-facebook
+          </v-icon>
+        </a>
+        <a href="https://twitter.com/UCCNetsoc" class="ml-1">
+          <v-icon>
+            mdi-twitter
+          </v-icon>
+        </a>
+        <a href="https://github.com/UCCNetsoc" class="ml-1">
+          <v-icon>
+            mdi-microsoft-github
+          </v-icon>
+        </a>
+        <a href="https://www.instagram.com/uccnetsoc/" class="ml-1">
+          <v-icon>
+            mdi-instagram
+          </v-icon>
+        </a>
       </v-footer>
     </v-content>
   </v-app>
@@ -157,19 +92,42 @@
 <script lang="ts">
 import Vue from 'vue'
 
-import HelloWorld from './components/HelloWorld.vue'
-
 export default Vue.extend({
   name: 'App',
-
   components: { },
 
   data: () => ({
-    drawer: true
+    drawer: true,
+    selectedMenu: 0,
+    menu: [
+      { icon: 'mdi-account-circle', name: 'Account', route: '/account' },
+      { icon: 'mdi-lifebuoy', name: 'Getting Started', route: '/getting-started' },
+      { icon: 'mdi-backup-restore', name: 'Backups', route: '/backups' },
+      { icon: 'mdi-cloud', name: 'Cloud', route: '/cloud' },
+      { icon: 'mdi-database', name: 'Databases', route: '/databases' },
+      { icon: 'mdi-gamepad-square', name: 'Games', route: '/games' },
+      { icon: 'mdi-web', name: 'Websites', route: '/websites' },
+      { icon: 'mdi-help-circle', name: 'Help', route: '/help' },
+      { icon: 'mdi-alert', name: 'Status', route: '/status' },
+      { icon: 'mdi-information', name: 'About & Contributors', route: '/about' }
+    ]
   }),
 
   created () {
     this.$vuetify.theme.dark = true
+
+    // TODO: fixed
+
+    let i = 0
+    for (const item of this.menu) {
+      console.log(this.$router.currentRoute, item.route)
+      // if (this.$router.currentRoute === item.route) {
+      //   this.selectedMenu = i
+      //   break
+      // }
+
+      i++
+    }
   }
 })
 </script>
