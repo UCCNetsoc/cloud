@@ -32,12 +32,14 @@
           <v-text-field
             label='Choose a password'
             v-model='password'
-            :rules='confirmPasswordRules'
+            :rules='passwordRules'
+            type='password'
           ></v-text-field>
           <v-text-field
             label='Confirm password'
             v-model='confirmPassword'
             :rules='confirmPasswordRules'
+            type='password'
           ></v-text-field>
           <v-checkbox
             v-model='aupAccepted'
@@ -50,7 +52,6 @@
           <v-checkbox
             @change='privacyCheckChange'
             v-model='privacyAccepted'
-            :rules='[ (v) => !!v | "Privacy required" ]'
           >
             <span slot='label'>
               I read and accept the <a @click='privacyCheckChange'>Privacy Policy</a>
@@ -71,11 +72,11 @@
     </v-card>
     <v-divider class='ma-2'/>
     <v-card-actions class="justify-center">
-      <v-btn v-on:click="$router.push('/login')" color="primary">Login</v-btn>
+      <v-btn v-on:click="$router.push('/login', () => {})" color="primary">Login</v-btn>
       <v-btn v-on:click="submit()" color="green">Sign Up</v-btn>
     </v-card-actions>
     <v-dialog
-      v-model="submitDialog.visible"
+      v-model="dialog.visible"
       width="460"
       persistent
       :fullscreen="$vuetify.breakpoint.mdAndDown"
@@ -86,10 +87,10 @@
         <dialog-logo/>
         <v-card-text class="my-2">
           <p class="my-2 text-center">
-            {{ submitDialog.text }}
+            {{ dialog.msg }}
           </p>
           <v-card-actions class="justify-center">
-            <v-btn v-on:click="submitDialog.visible = false" color="green">Okay</v-btn>
+            <v-btn v-on:click="dialog.visible = false" color="green">Okay</v-btn>
           </v-card-actions>
         </v-card-text>
       </v-card>
@@ -177,41 +178,54 @@ export default Vue.extend({
     },
 
     async submit () {
-      // this.refs.$form.validate()
+      this.refs.$form.validate()
+
+      if (!this.privacyAccepted) {
+        this.dialog = {
+          visible: true,
+          msg: 'You must agree to the privacy policy to create an account'
+        }
+        return
+      }
+
       if (this.formValid) {
-        const res = await fetch(`${Config.accountApiBaseUrl}/accounts/signup/${this.categories[this.category].model}`, {
-          method: 'POST',
-          body: JSON.stringify({
-            displayname: this.displayname,
-            email: this.email,
-            username: this.username,
-            password: this.password
+        try {
+          const res = await fetch(`${Config.accountApiBaseUrl}/accounts/signup/${this.categories[this.category].model}`, {
+            method: 'POST',
+            body: JSON.stringify({
+              displayname: this.displayname,
+              email: this.email,
+              username: this.username,
+              password: this.password
+            })
           })
-        })
 
-        switch (true) {
-          case (res.status === 201): {
-            this.submitDialog.visible = true
-            const { detail } = await res.json()
-            this.submitDialog.text = detail.msg
-            break
+          switch (true) {
+            case (res.status === 201): {
+              this.dialog.visible = true
+              const { detail } = await res.json()
+              this.dialog = {
+                visible: true,
+                msg: detail.msg
+              }
+              break
+            }
+
+            case (res.status >= 400): {
+              this.dialog.visible = true
+              const { detail } = await res.json()
+              this.dialog = {
+                visible: true,
+                msg: detail.msg
+              }
+              break
+            }
           }
-
-          case (res.status >= 400): {
-            this.submitDialog.visible = true
-            const { detail } = await res.json()
-
-            this.submitDialog.text = detail.msg
-            break
+        } catch (e) {
+          this.dialog = {
+            visible: true,
+            msg: `Could not create your account. An unexpected error happened.\nIf you're in contact with a SysAdmin give them this: ${e}`
           }
-
-          // case (res.status === 422): {
-          //   this.submitDialog.visible = true
-          //   const { detail } = await res.json()
-
-          //   this.submitDialog.text = detail.msg
-          //   break
-          // }
         }
       }
     }
@@ -232,7 +246,7 @@ export default Vue.extend({
     aupVisible: false,
     privacyVisible: false,
 
-    submitDialog: {
+    dialog: {
       visible: false,
       text: ''
     },
