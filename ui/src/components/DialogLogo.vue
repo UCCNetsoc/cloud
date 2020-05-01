@@ -12,7 +12,7 @@
         class="shrink"
         contain
         src="img/logo/nsa-white.svg"
-        transition="scale-transition"
+        transition="none"
         width="160"
         height="75"
       />
@@ -23,9 +23,9 @@
 <style scoped>
 
 @keyframes swipe {
-  0%{background-position:0% 50%; filter: invert(0) }
-  50%{background-position:100% 50%;  filter: invert(1)}
-  100%{background-position:0% 51%;  filter: invert(0)}
+  0%{background-position:0% 50%; filter: invert(0)     }
+  50%{background-position:100% 50%;  filter: invert(1) }
+  100%{background-position:0% 51%;  filter: invert(0)  }
 }
 
 .binary-background {
