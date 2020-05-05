@@ -1,4 +1,4 @@
-module common
+module github.com/ocanty/admin/common
 
 go 1.14
 
