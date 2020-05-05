@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	rest "common/rest"
+	rest "github.com/ocanty/admin/common/rest"
 
 	"github.com/dgrijalva/jwt-go"
 	jwtauth "github.com/go-chi/jwtauth"
