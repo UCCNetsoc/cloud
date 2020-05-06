@@ -95,8 +95,7 @@ func RequireKeycloakRoleJWT(publicKeyText string, signingAlgorithm string, role 
 				return
 			}
 
-			fmt.Println(claims)
-			if scopes, ok := claims["scopes"].(string); ok {
+			if scopes, ok := claims["scope"].(string); ok {
 				for _, scope := range []string{"openid", "profile", "email"} {
 					if !strings.Contains(scopes, "openid") {
 						rest.WriteError(w, 401, &rest.Detail{
@@ -107,7 +106,7 @@ func RequireKeycloakRoleJWT(publicKeyText string, signingAlgorithm string, role 
 				}
 			} else {
 				rest.WriteError(w, 401, &rest.Detail{
-					Msg: fmt.Sprintf("%s: %s %s", http.StatusText(401), "missing scopes"),
+					Msg: fmt.Sprintf("%s: %s", http.StatusText(401), "missing scopes"),
 				})
 				return
 			}
