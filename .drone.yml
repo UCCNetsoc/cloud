@@ -1,0 +1,129 @@
+kind: pipeline
+name: default
+
+volumes:
+  - name: cache
+    temp: {}
+
+steps:
+  - name: build_ui_dev
+    image: plugins/docker
+    volumes:
+      - name: cache
+        path: /var/lib/docker
+    settings:
+      tags:
+        - "${DRONE_COMMIT_SHA:0:7}_dev-env"
+        - dev-env
+      target: dev
+      dockerfile: ui/Dockerfile
+      repo: uccnetsoc/admin
+      registry: docker.io
+      custom_dns: [1.1.1.1]
+      username:
+        from_secret: docker_hub_user
+      password:
+        from_secret: docker_hub_token
+    when:
+      event:
+        - push
+      branch:
+        - master
+
+  - name: build_ui_prod
+    image: plugins/docker
+    volumes:
+      - name: cache
+        path: /var/lib/docker
+    settings:
+      tags:
+        - "${DRONE_COMMIT_SHA:0:7}"
+        - latest
+      dockerfile: ui/Dockerfile
+      repo: uccnetsoc/admin
+      registry: docker.io
+      custom_dns: [1.1.1.1]
+      username:
+        from_secret: docker_hub_user
+      password:
+        from_secret: docker_hub_token
+    when:
+      event:
+        - push
+      branch:
+        - master
+
+  - name: discord_notif_success
+    image: appleboy/drone-discord
+    environment:
+      WEBHOOK_ID:
+        from_secret: discord_webhook_id
+      WEBHOOK_TOKEN:
+        from_secret: discord_webhook_token
+    settings:
+      username: Netsoc CI
+      avatar_url: https://raw.githubusercontent.com/drone/brand/3051b0d85318a2a20b62927ba19fc07e24c0d751/logos/png/white/drone-logo-png-white-256.png
+      color: "#42f483"
+      message: admin successfully built and pushed. Build num {{build.number}}. {{build.link}}
+    when:
+      event:
+        - push
+      branch:
+        - master
+      status:
+        - success
+
+  - name: discord_notif_failure
+    image: appleboy/drone-discord
+    environment:
+      WEBHOOK_ID:
+        from_secret: discord_webhook_id
+      WEBHOOK_TOKEN:
+        from_secret: discord_webhook_token
+    settings:
+      username: Netsoc CI
+      avatar_url: https://raw.githubusercontent.com/drone/brand/3051b0d85318a2a20b62927ba19fc07e24c0d751/logos/png/white/drone-logo-png-white-256.png
+      color: "#e04414"
+      message: admin failed for {{build.author}}. Build num {{build.number}}. {{build.link}}
+    when:
+      event:
+        - push
+      branch:
+        - master
+      status:
+        - failure
+
+---
+kind: secret
+name: discord_webhook_id
+get:
+  path: discord/sysadmins_webhook
+  name: discord_webhook_id
+
+---
+kind: secret
+name: discord_webhook_token
+get:
+  path: discord/sysadmins_webhook
+  name: discord_webhook_token
+
+---
+kind: secret
+name: docker_hub_user
+get:
+  path: docker_registry/docker_hub
+  name: docker_hub_user
+
+---
+kind: secret
+name: docker_hub_token
+get:
+  path: docker_registry/docker_hub
+  name: docker_hub_token
+
+---
+kind: secret
+name: github_token
+get:
+  path: github/personal_access_tokens
+  name: public_repo_token
