@@ -11,8 +11,12 @@
   "dependencies": {
     "@mdi/font": "^3.6.95",
     "core-js": "^3.6.4",
+    "marked": "^0.8.0",
+    "oidc-client": "^1.10.1",
     "register-service-worker": "^1.6.2",
     "roboto-fontface": "*",
+    "streamsaver": "^2.0.4",
+    "typeface-roboto": "0.0.75",
     "vue": "^2.6.11",
     "vue-class-component": "^7.2.2",
     "vue-property-decorator": "^8.3.0",
@@ -23,6 +27,7 @@
   "devDependencies": {
     "@mdi/js": "^4.9.95",
     "@types/jest": "^24.0.19",
+    "@types/marked": "^0.7.2",
     "@typescript-eslint/eslint-plugin": "^2.18.0",
     "@typescript-eslint/parser": "^2.18.0",
     "@vue/cli-plugin-babel": "~4.2.0",
