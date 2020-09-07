@@ -1,64 +1,128 @@
 <template>
-  <v-container fluid class="d-flex justify-space-around">
-    <v-row class="ma-0">
-      <v-card class="flex-grow-1 ma-1">
-        <v-card-title>
-            <h1 class="font-weight-bold">Hi ocanty!</h1>
-        </v-card-title>
-        <v-card-subtitle class="mt-0">netsocadmin3 pre-release</v-card-subtitle>
-        <v-card-text>
-          Having issues or unexpected errors?
-          <a href="https://github.com/UCCNetsoc/netsocadmin2">
-            Report all problems on our GitHub
-          </a>
-        </v-card-text>
-      </v-card>
-      <v-card class="flex-grow-1 ma-1">
-        <v-card-title>About</v-card-title>
-        <v-card-subtitle>History of netsocadmin</v-card-subtitle>
-        <v-card-text>
-          <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam. Sed nisi. Nulla quis sem at nibh elementum imperdiet. Duis sagittis ipsum. Praesent mauris. Fusce nec tellus sed augue semper porta. Mauris massa. Vestibulum lacinia arcu eget nulla. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Curabitur sodales ligula in libero. Sed dignissim lacinia nunc. </p>
-
-          <p>Curabitur tortor. Pellentesque nibh. Aenean quam. In scelerisque sem at dolor. Maecenas mattis. Sed convallis tristique sem. Proin ut ligula vel nunc egestas porttitor. Morbi lectus risus, iaculis vel, suscipit quis, luctus non, massa. Fusce ac turpis quis ligula lacinia aliquet. Mauris ipsum. Nulla metus metus, ullamcorper vel, tincidunt sed, euismod in, nibh. Quisque volutpat condimentum velit. </p>
-
-          <p>Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Nam nec ante. Sed lacinia, urna non tincidunt mattis, tortor neque adipiscing diam, a cursus ipsum ante quis turpis. Nulla facilisi. Ut fringilla. Suspendisse potenti. Nunc feugiat mi a tellus consequat imperdiet. Vestibulum sapien. Proin quam. Etiam ultrices. Suspendisse in justo eu magna luctus suscipit. Sed lectus. </p>
-
-          <p>Integer euismod lacus luctus magna. Quisque cursus, metus vitae pharetra auctor, sem massa mattis sem, at interdum magna augue eget diam. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Morbi lacinia molestie dui. Praesent blandit dolor. Sed non quam. In vel mi sit amet augue congue elementum. Morbi in ipsum sit amet pede facilisis laoreet. Donec lacus nunc, viverra nec, blandit vel, egestas et, augue. Vestibulum tincidunt malesuada tellus. Ut ultrices ultrices enim. Curabitur sit amet mauris. Morbi in dui quis est pulvinar ullamcorper. </p>
-
-          <p>Nulla facilisi. Integer lacinia sollicitudin massa. Cras metus. Sed aliquet risus a tortor. Integer id quam. Morbi mi. Quisque nisl felis, venenatis tristique, dignissim in, ultrices sit amet, augue. Proin sodales libero eget ante. Nulla quam. Aenean laoreet. Vestibulum nisi lectus, commodo ac, facilisis ac, ultricies eu, pede. Ut orci risus, accumsan porttitor, cursus quis, aliquet eget, justo. Sed pretium blandit orci. Ut eu diam at pede suscipit sodales. </p>
-        </v-card-text>
-      </v-card>
-      <v-card class="flex-grow-0 ma-1">
-        <v-card-title>GDPR &amp; My Data</v-card-title>
-        <v-card-subtitle></v-card-subtitle>
-        <v-card-text>
-          <p>You can request a data download at any time</p>
-        </v-card-text>
-      </v-card>
-      <v-card :loading="contributors == null" class="flex-grow-1 ma-1">
-        <v-card-title>Contributors</v-card-title>
-        <v-card-subtitle></v-card-subtitle>
-        <v-card-text>
-          <a v-for="contributor in contributors" v-bind:key="contributor.login" :href="contributor.html_url">
-            <v-avatar class="ma-1" color="white">
-              <img transition="scale-transition" :src="contributor.avatar_url"/>
-            </v-avatar>
-          </a>
-        </v-card-text>
-      </v-card>
+  <v-container fluid>
+    <v-row>
+      <v-col cols="12" sm="6">
+        <v-card>
+          <v-card-title>
+            Hi {{ $store.state.auth.user.profile.preferred_username }}!
+          </v-card-title>
+          <v-card-subtitle>
+            UCC Netsoc welcomes you!
+          </v-card-subtitle>
+          <v-card-text>
+            <p>
+              We offer a user server that any of our members can connect to and make use of at any time.<br>
+              By default you have a free account on this server, automatically made available when you signed up
+            </p>
+            <p>
+              You can play around with Linux, store files, compile code... hat you do with it is all up to you!
+            </p>
+            <p>
+              Please remember to keep the <b>Terms of Use</b> in mind, this server space is shared with our other users.
+            </p>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="4">
+        <v-card>
+          <v-card-title>
+            Account
+          </v-card-title>
+          <v-card-text class="ma-0 justify-center">
+            Username: {{ $store.state.auth.user.profile.preferred_username }}<br/>
+            Email: {{ $store.state.auth.user.profile.email }}
+          </v-card-text>
+          <v-card-actions>
+            <v-container flex class="justify-center">
+              <v-btn color="primary" class="mx-1" @click="gdprRequest.visible=true">
+                Data Request
+              </v-btn>
+              <v-btn color="warning" class="mx-1" @click="passwordReset.visible=true">
+                Reset Password
+              </v-btn>
+              <v-btn color="red" class="mx-1" @click="deleteAccount.visible=true">
+                Delete Account
+              </v-btn>
+            </v-container>
+          </v-card-actions>
+        </v-card>
+      </v-col>
     </v-row>
+    <v-row>
+      <v-col cols="12" sm="6">
+        <v-card>
+          <v-card-title>
+            Connecting to the server
+          </v-card-title>
+          <v-card-text>
+            <p>
+              You can connect to the server via <code>ssh</code> to <code>portal.netsoc.co</code> or using our web based Terminal<br>
+              Your username and password are the same ones as your account on this website
+            </p>
+            <h2 class="font-weight-regular pb-2">Troubleshooting:</h2>
+            <ul>
+              <li>
+                <b>It was working previously and now I am recieving a message similar to <code>Connection refused</code>:</b>
+                <p>
+                  Every user gets 5 password attempts from their IP address until their account is temporarily blocked for 24hrs
+                  <br><br>
+                  This is an automated system to prevent security attacks on our network.
+                  <br>
+                  If you have gotten your password wrong too many times, you will need to wait these 24hrs or contact the SysAdmins on our Discord
+                </p>
+              </li>
+              <li>
+                <b>I am accessing the server from inside student accomodation / workplace WiFi</b>
+                <p>
+                  Some businesses block all outgoing SSH (port 22) traffic.
+                  You will need to find an alternative internet connection or make use of a VPN.
+                </p>
+              </li>
+              <li>
+                <b>When I try to type my password into the terminal/PuTTY, the cursor doesn't move</b>
+                <p>
+                  This is standard security practice to hide the length of your password<br />
+                  Your keystrokes are still being registered, they just won't appear on the screen.<br />
+                  Enter and Backspace will still work
+                </p>
+              </li>
+            </ul>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+    <password-reset-dialog :visible="passwordReset.visible" @successful="passwordReset.visible=false" @cancelled="passwordReset.visible=false"/>
+    <g-d-p-r-dialog :visible="gdprRequest.visible" @successful="gdprRequest.visible=false" @cancelled="gdprRequest.visible=false"/>
+    <delete-account-dialog :visible="deleteAccount.visible" @successful="deleteAccount.visible=false"/>
   </v-container>
 </template>
 
 <script lang="ts">
 import Vue from 'vue'
+import PasswordResetDialog from '@/components/PasswordResetDialog.vue'
+import GDPRDialog from '@/components/GDPRDialog.vue'
+import DeleteAccountDialog from '@/components/DeleteAccountDialog.vue'
 
 export default Vue.extend({
   name: 'Account',
-  components: {},
+  components: {
+    PasswordResetDialog,
+    GDPRDialog,
+    DeleteAccountDialog
+  },
 
   data: () => ({
-    some: null
+    passwordReset: {
+      visible: false
+    },
+
+    gdprRequest: {
+      visible: false
+    },
+
+    deleteAccount: {
+      visible: false
+    }
   })
 })
 </script>

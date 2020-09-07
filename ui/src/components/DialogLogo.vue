@@ -8,13 +8,13 @@
       primary-title
     >
       <v-img
-        alt="netsocadmin3 logo"
+        alt="admin logo"
         class="shrink"
         contain
-        src="img/logo/nsa-white.svg"
+        :src="require('@/assets/admin-logo.svg')"
         transition="none"
         width="160"
-        height="75"
+        height="64"
       />
     </v-card-title>
   </v-card>
@@ -29,10 +29,11 @@
 }
 
 .binary-background {
-  background: url('../../public/img/logo/binary-repeat.png') rgba(22,22,22,1);
+  background: url("../assets/binary-repeat.png") rgba(22,22,22,1);
   background-size: 45%;
 
   animation: swipe 45s ease infinite;
+  background-repeat: round no-repeat;
 }
 
 </style>

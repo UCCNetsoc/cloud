@@ -34,8 +34,8 @@ export function useAuthRoutes (router: Router) {
   router.beforeEach((to: Route, _from: Route, next: Function) => {
     // Don't let auth routes hit the silent sign in, prevents a loop
     if ([
-      '/login',
-      '/logout',
+      '/accounts/login',
+      '/accounts/logout',
       loginRedirectUrl.pathname,
       silentRedirectUrl.pathname,
       logoutRedirectUrl.pathname
@@ -55,7 +55,10 @@ export function useAuthRoutes (router: Router) {
         // Authentication failed, however we don't know if the page they're going to requires auth or not
         // so send them there anyway. The beforeRouteEnter hook on the component they're going to
         // will handle it by forcing them to auth then (assuming it requires auth)
-        .catch(() => next())
+        .catch((e) => {
+          console.error('Signing in silently failed: ', e)
+          next()
+        })
     } else {
       // User already authenticated
       next()
@@ -72,7 +75,7 @@ export function useAuthRoutes (router: Router) {
 
   router.addRoutes([
     {
-      path: '/login',
+      path: '/accounts/login',
       component: Landing.extend({
         beforeRouteEnter (_to: Route, _from: Route, next: Function) {
           userManager.signinPopup()
@@ -103,7 +106,7 @@ export function useAuthRoutes (router: Router) {
       }
     },
     {
-      path: '/logout',
+      path: '/accounts/logout',
       component: Landing.extend({
         beforeRouteEnter (_to: Route, from: Route, next: Function) {
           userManager.signoutPopup()
@@ -133,107 +136,4 @@ export function useAuthRoutes (router: Router) {
       }
     }
   ])
-
-  // router.addRoutes([
-
-  // ])
-
-  // Because the first time the user hits / vue-router isn't initialized yet
-  // and no route is hit, we need to check silent sign in manually
-  // The .catch() prevents an exception from happening if the user doesn't have a cookie on SSO (i.e not signed in on Keycloak)
-  // userManager.signinSilent()
-  //   .catch(() => {}) // eslint-disable-line @typescript-eslint/no-empty-function
-
-  //   router.addRoutes([
-  //     {
-  //       path: '/login',
-  //       component: Landing.extend({
-  //         beforeRouteEnter (to: Route, from: Route, next: Function) {
-  //           // Open the sign in popup, which when the user signs in will go to /<redirectUrl>
-  //           // oidc-client will resolve this promise when signinPopupCallback is ran in the route handler for /<redirectUrl>
-  //           userManager.signinPopup()
-  //             .then(() => {
-  //               // Render the component
-  //               next((landing: Landing) => {
-  //                 // Send the user back to where they came from
-  //                 landing.$router.back()
-  //               })
-  //             })
-  //             .catch((reason: Error) => {
-  //               console.log(`Could not authenticate user: ${reason}`)
-
-//               // Send them back to the homepage
-//               next('/')
-//             })
-//         }
-//       })
-//     },
-//     {
-//       path: redirectUrl.pathname,
-//       component: Landing,
-//       beforeEnter: (to: Route, from: Route, next: Function) => {
-//         // BUG:
-//         // https://github.com/IdentityModel/oidc-client-js/issues/937
-//         // Currently need to split the href string due to a bug when
-//         // passing it into signin*
-//         userManager.signinPopupCallback(window.location.href.split('?')[1])
-//           .catch((reason) => {
-//             console.log(`Could not handle the redirect for regular sign in: ${reason}`)
-//             next()
-//           })
-//       }
-//     },
-//     {
-//       path: silentRedirectUrl.pathname,
-//       component: Landing,
-//       beforeEnter: (to: Route, from: Route, next: Function) => {
-//         // BUG:
-//         // https://github.com/IdentityModel/oidc-client-js/issues/937
-//         // Currently need to split the href string due to a bug when
-//         // passing it into signin*
-//         userManager.signinSilentCallback(window.location.href.split('?')[1])
-//           .then(() => {
-//             next(false)
-//           })
-//           .catch((reason) => {
-//             console.log(`Could not handle the redirect for silent sign in: ${reason}`)
-//             next(false)
-//           })
-//       }
-//     },
-//     {
-//       path: '/logout',
-//       component: Landing.extend({
-//         beforeRouteEnter (to: Route, from: Route, next: Function) {
-//           // Open the sign out popup, which when the user signs out will go to /<loggedOutUrl>
-//           userManager.signoutPopup()
-//             .then(() => {
-//               if (from.path !== '/') {
-//                 next('/')
-//               } else {
-//                 next(false)
-//               }
-//             })
-//             .catch((reason: Error) => {
-//               console.log(`Could not sign out user: ${reason}`)
-//               next(false)
-//             })
-//         }
-//       })
-//     },
-//     {
-//       path: loggedOutUrl.pathname,
-//       component: Landing,
-//       beforeEnter: (_: Route, __: Route, next: Function) => {
-//       // BUG:
-//       // https://github.com/IdentityModel/oidc-client-js/issues/937
-//       // Currently need to split the href string due to a bug when
-//       // passing it into signin*
-//         userManager.signoutPopupCallback(window.location.href.split('?')[1]).then(() => {
-//           next(false)
-//         })
-//       }
-//     }
-//   ])
-// })
 }

@@ -1,22 +1,44 @@
 <template>
   <v-container fluid>
     <v-row>
-      <v-col cols="12" sm="6">
+      <v-col cols="12" sm="12">
         <v-card>
-          <v-card-title>
-            <h1>Databases</h1>
-          </v-card-title>
-          <v-card-text>
-            <p>
-              We offer MySQL &amp; PostgreSQL databases to all of our users
-              You will need
-            </p>
-          </v-card-text>
+          <v-container fluid class="d-flex flex-xs-wrap flex-sm-wrap flex-md-nowrap py-2">
+            <v-card flat>
+              <v-card-title>
+                Databases
+              </v-card-title>
+              <v-card-subtitle>
+                Store that data!
+              </v-card-subtitle>
+              <v-card-text>
+                <v-list flat>
+                  Select a database from the list below:
+                  <v-list-item-group v-model="selectedDbServer" color="primary">
+                    <v-list-item
+                      v-for="db in dbServers"
+                      :key="db"
+                    >
+                      <v-list-item-content>
+                        <v-list-item-title v-text="db"></v-list-item-title>
+                      </v-list-item-content>
+                    </v-list-item>
+                  </v-list-item-group>
+                </v-list>
+              </v-card-text>
+            </v-card>
+            <v-divider v-if="selectedDbServer !== undefined" vertical class="hidden-sm-and-down"/>
+            <v-container v-if="selectedDbServer == 0" flat>
+              <my-sql-info/>
+            </v-container>
+          </v-container>
         </v-card>
       </v-col>
-      <v-col cols="12" sm="6">
-        <v-card>
-          <domain-directory-mapping/>
+    </v-row>
+    <v-row>
+      <v-col cols="12" sm="12" align="stretch">
+        <v-card v-if="selectedDbServer == 0">
+          <my-sql-list />
         </v-card>
       </v-col>
     </v-row>
@@ -25,15 +47,19 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import DomainDirectoryMapping from '@/components/DomainDirectoryMapping.vue'
+import MySqlList from '@/components/MySqlList'
+import MySqlInfo from '@/components/MySqlInfo'
 
 export default Vue.extend({
   name: 'Databases',
   components: {
-    DomainDirectoryMapping
+    MySqlInfo,
+    MySqlList
   },
 
   data: () => ({
+    dbServers: ['MySQL'],
+    selectedDbServer: undefined
   })
 })
 </script>

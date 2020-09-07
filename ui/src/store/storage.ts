@@ -17,34 +17,34 @@ interface State {
 
 const mutations: MutationTree<State> = {
   setItem (state: State, { key, value }: { key: string; value: string }): void {
-    console.log("setItem", key, value)
+    // console.log("setItem", key, value)
     state.storage[key] = value
   },
 
   removeItem (state: State, { key }: {key: string}) {
-    console.log("removeItem", key)
+    // console.log("removeItem", key)
     delete state.storage[key]
   },
 
   clear (state: State) {
-    console.log("clear")
+    // console.log("clear")
     state.storage = { }
   }
 }
 
 const actions: ActionTree<State, any> = {
   setItem (store: ActionContext<State, any>, payload: { key: string; value: string }) {
-    console.log("commit setItem", payload)
+    // console.log("commit setItem", payload)
     store.commit('setItem', payload)
   },
 
   removeItem (store: ActionContext<State, any>, payload: { key: string }) {
-    console.log("commit removeItem", payload)
+    // console.log("commit removeItem", payload)
     store.commit('removeItem', payload)
   },
 
   clear (store: ActionContext<State, any>) {
-    console.log("clear")
+    // console.log("clear")
     store.commit('clear')
   }
 }
@@ -80,19 +80,19 @@ export class VuexStorage {
   }
 
   get length (): number {
-    console.log("length")
+    // console.log("length")
     const storage = this.store.getters[this.namespace + '/storage']
     return Object.keys(storage).length
   }
 
   key (n: number): string {
-    console.log(`key ${n}`)
+    // console.log(`key ${n}`)
     const storage = this.store.getters[this.namespace + '/storage']
     return Object.keys(storage)[n]
   }
 
   getItem (key: string): string | null {
-    console.log("getItem", key)
+    // console.log("getItem", key)
     const storage = this.store.getters[this.namespace + '/storage']
 
     if (key in storage) {
@@ -103,18 +103,18 @@ export class VuexStorage {
   }
 
   setItem (key: string, value: any): void {
-    console.log("setItem", key, value)
+    // console.log("setItem", key, value)
     this.store.dispatch(this.namespace + '/setItem', { key, value })
     
   }
 
   removeItem (key: string) {
-    console.log("removeItem", key)
+    // console.log("removeItem", key)
     this.store.dispatch(this.namespace + '/removeItem', { key })
   }
 
   clear () {
-    console.log("clear")
+    // console.log("clear")
     this.store.dispatch(this.namespace + '/clear')
   }
 }
