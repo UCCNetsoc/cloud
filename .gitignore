@@ -3,7 +3,9 @@ home/
 ui/node_modules
 
 .vscode
-
+bin/
+lib/
+include/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
