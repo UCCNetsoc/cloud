@@ -1,6 +1,8 @@
-/backing-services/freeipa
-/home
-/ui/node_modules
+backing-services/freeipa/
+home/
+ui/node_modules
+
+.vscode
 
 
 # Byte-compiled / optimized / DLL files
