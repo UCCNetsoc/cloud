@@ -16,7 +16,7 @@ steps:
         - "${DRONE_COMMIT_SHA:0:7}_dev-env"
         - dev-env
       target: dev
-      context: ./ui
+      context: ui
       repo: uccnetsoc/admin
       registry: docker.io
       custom_dns: [1.1.1.1]
@@ -39,7 +39,7 @@ steps:
       tags:
         - "${DRONE_COMMIT_SHA:0:7}"
         - latest
-      context: ./ui
+      context: ui
       repo: uccnetsoc/admin
       registry: docker.io
       custom_dns: [1.1.1.1]
