@@ -101,13 +101,13 @@ export default Vue.extend({
       }
 
       // Extract action
-      const { _ } = this.confirmCancel.action
+      // const { _ } = this.confirmCancel.action
       this.confirmCancel.loading = true
 
       try {
         switch (this.confirmCancel.mode) {
           case ConfirmCancelMode.CreateUser: {
-            const res = await fetchRest(
+            await fetchRest(
               `${config.apiBaseUrl}/v1/mysql/${username}/user`, {
                 method: 'POST',
                 headers
@@ -120,20 +120,20 @@ export default Vue.extend({
                 headers
               })
 
-            const detail = await res.json()
-            this.msg = detail.msg
+            // const detail = await res.json()
+            this.msg = 'MySQL user created, check your email for the password'
             break
           }
 
           case ConfirmCancelMode.ResetPassword: {
-            const res = await fetchRest(
+            await fetchRest(
               `${config.apiBaseUrl}/v1/mysql/${username}/user/password-reset-email`, {
                 method: 'POST',
                 headers
               })
 
-            const d = await res.json()
-            this.msg = d.detail.msg
+            // const d = await res.json()
+            this.msg = 'Password reset, check your email!'
           }
         }
       } catch (e) {
