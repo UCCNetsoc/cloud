@@ -1,17 +1,17 @@
 /* width */
 ::-webkit-scrollbar {
   width: 8px;
-  
+  background-color: rgb(24, 24, 24)
 }
 
 /* Track */
 ::-webkit-scrollbar-track {
-  background: rgba(0,0,0,0); 
+  background-color: rgba(0,0,0,0); 
 }
  
 /* Handle */
 ::-webkit-scrollbar-thumb {
-  background: rgb(77,77,77); 
+  background: rgb(55,55,55); 
   border-radius: 2px;
 }
 
@@ -19,4 +19,15 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(55,55,55);
   transition: 1s all;
+}
+
+code {
+  margin: 0.1rem;
+  color: white !important;
+  background-color: #333333 !important;
+}
+
+.markdown img {
+  max-width: 100% !important;
+  height: auto !important;
 }

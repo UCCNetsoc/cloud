@@ -12,18 +12,18 @@
         primary-title
       >
         <v-img
-          alt="netsocadmin3 logo"
+          alt="admin logo"
           class="shrink mr-12"
           contain
-          src="img/logo/netsoc-white.svg"
+          src="@/assets/netsoc-horizontal.svg"
           transition="scale-transition"
-          width="240"
+          width="600"
           height="32"
         />
       </v-card-title>
       <v-divider></v-divider>
       <v-card-text>
-        <div class="my-3" v-html="privacyHtml"></div>
+        <div class="markdown my-3" v-html="html"></div>
       </v-card-text>
       <v-divider></v-divider>
       <v-card-actions class="justify-center">
@@ -47,24 +47,36 @@ import Vue from 'vue'
 import marked from 'marked'
 
 export default Vue.extend({
-  name: 'PrivacyPolicy',
+  name: 'Policy',
   components: {},
 
   data: () => ({
-    privacyHtml: 'Loading...'
+    html: 'Loading...'
   }),
 
-  async created () {
+  async mounted () {
     try {
-      const req = await fetch('https://raw.githubusercontent.com/UCCNetsoc/privacy-policy/master/README.md')
-      this.privacyHtml = marked(await req.text())
+      const req = await fetch(this.mdUrl)
+      let text = await req.text()
+
+      // Trim preamble if it's present
+      if (text.indexOf('---') === 0) {
+        const index = text.indexOf('---', 3)
+
+        if (index > 0) {
+          text = text.substring(index + 3, text.length)
+        }
+      }
+
+      this.html = marked(text)
     } catch (err) {
-      this.privacyHtml = 'Could not fetch Privacy Policy!'
+      this.html = `Could not fetch policy! ${err}`
     }
   },
 
   props: {
-    visible: Boolean
+    visible: Boolean,
+    mdUrl: String
   }
 })
 </script>
