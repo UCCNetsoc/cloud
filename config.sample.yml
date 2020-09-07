@@ -1,0 +1,167 @@
+production: false 
+auth:
+  direct_grant_url: "http://keycloak.netsoc.local:8080/auth/realms/freeipa/protocol/openid-connect/token"
+  jwt:
+    public_key: |
+      -----BEGIN PUBLIC KEY-----
+      MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC rVrCuTtArbgaZzL1hvh0xtL5mc7o0NqPVnYXkLvgcwiC3BjLGw1tGEGoJaXDuSaRllobm53JBhjx33UNv+5z/UMG4kytBWxheNVKnL6GgqlNabMaFfPLPCF8kAgKnsi79NMo+n6KnSY8YeUmec/p2vjO2NjsSAVcWEQMVhJ31LwIDAQAB
+      -----END PUBLIC KEY-----
+    signing_algorithm: "RS256"
+links:
+  base_url: "http://admin.netsoc.local:8080"
+  jwt:
+    public_key: |
+      -----BEGIN PUBLIC KEY-----
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5Co+UQw9fJj4k+1cZCFu
+      1bLcspl87qMSieM7qg+BPckfwrP0WrSgu8i4pUzmiP+sZrXQ2/WC6UF6bUc3CHfz
+      yEJj20iUj8heSvvjqoMMMASrJSCXabOPE2Bp6XGIwx+S086EiK8HrpnUkrQSHn4M
+      whiGjeXzoi/LMLBO/Jl6OB7F51TGIG62NLW9dPfEwgAvm09vHz/cy2p/denmLO7Z
+      kyQcmkPAUpsuBvaoQmkNl2IW2l/2YEMxN++XWxuWsrFXgKOYkG8Ira5c4y6930Rq
+      +ehtU3p1rXAueAJ6fmTW0TZ7/KCjYvUOLSslx0T3cYlzaj7v5G9nbqoy/oXl3Qqb
+      VQIDAQAB
+      -----END PUBLIC KEY-----
+    private_key: |
+      -----BEGIN RSA PRIVATE KEY-----
+      MIIEpAIBAAKCAQEA5Co+UQw9fJj4k+1cZCFu1bLcspl87qMSieM7qg+BPckfwrP0
+      WrSgu8i4pUzmiP+sZrXQ2/WC6UF6bUc3CHfzyEJj20iUj8heSvvjqoMMMASrJSCX
+      abOPE2Bp6XGIwx+S086EiK8HrpnUkrQSHn4MwhiGjeXzoi/LMLBO/Jl6OB7F51TG
+      IG62NLW9dPfEwgAvm09vHz/cy2p/denmLO7ZkyQcmkPAUpsuBvaoQmkNl2IW2l/2
+      YEMxN++XWxuWsrFXgKOYkG8Ira5c4y6930Rq+ehtU3p1rXAueAJ6fmTW0TZ7/KCj
+      YvUOLSslx0T3cYlzaj7v5G9nbqoy/oXl3QqbVQIDAQABAoIBABkbvPfWTP3lJ5W/
+      zScHtta1dCwDUAhC0ctywiIYyrQt6dzXSNCih/2iPQ+TwtrYp/Q1leJexiU9G2fj
+      Kl84NA+ZnruG5TJdbmL6DTe6bCDsopjXWVI8fEY5me4inFY8pz+/vj38ZPAF5aqv
+      Pj80x9qkMEp1P7ZdZBLblBWgHh8GrqmxJsEv4ipvH22wLv4D+y784pxRzqsv18h1
+      6opEw6XYPdv/zZ4aSlXRERH+U0DGHdwC/FCX5m6nlK+RCyMY9jY2VgsDSTbHpEq8
+      ABoCpz9J/1yw9OYVOvc2MPiW0ONxAadKMAhKBOU9+sRxWYOy/OublBBxjMmBlpXU
+      3xC3U5ECgYEA/MFDvTX7JiPJLHVPyT5kczwKR3+hgF6RxaDcozSE27k7YXCEkNKD
+      QMAhMuY+jIkiej2ej84gyDkIRkpGlZKWRXvlrcwhBVQGWgJbV6ztZ0C35aQHP30i
+      06l0SDaarkfLJ40diTyV8ZS+ZL1vxhRxR3Oi2p82yUxBWNyNGYBnZAsCgYEA5xgo
+      lq0peCFZQuC3k6UC6rIv8TNEzdYcWPy/WNRf17Ta07fQu/+Zi02HQ45zTGk2bmQ3
+      GFoK4AfrUM/iHPMXwhwmaM1YOl4HCFTRT4yv2lYucrfQ3Z+vbfWPd8Ex5bkzfZnU
+      V4quuTtSfIPvrLY+WAdYps4JuAJg5cvOUBFxOh8CgYAc3AhbA13g1fczb1Wj2c7o
+      ZXObBFSxbprgYOSwcd+1ounHz2wjiRXZf9aKlEWSEFpycLS5IMUXd4OdWv/CNlGY
+      L3RjKsqebCCpiFlbonAc+QPGYbs+IZCncFLJqApzWdk1c+RqdhN82QoAQK0RheYF
+      TYvLwKAlzeIsPkqSHdowTwKBgQCa32zsNhaRpL/eex1sfGzs/wf0POjCjdinppNS
+      I9orhNAWjZz9MTokyot5MfGBZw2Mg+sMjeO16njAyuD9h8kHVLhFCkEztKo/4h/4
+      kQ+VYqZ0SU5YCNmX9rb0iew3yZuBdGODW7Tm/KO2QPGSLPyxIBNAjtqikC2CM8kL
+      jfT0/wKBgQDGI+txHkl+NSZc889sGL7h+mNg1i7BXXLfmG/2HahYF6QiO1cnIC0a
+      gohQO9sbxUCk3Vj/f+zqsa9pbC2mZkgvaOr9unhuxNKnkUIOHyCqQi1u0YA9t8e5
+      /+RtZ8ZrqQNLY8Yta/mXSuycnLCkF0+/7Rx4DIRK/0Oo4gbRwduTAg==
+      -----END RSA PRIVATE KEY-----
+accounts:
+  home_dirs: "/home/users"
+  username_blacklist:
+    - admin
+    - blog
+    - ldap
+    - feynman
+    - lovelace
+    - leela
+    - bigbertha
+    - boole
+    - wiki
+    - root
+    - apache2
+    - httpd
+    - www-data
+    - thief
+    - netsoc
+    - irc
+    - ircd
+    - mysql
+    - cron
+    - fail2ban
+    - daemon
+    - games
+    - bin
+    - sys
+    - sync
+    - games
+    - man
+    - lp
+    - mail
+    - news
+    - uucp
+    - proxy
+    - backup
+    - list
+    - gnats
+    - nobody
+    - systemd-timesync
+    - systemd-network
+    - systemd-resolve
+    - systemd-bus-proxy
+    - syslog
+    - _apt
+    - lxd
+    - messagebus
+    - uuidd
+    - dnsmasq
+    - sshd
+    - redis
+    - ntp
+    - bind
+    - libvirt-qemu
+    - libvirt-dnsmasq
+    - bareos
+    - postfix
+    - postgres
+    - colord
+    - boole
+    - unf2b
+    - docker
+    - ci
+    - portainer
+  freeipa:
+    server: "ipa.netsoc.local"
+    username: "admin"
+    password: "netsoc_freeipa"
+backups:
+  folder: ".snaps"
+mentorships:
+  available:
+    typescript:
+      title: Typescript with Forde
+      teacher: Michael Forde
+      description: |
+        <img src="https://www.positronx.io/wp-content/uploads/2018/11/positronx-banner-1152-1.jpg" style="width:256px" />
+        
+        #### A 6 class lesson on TypeScript
+
+        The hot new JavaScript replacement that is taking Silicon Valley by storm!
+
+        Tear the hairs out of your eyelids and watch as eslint crashes inside vscode for the 7th time today!
+webhooks:
+  info: https://discordapp.com/api/webhooks/732754216883585059/6LqFp1ZsomNdlMT78PBJCQNXN5hq_luwiec4UxTVcRpLErSnLWCi7SRnMKztIYRoSK-t
+  form_filled: https://discordapp.com/api/webhooks/732754216883585059/6LqFp1ZsomNdlMT78PBJCQNXN5hq_luwiec4UxTVcRpLErSnLWCi7SRnMKztIYRoSK-t
+metrics:
+  port: 8000
+email:
+  from_name: "UCC Netsoc Admin"
+  from_address: "admin@netsoc.co"
+  reply_to_address: "netsoc@uccsocieties.ie"
+  sendgrid:
+    key: "- no pls -"
+mysql:
+  server: mysql.netsoc.local
+  username: root
+  password: netsoc_mysql
+websites:
+  folder: "www"
+  config_filename: "netsoc.json"
+  dns:
+    base_domain: "netsoc.dev"
+    txt_name: "_netsoc"
+    allowed_a_aaaa: 
+    - 84.39.234.50
+    - 84.39.234.51
+homedir_consistency:
+  scan_interval: 60
+webserver_configurator:
+  push_interval: 120
+  unit:
+    basic_auth:
+      username: netsoc_unit
+      password: netsoc_unit
+    targets:
+      - unitproxy.netsoc.local:8080
