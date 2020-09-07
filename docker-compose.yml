@@ -1,44 +1,45 @@
 version: "3.7"
 services:
-  traefik.netsoc.local:
-    image: traefik:2.2.0
-    ports:
-      - "80:80"
-      - "443:443"
-    labels:
-      # global redirect to https
-      - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.entrypoints=web"
-      - "traefik.http.routers.dashboard.rule=Host(`traefik.netsoc.local`)"
-      - "traefik.http.routers.dashboard.service=dashboard-service"
-      - "traefik.http.services.dashboard-service.loadbalancer.server.port=8080"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - "./traefik:/traefik/"
-    command: traefik --configFile=/traefik/static_config.yml
-  user_websites.netsoc.local:
-    image: nginx
-    volumes:
-      - "./user_websites/nginx.conf:/etc/nginx/nginx.conf:ro"
-      - "./user_websites/home:/home"
-  nsa3.netsoc.local:
+  admin.netsoc.local:
     build:
       context: "./ui"
+      target: dev
     command: npm run serve
     volumes:
-      - "./ui/:/app"    
-  account.nsa3.netsoc.local:
-    image: tiangolo/uvicorn-gunicorn-fastapi:python3.7
-    ports:
-      - 0.0.0.0:8083:8080
-    volumes:
-      - "./account/v1:/app/v1/"
-      - "./account/requirements.txt:/requirements.txt"
-      - "./account/prestart.sh:/app/prestart.sh"
-    command: /start-reload.sh --host 0.0.0.0 --debug --port 8080
+      - "./ui/:/app"
     environment:
-      MODULE_NAME: "v1.main"
+      VUE_APP_NETSOC_API_URL: "http://api.netsoc.local"
+  api.netsoc.local:
+    restart: always
+    image: tiangolo/uvicorn-gunicorn-fastapi:python3.8
+    volumes:
+      - "./api/v1:/app/v1/"
+      - "./api/requirements.txt:/requirements.txt"
+      - "./api/prestart.sh:/app/prestart.sh"
+      - "./config.sample.yml:/config.yml"
+      - "./home/users/:/home/users:Z"
+    command: /start-reload.sh --host 0.0.0.0 --port 8080
+    environment:
+      MODULE_NAME: "v1.main"  
       VARIABLE_NAME: "api"
+  unitproxy.netsoc.local:
+    image: nginx:1.19.2
+    depends_on:
+      - "unit.netsoc.local"
+    volumes:
+      - "./unitproxy.nginx.conf:/etc/nginx/conf.d/default.conf"
+      - "./unitproxy.htpasswd:/unitproxy.htpasswd:ro"
+      - "./unitproxy-fix-socket-permissions.sh:/docker-entrypoint.d/fix-socket-permssions.sh"
+      - "unitsock:/var/run/:z"
+  unit.netsoc.local:
+    privileged: true
+    cap_add:
+      - ALL
+    entrypoint: /usr/sbin/unitd --no-daemon --control unix:/var/run/control.unit.sock
+    image: nginx/unit:1.19.0-full
+    volumes:
+      - "./home/users/:/home/users/:z"
+      - "unitsock:/var/run/:z"
   ipa.netsoc.local:
     image: freeipa/freeipa-server:latest
     command: >
@@ -58,49 +59,52 @@ services:
     volumes:
       - "/sys/fs/cgroup:/sys/fs/cgroup:ro"
       - "/etc/machine-id:/etc/machine-id:ro"
-      - "./freeipa/data:/data:z"
+      - "./backing-services/freeipa/data:/data:z"
     sysctls:
+      #  Fixes:
+      #  DEBUG The ipa-server-install command failed, exception: 
+      #  RuntimeError: IPv6 stack is enabled in the kernel but there is no interface that has ::1 address assigned.
+      #  Add ::1 address resolution to "lo" interface. You might need to enable IPv6 on the interface "lo" in sysctl.conf.
       net.ipv6.conf.lo.disable_ipv6: 0
-      # Fixes:
-      # DEBUG The ipa-server-install command failed, exception: 
-      # RuntimeError: IPv6 stack is enabled in the kernel but there is no interface that has ::1 address assigned.
-      # Add ::1 address resolution to "lo" interface. You might need to enable IPv6 on the interface "lo" in sysctl.conf.
-    # ports:
-    #   - 80:80
-    #   - 443:443
-    #   - "389:389"   # ldap
-    #   - "636:636"   # ldaps
-    #   - "88:88"     # kerberos
-    #   - "464:464"   # kpasswd 
-    #   - "749:749"   # kpasswd
-    #   - "123:123"   # ntp
+  ipaclient.netsoc.local:
+    hostname: ipaclient.netsoc.local
+    image: adelton/freeipa-client
+    restart: always
+    depends_on:
+      - "ipa.netsoc.local"
+    environment:
+      PASSWORD: netsoc_freeipa
+      IPA_CLIENT_INSTALL_OPTS: --server=ipa.netsoc.local --domain=netsoc.local --force-join
+    volumes:
+      - "./home/:/home/:Z"
   keycloak.netsoc.local:
-    image: jboss/keycloak:9.0.3
+    image: uccnetsoc/keycloak:9.0.3-themed
     environment:
       KEYCLOAK_USER: netsoc_keycloak
       KEYCLOAK_PASSWORD: netsoc_keycloak
-      DB_VENDOR: postgres
-      DB_ADDR: postgres.netsoc.test
-      DB_DATABASE: netsoc_keycloak
-      DB_USER: netsoc_keycloak
-      DB_PASSWORD: netsoc_keycloak
       KEYCLOAK_IMPORT: /tmp/keycloak/freeipa-realm.json
+      DB_VENDOR: H2
     depends_on:
       - "ipa.netsoc.local"
     hostname:
       keycloak.netsoc.local
     volumes:
-      - "./keycloak/:/tmp/keycloak/"
-      - "./keycloak/krb5.keytab:/krb5.keytab"
-  postgres.netsoc.test:
-    image: postgres
+      - "./backing-services/keycloak/:/tmp/keycloak/"
+      - "./backing-services/keycloak/krb5.keytab:/krb5.keytab"
+      - "/etc/localtime:/etc/localtime:ro"
+  mysql.netsoc.local:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
     environment:
-      POSTGRES_USER: netsoc_keycloak
-      POSTGRES_PASSWORD: netsoc_keycloak
-      POSTGRES_DB: netsoc_keycloak
+      MYSQL_ROOT_PASSWORD: netsoc_mysql
+    ports:
+      - "0.0.0.0:3306:3306"
   proxy.netsoc.local:
     image: wernight/dante
     ports:
       - "0.0.0.0:1080:1080"
   whoami.netsoc.local:
     image: containous/whoami
+volumes:
+  unitsock:
