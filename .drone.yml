@@ -31,18 +31,43 @@ steps:
       branch:
         - master
 
-  - name: build_ui_prod
+#   - name: build_ui_prod
+#     image: plugins/docker
+#     volumes:
+#       - name: cache
+#         path: /var/lib/docker
+#     settings:
+#       tags:
+#         - "${DRONE_COMMIT_SHA:0:7}"
+#         - latest
+#       context: ui
+#       dockerfile: ui/Dockerfile
+#       repo: uccnetsoc/admin
+#       registry: docker.io
+#       custom_dns: [1.1.1.1]
+#       username:
+#         from_secret: docker_hub_user
+#       password:
+#         from_secret: docker_hub_token
+#     when:
+#       event:
+#         - push
+#       branch:
+#         - master
+
+  - name: build_api_dev
     image: plugins/docker
     volumes:
       - name: cache
         path: /var/lib/docker
     settings:
       tags:
-        - "${DRONE_COMMIT_SHA:0:7}"
-        - latest
-      context: ui
-      dockerfile: ui/Dockerfile
-      repo: uccnetsoc/admin
+        - "${DRONE_COMMIT_SHA:0:7}_dev-env"
+        - dev-env
+      target: dev
+      context: api
+      dockerfile: api/Dockerfile
+      repo: uccnetsoc/api
       registry: docker.io
       custom_dns: [1.1.1.1]
       username:
