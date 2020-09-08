@@ -32,15 +32,15 @@ hb = Gauge('netsocadmin_heartbeat', 'Unixtime Netsoc Admin heartbeat')
 def heartbeat():
     hb.set_to_current_time()
 
-# @api.on_event("startup")
-# @repeat_every(seconds=config.webserver_configurator.push_interval)
-# def run_configurator():
-#     logger.info("webserver_configurator began running")
-#     try:
-#         webserver_configurator.configure()
-#         logger.info("webserver_configurator finished running")
-#     except Exception as e:
-#         logging.error("webserver_configurator had an exception while running", e=e, exc_info=True)
+@api.on_event("startup")
+@repeat_every(seconds=config.webserver_configurator.push_interval)
+def run_configurator():
+    logger.info("webserver_configurator began running")
+    try:
+        webserver_configurator.configure()
+        logger.info("webserver_configurator finished running")
+    except Exception as e:
+        logging.error("webserver_configurator had an exception while running", e=e, exc_info=True)
 
 @api.on_event("startup")
 @repeat_every(seconds=config.homedir_consistency.scan_interval)
