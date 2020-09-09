@@ -121,6 +121,7 @@
       >
         <v-text-field
           label='Name'
+          :rules='websiteNameRules'
           v-model='confirmCancel.action.name'
         ></v-text-field>
       </v-form>
@@ -137,7 +138,7 @@
         <v-text-field
           label='Host'
           v-model='confirmCancel.action.host'
-          :rules='required'
+          :rules='websiteHostRules'
           :placeholder='$store.state.auth.user.profile.preferred_username+".netsoc.co"'
         ></v-text-field>
       </v-form>
@@ -179,6 +180,7 @@ import MessageDialog from '@/components/MessageDialog.vue'
 
 import { config } from '@/config'
 import { fetchRest } from '@/api/rest'
+import { openApiGetSchemaProperty, openApiPropertyValidator } from '@/api/openapi'
 
 import Vue from 'vue'
 
@@ -224,6 +226,19 @@ export default Vue.extend({
     required () {
       return [
         (v: string) => !!v || 'Required'
+      ]
+    },
+
+    websiteNameRules () {
+      return [
+        (v: string) => !!v || 'Website name required',
+        openApiPropertyValidator(openApiGetSchemaProperty('Website', 'name'))
+      ]
+    },
+
+    websiteHostRules () {
+      return [
+        (v: string) => !!v || 'Website host required'
       ]
     }
   },

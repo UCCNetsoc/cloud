@@ -1,6 +1,6 @@
 <template>
   <!-- <div></div> -->
-  <video v-if="enabled" ref="video" autoplay="autoplay" muted loop v-bind:style="{ height: maxHeight }" class="bg">
+  <video v-if="enabled" ref="video" autoplay="autoplay" muted loop :style="{ height: maxHeight, ...additionalStyle }" class="bg">
     <source src="@/assets/bgvideo-orig.mp4" type="video/mp4">
   </video>
 </template>
@@ -60,6 +60,9 @@ export default Vue.extend({
     playbackRate: {
       type: Number,
       default: 0
+    },
+    additionalStyle: {
+      type: Object
     }
   },
 
