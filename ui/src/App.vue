@@ -16,6 +16,7 @@
             v-for="item in menu"
             v-bind:key="item.name"
             @click="$router.push(item.route)"
+            v-bind:title="item.name"
           >
             <v-list-item-action>
               <v-icon>{{ item.icon }}</v-icon>
