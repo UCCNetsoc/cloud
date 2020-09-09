@@ -91,6 +91,26 @@ It consists of an OpenAPI compliant REST API written in FastAPI, a frontend in V
       * You can now use any route that requirements authorization
       * The `netsoc_sysadmin` account should be able to modify the resources of any `netsoc_account`
 
+### Troubleshooting and common issues
+
+* Keycloak down and  `User with username 'netsoc_keycloak' already added to '/opt/jboss/keycloak/standalone/configuration/keycloak-add-user.json'` in logs
+  * You killed keycloak while it was booting up and loading
+  * Run `docker-compose rm keycloak.netsoc.local` and `docker-compose up keycloak.netsoc.local`
+
+* Console spamming IPA client can't verify IPA server/API crashing repeatedly
+  * This is normal (for the first few seconds on first boot)
+  * If it persists, it means that the ipa server is probably down
+  * Try `docker-compose ps ipa.netsoc.local`
+    * If FreeIPA up, try:
+      * `docker-compose exec ipa.netsoc.local bash` and run `systemctl status`
+      * Check service logs using `journalctl`
+    * If FreeIPA down, check logs in
+      * `./backing-services/freeipa/data/var/log/ipa-*.log`
+      * `ipa-server-configure-first.log` is normally the first log that gets written
+  * In both cases it might be helpful to run `./freeipa-delete-data.sh` and `./freeipa-decompress-data.sh` to get a clean FreeIPA installation
+
+
+
 ## Service passwords
 
 * FreeIPA
@@ -113,3 +133,4 @@ It consists of an OpenAPI compliant REST API written in FastAPI, a frontend in V
 # Configuration format
 
 See `config.sample.yaml`
+
