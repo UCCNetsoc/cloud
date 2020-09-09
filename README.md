@@ -5,8 +5,9 @@ admin is the REST API and control panel powering UCC Netsoc's services available
 It consists of an OpenAPI compliant REST API written in FastAPI, a frontend in Vue(x) using Vuetify and (coming soon) a command line application
 
 # Features:
-* Account sign-in and sign-up system (backed by Keycloak OIDC & FreeIPA)
+* Account sign-in and sign-up system (backed by Keycloak OIDC federated to FreeIPA)
 * Backups (can serve backups from a cron job or FS snapshots)
+* Built with observability in mind, Prometheus exporters and webhook calls for many resources and stats
 * Database creation and management (MySQL)
 * GDPR compliance (can download user data)
 * Mentorship sign ups
