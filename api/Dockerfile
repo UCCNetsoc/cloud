@@ -1,10 +1,13 @@
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.7 AS dev
+FROM tiangolo/uvicorn-gunicorn-fastapi:python3.8 AS dev
 
 
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.7 AS prod
+FROM tiangolo/uvicorn-gunicorn-fastapi:python3.8 AS prod
 COPY ./v1 /app/v1
-COPY requirements.txt /v1/requirements.txt
+COPY requirements.txt /requirements.txt
 
-RUN pip3 install -r /v1/requirements.txt
+RUN pip3 install -r /requirements.txt
 
-ENTRYPOINT [ "start.sh" ]
+ENV MODULE_NAME=v1.main
+ENV VARIABLE_NAME=api
+
+ENTRYPOINT [ "start.sh" "--host", "0.0.0.0", "--port", "8080" ]

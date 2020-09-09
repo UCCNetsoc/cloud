@@ -67,7 +67,32 @@ steps:
       target: dev
       context: api
       dockerfile: api/Dockerfile
-      repo: uccnetsoc/api
+      repo: uccnetsoc/admin_api
+      registry: docker.io
+      custom_dns: [1.1.1.1]
+      username:
+        from_secret: docker_hub_user
+      password:
+        from_secret: docker_hub_token
+    when:
+      event:
+        - push
+      branch:
+        - master
+
+  - name: build_api_prod
+    image: plugins/docker
+    volumes:
+      - name: cache
+        path: /var/lib/docker
+    settings:
+      tags:
+        - "${DRONE_COMMIT_SHA:0:7}"
+        - latest
+      target: prod
+      context: api
+      dockerfile: api/Dockerfile
+      repo: uccnetsoc/admin_api
       registry: docker.io
       custom_dns: [1.1.1.1]
       username:
