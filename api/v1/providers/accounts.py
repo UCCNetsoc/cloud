@@ -55,6 +55,7 @@ class FreeIPA:
                 raise exceptions.provider.Unavailable(f"Couldn't connect to FreeIPA server: {e}")
 
         try:
+            # The FreeIPA session can expire every 15 minutes so we need to test if we're still logged in
             self._client_instance.ping()
         except freeipa.exceptions.Unauthorized as e:
             logger.info("FreeIPA provider session expired")
@@ -359,5 +360,3 @@ class FreeIPA:
             return find['result'][0]
         elif find2['count'] > 0:
             return find2['result'][0]
-
-          
