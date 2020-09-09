@@ -264,15 +264,11 @@ class FreeIPA:
     def read_accounts_all(
         self
     ) -> Dict[str, models.account.Account]:
-        logger.info("read_accounts_allaa")
         find = self._client.user_find()
-        logger.info("read_accounts_allab")
         find2 = self._client.stageuser_find()
 
         accounts = self._populate_accounts_from_user_find(find)
-        logger.info("read_accounts_allac")
         staged_accounts = self._populate_accounts_from_stageuser_find(find2)
-        logger.info("read_accounts_allad")
 
         return {**staged_accounts, **accounts}
 
