@@ -14,7 +14,10 @@ It consists of an OpenAPI compliant REST API written in FastAPI, a frontend in V
 * Websites (powered with isolation by Nginx Unit) with software installation
 
 # Screenshots
-
+![](./screenshots/s1.PNG)
+![](./screenshots/s2.PNG)
+![](./screenshots/s3.PNG)
+![](./screenshots/s4.PNG)
 
 # Development environment:
 
