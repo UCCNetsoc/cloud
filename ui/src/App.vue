@@ -1,6 +1,6 @@
 <template>
   <v-app id="inspire">
-    <bg-video :playbackRate="bgRate" :style="bgStyle" />
+    <bg-video :playbackRate="bgRate" :additionalStyle="bgStyle" />
     <v-navigation-drawer
       v-model="drawer"
       app
@@ -115,7 +115,7 @@
         </a>
       </v-footer>
     </v-content>
-      <message-dialog :visible="msg.length > 0" @okay="msg = ''">
+    <message-dialog :visible="msg.length > 0" @okay="msg = ''">
       {{ msg }}
     </message-dialog>
   </v-app>
@@ -175,7 +175,7 @@ export default Vue.extend({
         return {}
       } else {
         return {
-          backgroundColor: 'rgba(0,0,0,0.5)'
+          filter: 'brightness(0.4)'
         }
       }
     },
@@ -193,7 +193,7 @@ export default Vue.extend({
     this.$vuetify.theme.dark = true
   },
 
-  mounted () {
+  updated () {
     let i = 0
     for (const item of this.menu) {
       if (this.$route.path === item.route) {
@@ -205,7 +205,7 @@ export default Vue.extend({
     }
 
     // Hide drawer if we're on a non-menu page
-    this.drawer = false
+    // this.drawer = false
   }
 })
 </script>

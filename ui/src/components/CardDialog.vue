@@ -6,7 +6,7 @@
     :fullscreen="$vuetify.breakpoint.mdAndDown"
     class="ma-4"
     scrollable
-    :overlay-opacity="0.2"
+    :overlay-opacity="0.1"
   >
     <v-card :loading="loading">
       <dialog-logo/>
