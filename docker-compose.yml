@@ -9,6 +9,7 @@ services:
       - "./ui/:/app"
     environment:
       VUE_APP_NETSOC_API_URL: "http://api.netsoc.local"
+      VUE_APP_OIDC_AUTHORITY: http://keycloak.netsoc.local:8080/auth/realms/freeipa
   api.netsoc.local:
     restart: always
     image: tiangolo/uvicorn-gunicorn-fastapi:python3.8
