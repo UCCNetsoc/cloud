@@ -41,7 +41,7 @@ services:
       - "./home/users/:/home/users/:z"
       - "unitsock:/var/run/:z"
   ipa.netsoc.local:
-    image: freeipa/freeipa-server:latest
+    image: uccnetsoc/freeipa-server:4.8.7-pulled-2020-07-03
     command: >
       ipa-server-install
       --unattended
