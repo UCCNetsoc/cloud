@@ -1,8 +1,8 @@
 #!/bin/bash
 
 if [[ $# -eq 0 ]] ; then
-    echo 'Must provide path to dev-env'
-    exit 0
+    echo 'Must provide path to dev-env. For example: ./start-dev.sh ../dev-env'
+    exit 1
 fi
 
 if [ ! -d "./bin" ]; then
