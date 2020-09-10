@@ -8,6 +8,10 @@ from .jwt import Payload
 import time
 
 class Backup(BaseModel):
+    """
+    Represents a possible backup belonging to a user, Path can be a file or folder
+    """
+
     name: str
     path: Path
     uid: int

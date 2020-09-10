@@ -5,8 +5,9 @@ admin is the REST API and control panel powering UCC Netsoc's services available
 It consists of an OpenAPI compliant REST API written in FastAPI, a frontend in Vue(x) using Vuetify and (coming soon) a command line application
 
 # Features:
-* Account sign-in and sign-up system (backed by Keycloak OIDC & FreeIPA)
+* Account sign-in and sign-up system (backed by Keycloak OIDC federated to FreeIPA)
 * Backups (can serve backups from a cron job or FS snapshots)
+* Built with observability in mind, Prometheus exporters and webhook calls for many resources and stats
 * Database creation and management (MySQL)
 * GDPR compliance (can download user data)
 * Mentorship sign ups
@@ -14,7 +15,10 @@ It consists of an OpenAPI compliant REST API written in FastAPI, a frontend in V
 * Websites (powered with isolation by Nginx Unit) with software installation
 
 # Screenshots
-
+![](./screenshots/s1.PNG)
+![](./screenshots/s2.PNG)
+![](./screenshots/s3.PNG)
+![](./screenshots/s4.PNG)
 
 # Development environment:
 
@@ -88,6 +92,26 @@ It consists of an OpenAPI compliant REST API written in FastAPI, a frontend in V
       * You can now use any route that requirements authorization
       * The `netsoc_sysadmin` account should be able to modify the resources of any `netsoc_account`
 
+### Troubleshooting and common issues
+
+* Keycloak down and  `User with username 'netsoc_keycloak' already added to '/opt/jboss/keycloak/standalone/configuration/keycloak-add-user.json'` in logs
+  * You killed keycloak while it was booting up and loading
+  * Run `docker-compose rm keycloak.netsoc.local` and `docker-compose up keycloak.netsoc.local`
+
+* Console spamming IPA client can't verify IPA server/API crashing repeatedly
+  * This is normal (for the first few seconds on first boot)
+  * If it persists, it means that the ipa server is probably down
+  * Try `docker-compose ps ipa.netsoc.local`
+    * If FreeIPA up, try:
+      * `docker-compose exec ipa.netsoc.local bash` and run `systemctl status`
+      * Check service logs using `journalctl`
+    * If FreeIPA down, check logs in
+      * `./backing-services/freeipa/data/var/log/ipa-*.log`
+      * `ipa-server-configure-first.log` is normally the first log that gets written
+  * In both cases it might be helpful to run `./freeipa-delete-data.sh` and `./freeipa-decompress-data.sh` to get a clean FreeIPA installation
+
+
+
 ## Service passwords
 
 * FreeIPA
@@ -110,3 +134,4 @@ It consists of an OpenAPI compliant REST API written in FastAPI, a frontend in V
 # Configuration format
 
 See `config.sample.yaml`
+
