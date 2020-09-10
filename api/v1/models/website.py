@@ -16,7 +16,7 @@ Name = {
     "default": None,
     "alias": "name",
     "title": "Website name",
-    "desription": "Only lowercase alphabetical characters with hyphens allowed",
+    "description": "Only lowercase alphabetical characters with hyphens allowed",
     "regex": r"^[a-zA-Z_-]+$",
 }
 

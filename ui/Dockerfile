@@ -7,7 +7,7 @@ RUN npm install
 FROM node:13.10.1-alpine3.11 AS prod_builder
 
 WORKDIR /app
-COPY . .
+COPY --from=dev /app .
 RUN npm run build
 
 FROM nginx:1.18.0 AS prod

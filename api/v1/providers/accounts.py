@@ -55,6 +55,7 @@ class FreeIPA:
                 raise exceptions.provider.Unavailable(f"Couldn't connect to FreeIPA server: {e}")
 
         try:
+            # The FreeIPA session can expire every 15 minutes so we need to test if we're still logged in
             self._client_instance.ping()
         except freeipa.exceptions.Unauthorized as e:
             logger.info("FreeIPA provider session expired")
@@ -264,15 +265,11 @@ class FreeIPA:
     def read_accounts_all(
         self
     ) -> Dict[str, models.account.Account]:
-        logger.info("read_accounts_allaa")
         find = self._client.user_find()
-        logger.info("read_accounts_allab")
         find2 = self._client.stageuser_find()
 
         accounts = self._populate_accounts_from_user_find(find)
-        logger.info("read_accounts_allac")
         staged_accounts = self._populate_accounts_from_stageuser_find(find2)
-        logger.info("read_accounts_allad")
 
         return {**staged_accounts, **accounts}
 
@@ -363,5 +360,3 @@ class FreeIPA:
             return find['result'][0]
         elif find2['count'] > 0:
             return find2['result'][0]
-
-          
