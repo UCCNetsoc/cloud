@@ -15,5 +15,21 @@ if [ ! -d "./bin" ]; then
 	cd - && cd ./ui && npm install && cd ..
 fi
 
+WD=`pwd`
 cd $1
+
+if [ ! -f "./admin/docker-compose.override.yml" ]; then
+	echo "version: \"3.7\" 
+services:
+  admin:
+    volumes:
+      - ${WD}/ui:/app
+  api:
+    volumes:
+      - ${WD}/api:/app
+      - ${WD}/api/requirements.txt:/requirements.txt
+      - ${WD}/config.sample.yml:/config.yml
+" > ./admin/docker-compose.override.yml
+fi
+
 bash --init-file <(echo "source bin/activate") -c "./dev-env up admin api"
