@@ -27,7 +27,7 @@ It consists of an OpenAPI compliant REST API written in FastAPI, a frontend in V
 1. You will need Docker and `pip` installed
 
 1. Pull the repo
-1. Pull the [dev-env](https://github.com/UCCNetsoc/dev-env) into another direcotry
+1. Pull the [dev-env](https://github.com/UCCNetsoc/dev-env) into another directory
 1. `cd` into this repo and run `./start-dev.sh /path/to/dev-env`
 
    1. This will setup the Python virtual env for you and install + run `docker-compose`
