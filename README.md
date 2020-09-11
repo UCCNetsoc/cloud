@@ -27,15 +27,14 @@ It consists of an OpenAPI compliant REST API written in FastAPI, a frontend in V
 1. You will need Docker and `pip` installed
 
 1. Pull the repo
-1. Pull the [dev-env](https://github.com/UCCNetsoc/dev-env)
-1. Run `./start-dev.sh /path/to/dev-env`
+1. Pull the [dev-env](https://github.com/UCCNetsoc/dev-env) into another direcotry
+1. `cd` into this repo and run `./start-dev.sh /path/to/dev-env`
 
    1. This will setup the Python virtual env for you and install + run `docker-compose`
    1. We run a FreeIPA server and client container as part of the development environment
       - FreeIPA is very peculiar about filesystem permissions and ownership (which git does not do a good job of preserving).
       - Therefore, we bundle FreeIPA's data as a `.tar.gz` file, `./start-dev.sh` will untar it into the correct directories for you
       - If you make modifications to FreeIPA settings/user home directories that you believe should be committed back into the repo run `./compress-freeipa.sh` and `git add freeipa-data.tar.gz` in the project root
-   1. You will then enter the project venv and you are free to begin development
 
 1. You can run `./dev-env up admin` in the dev-env root to boot the services as well. This will setup the following containers
 
