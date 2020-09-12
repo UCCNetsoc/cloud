@@ -73,6 +73,7 @@
             v-on:decline='tosAccepted = false; tosVisible = false'
             :visible='tosVisible'
           />
+          <vue-hcaptcha :sitekey='hcaptcha'></vue-hcaptcha>
         </v-form>
       </v-card-text>
       <v-divider/>
@@ -103,11 +104,13 @@ import Policy from '@/components/Policy.vue'
 import { config } from '@/config'
 import { fetchRest } from '@/api/rest'
 import { openApiGetSchemaProperty, openApiPropertyValidator } from '@/api/openapi'
+import VueHcaptcha from '@hcaptcha/vue-hcaptcha'
 
 export default Vue.extend({
   components: {
     CardDialog,
-    Policy
+    Policy,
+    VueHcaptcha
   },
 
   props: {
@@ -147,6 +150,10 @@ export default Vue.extend({
         (v: string) => !!v || 'Email required',
         (v: string) => openApiPropertyValidator(openApiGetSchemaProperty(this.categories[this.category].model, 'email'))(v + this.categories[this.category].emailSuffix)
       ]
+    },
+
+    hcaptcha () {
+      return config.hCaptchaSiteKey
     }
   },
 
