@@ -91,7 +91,7 @@ class HomeDirFolder:
             def targz_stream():
                 def demote(uid, gid):
                     os.setgid(gid)
-                    os.seteuid(uid)
+                    os.setuid(uid)
 
                 tar = subprocess.Popen(["tar", "-cf", "-", base_path], stdout=subprocess.PIPE, preexec_fn=demote(backup.uid, backup.uid))
                 pigz = subprocess.Popen(["pigz", "--best", "-c", "-f"], stdin=tar.stdout, stdout=subprocess.PIPE, preexec_fn=demote(backup.uid, backup.uid))
