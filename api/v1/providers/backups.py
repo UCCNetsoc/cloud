@@ -93,8 +93,8 @@ class HomeDirFolder:
                     os.setgid(gid)
                     os.setuid(uid)
 
-                tar = subprocess.Popen(["tar", "-cf", "-", base_path], stdout=subprocess.PIPE, preexec_fn=demote(backup.uid, backup.uid))
-                pigz = subprocess.Popen(["pigz", "--best", "-c", "-f"], stdin=tar.stdout, stdout=subprocess.PIPE, preexec_fn=demote(backup.uid, backup.uid))
+                tar = subprocess.Popen(["tar", "-cf", "-", base_path.name], stdout=subprocess.PIPE, preexec_fn=demote(backup.uid, backup.uid), cwd=base_path.parent)
+                pigz = subprocess.Popen(["pigz", "--best", "-c", "-f"], stdin=tar.stdout, stdout=subprocess.PIPE, preexec_fn=demote(backup.uid, backup.uid), cwd=base_path.parent)
 
                 sel = selectors.DefaultSelector()
                 sel.register(pigz.stdout, selectors.EVENT_READ)
