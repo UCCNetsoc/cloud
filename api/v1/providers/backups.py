@@ -101,11 +101,11 @@ class HomeDirFolder:
 
                 chunk_size = os.cpu_count() * 128000 # Cpu Cores * pigz 128K Blocks
                 while True:
-                    for key, _ in sel.select():
-                        data = key.fileobj.read1(chunk_size)
-                        if not data:
-                            return
-                        yield data
+                    key, _ = sel.select()[0]
+                    data = key.fileobj.read(chunk_size)
+                    if not data:
+                        return
+                    yield data
 
             return StreamingResponse(
                 targz_stream(),
