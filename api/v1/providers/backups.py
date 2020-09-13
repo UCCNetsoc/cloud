@@ -4,6 +4,8 @@ import io
 import tarfile
 import logging
 import mimetypes
+import selectors
+import subprocess
 
 from typing import List
 from pathlib import Path
@@ -87,63 +89,23 @@ class HomeDirFolder:
             )
         elif base_path.is_dir():
             def targz_stream():
-                class FileObjStream(object):
-                    def __init__(self):
-                        self.buffer = io.BytesIO()
-                        self.offset = 0
+                def demote(uid, gid):
+                    os.setgid(gid)
+                    os.setuid(uid)
 
-                    def write(self, s):
-                        self.buffer.write(s)
-                        self.offset += len(s)
+                tar = subprocess.Popen(["tar", "-cf", "-", base_path.name], stdout=subprocess.PIPE, preexec_fn=demote(backup.uid, backup.uid), cwd=base_path.parent)
+                pigz = subprocess.Popen(["pigz", "--best", "-c", "-f"], stdin=tar.stdout, stdout=subprocess.PIPE, preexec_fn=demote(backup.uid, backup.uid), cwd=base_path.parent)
 
-                    def tell(self): 
-                        return self.offset
+                sel = selectors.DefaultSelector()
+                sel.register(pigz.stdout, selectors.EVENT_READ)
 
-                    def close(self):
-                        self.buffer.close()
-
-                    def pop(self):
-                        s = self.buffer.getvalue()
-                        self.buffer.close()
-
-                        self.buffer = io.BytesIO()
-
-                        return s
-                
-                stream = FileObjStream()
-
-                with tarfile.open(mode="w|gz", fileobj=stream) as tar:
-                    for root, dirs, files in os.walk(base_path, topdown=False):
-                        for rel_path in files:
-                            logging.getLogger("api").info(rel_path)
-                            abs_path = base_path.joinpath(rel_path)
-                            tar_info = tar.gettarinfo(abs_path, arcname=rel_path)
-                            tar.addfile(tar_info)  
-
-                            with open(abs_path, "rb") as file:
-                                logging.getLogger("api").info(f"file size: { tar_info.size }")
-
-                                blocks, remainder = divmod(tar_info.size, tarfile.BLOCKSIZE)
-
-                                for b in range(blocks):
-                                    block = file.read(tarfile.BLOCKSIZE)
-
-                                    if len(block) < tarfile.BLOCKSIZE:
-                                        raise exceptions.resource.Unavailable("unexpected end of data")
-                                    
-                                    tar.fileobj.write(block)
-                                    yield stream.pop()
-
-                                if remainder > 0:
-                                    block = file.read(remainder)
-                                    tar.fileobj.write(block)
-                                    tar.fileobj.write(tarfile.NUL * (tarfile.BLOCKSIZE - remainder))
-                                    yield stream.pop()
-
-                                    blocks += 1
-
-                                tar.offset += blocks * tarfile.BLOCKSIZE
-                yield stream.pop()
+                chunk_size = os.cpu_count() * 128000 # Cpu Cores * pigz 128K Blocks
+                while True:
+                    key, _ = sel.select()[0]
+                    data = key.fileobj.read(chunk_size)
+                    if not data:
+                        return
+                    yield data
 
             return StreamingResponse(
                 targz_stream(),

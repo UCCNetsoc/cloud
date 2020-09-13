@@ -2,6 +2,7 @@ FROM tiangolo/uvicorn-gunicorn-fastapi:python3.8 AS dev
 
 
 FROM tiangolo/uvicorn-gunicorn-fastapi:python3.8 AS prod
+RUN apt-get update && apt-get install pigz && apt-get clean
 COPY ./v1 /app/v1
 COPY requirements.txt /requirements.txt
 
