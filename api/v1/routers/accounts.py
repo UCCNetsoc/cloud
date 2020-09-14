@@ -31,7 +31,7 @@ async def send_verification_email(email_or_username : str, body : models.account
     if not utilities.hcaptcha.verify_hcaptcha(body.captcha):
         return models.rest.Error(
             detail=models.rest.Detail(
-                msg=f"Invalid hcaptcha response"
+                msg=f"Invalid captcha"
             )
         )
 
@@ -126,7 +126,7 @@ async def send_password_reset_email(
     if not utilities.hcaptcha.verify_hcaptcha(body.captcha):
         return models.rest.Error(
             detail=models.rest.Detail(
-                msg=f"Invalid hcaptcha response"
+                msg=f"Invalid captcha"
             )
         )
     resource_account = providers.accounts.find_account(email_or_username)

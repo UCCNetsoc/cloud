@@ -6,6 +6,7 @@ def verify_hcaptcha(token: str) -> bool:
         return True
     try:
         response = requests.post(config.hcaptcha.url, {'response': token, 'secret': config.hcaptcha.secret})
+        response.raise_for_status()
         data = response.json()
         return data["success"]
     except requests.exceptions.RequestException as e:
