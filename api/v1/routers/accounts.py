@@ -120,8 +120,15 @@ async def verification(
     responses={400: {"model": models.rest.Error}}
 )
 async def send_password_reset_email(
-    email_or_username : str
+    email_or_username : str,
+    body : models.account.EmailVerification
 ):
+    if not utilities.hcaptcha.verify_hcaptcha(body.hcaptcha):
+        return models.rest.Error(
+            detail=models.rest.Detail(
+                msg=f"Invalid hcaptcha response"
+            )
+        )
     resource_account = providers.accounts.find_account(email_or_username)
 
     if resource_account.verified:
