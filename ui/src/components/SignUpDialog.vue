@@ -73,12 +73,12 @@
             v-on:decline='tosAccepted = false; tosVisible = false'
             :visible='tosVisible'
           />
-          <vue-hcaptcha :sitekey='hcaptcha'></vue-hcaptcha>
+          <vue-hcaptcha :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
         </v-form>
       </v-card-text>
       <v-divider/>
       <v-card-actions class="justify-center ma-3">
-        <v-btn v-on:click="submit()" color="green">Sign Up</v-btn>
+        <v-btn v-on:click="submit()" :disabled='disabled' color="green">Sign Up</v-btn>
         <v-btn v-on:click="$emit('cancelled')" color="red">Cancel</v-btn>
       </v-card-actions>
     </card-dialog>
@@ -175,6 +175,12 @@ export default Vue.extend({
       }
     },
 
+    onVerify (response: string) {
+      this.hcaptchaResponse = response
+      this.disabled = false
+      console.log(response)
+    },
+
     async submit () {
       this.$refs.form.validate()
 
@@ -208,7 +214,10 @@ export default Vue.extend({
 
         try {
           const verify = await fetchRest(`${config.apiBaseUrl}/v1/accounts/${this.email}/verification-email`, {
-            method: 'POST'
+            method: 'POST',
+            body: JSON.stringify({
+              hcaptcha: this.hcaptchaResponse
+            })
           })
 
           const { detail } = await verify.json()
@@ -244,6 +253,8 @@ export default Vue.extend({
   data: () => ({
     openApiSpec: undefined,
 
+    hcaptchaResponse: '',
+    disabled: true,
     tosVisible: false,
     privacyVisible: false,
 
