@@ -165,5 +165,3 @@ webserver_configurator:
       password: netsoc_unit
     targets:
       - unitproxy.netsoc.local:8080
-hcaptcha:
-  secret: "insert_here"
