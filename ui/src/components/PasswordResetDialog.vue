@@ -113,7 +113,7 @@ export default Vue.extend({
           const res = await fetchRest(`${config.apiBaseUrl}/v1/accounts/${this.emailOrUsername}/password-reset-email`, {
             method: 'POST',
             body: JSON.stringify({
-              hcaptcha: this.hcaptchaResponse
+              captcha: this.hcaptchaResponse
             })
           })
 

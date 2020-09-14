@@ -1,7 +1,7 @@
 
 from pydantic import BaseModel
 from pathlib import Path
-from typing import Set, List, Dict
+from typing import Set, List, Dict, Optional
 from v1 import models
 
 class Auth(BaseModel):
@@ -95,7 +95,7 @@ class HomeDirConsistency(BaseModel):
     scan_interval: int
 
 class Hcaptcha(BaseModel):
-    secret: str 
+    secret: Optional[str]
     url = "https://hcaptcha.com/siteverify"
 
 class Config(BaseModel):

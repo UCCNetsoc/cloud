@@ -35,4 +35,4 @@ class EmailVerification(BaseModel):
     """
         Represents an email verification request
     """
-    hcaptcha: str = ""
+    captcha: str = ""
