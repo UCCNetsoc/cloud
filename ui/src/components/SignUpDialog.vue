@@ -178,7 +178,6 @@ export default Vue.extend({
     onVerify (response: string) {
       this.hcaptchaResponse = response
       this.disabled = false
-      console.log(response)
     },
 
     async submit () {
