@@ -113,4 +113,4 @@ class Config(BaseModel):
     webserver_configurator: WebserverConfigurator
     homedir_consistency: HomeDirConsistency
     metrics: Metrics
-    hcaptcha: Hcaptcha
+    hcaptcha: Optional[Hcaptcha]
