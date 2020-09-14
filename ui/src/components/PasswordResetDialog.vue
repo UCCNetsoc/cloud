@@ -21,7 +21,7 @@
           ></v-text-field>
         </v-form>
       </v-card-text>
-      <vue-hcaptcha :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
+      <vue-hcaptcha v-if="hcaptcha !== ''" :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
       <v-divider/>
       <v-card-actions class="justify-center ma-3">
         <v-btn :disabled='disabled' v-on:click="submit()" color="green">Confirm</v-btn>
@@ -78,7 +78,7 @@ export default Vue.extend({
     emailOrUsername: '',
 
     hcaptchaResponse: '',
-    disabled: true,
+    disabled: config.hCaptchaSiteKey !== '',
 
     resultDialog: {
       visible: false,

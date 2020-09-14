@@ -73,7 +73,7 @@
             v-on:decline='tosAccepted = false; tosVisible = false'
             :visible='tosVisible'
           />
-          <vue-hcaptcha :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
+        <vue-hcaptcha v-if="hcaptcha !== ''" :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
         </v-form>
       </v-card-text>
       <v-divider/>
@@ -253,7 +253,7 @@ export default Vue.extend({
     openApiSpec: undefined,
 
     hcaptchaResponse: '',
-    disabled: true,
+    disabled: config.hCaptchaSiteKey !== '',
     tosVisible: false,
     privacyVisible: false,
 
