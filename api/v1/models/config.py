@@ -94,6 +94,10 @@ class Backups(BaseModel):
 class HomeDirConsistency(BaseModel):
     scan_interval: int
 
+class Hcaptcha(BaseModel):
+    secret: str 
+    url = "https://hcaptcha.com/siteverify"
+
 class Config(BaseModel):
     production: bool = False
     home_dirs: Path = Path("/home/users")
@@ -109,3 +113,4 @@ class Config(BaseModel):
     webserver_configurator: WebserverConfigurator
     homedir_consistency: HomeDirConsistency
     metrics: Metrics
+    hcaptcha: Hcaptcha

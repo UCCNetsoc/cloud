@@ -27,7 +27,14 @@ async def get_bearer_account(
     status_code=201,
     response_model=models.rest.Info,
 )
-async def send_verification_email(email_or_username : str):
+async def send_verification_email(email_or_username : str, body : models.account.EmailVerification):
+    if not utilities.hcaptcha.verify_hcaptcha(body.hcaptcha):
+        return models.rest.Error(
+            detail=models.rest.Detail(
+                msg=f"Invalid hcaptcha response"
+            )
+        )
+
     resource_account = providers.accounts.find_account(email_or_username)
 
     if resource_account.verified:
