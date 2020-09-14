@@ -73,11 +73,12 @@
             v-on:decline='tosAccepted = false; tosVisible = false'
             :visible='tosVisible'
           />
+        <vue-hcaptcha v-if="hcaptcha !== ''" :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
         </v-form>
       </v-card-text>
       <v-divider/>
       <v-card-actions class="justify-center ma-3">
-        <v-btn v-on:click="submit()" color="green">Sign Up</v-btn>
+        <v-btn v-on:click="submit()" :disabled='disabled' color="green">Sign Up</v-btn>
         <v-btn v-on:click="$emit('cancelled')" color="red">Cancel</v-btn>
       </v-card-actions>
     </card-dialog>
@@ -103,11 +104,13 @@ import Policy from '@/components/Policy.vue'
 import { config } from '@/config'
 import { fetchRest } from '@/api/rest'
 import { openApiGetSchemaProperty, openApiPropertyValidator } from '@/api/openapi'
+import VueHcaptcha from '@hcaptcha/vue-hcaptcha'
 
 export default Vue.extend({
   components: {
     CardDialog,
-    Policy
+    Policy,
+    VueHcaptcha
   },
 
   props: {
@@ -147,6 +150,10 @@ export default Vue.extend({
         (v: string) => !!v || 'Email required',
         (v: string) => openApiPropertyValidator(openApiGetSchemaProperty(this.categories[this.category].model, 'email'))(v + this.categories[this.category].emailSuffix)
       ]
+    },
+
+    hcaptcha () {
+      return config.hCaptchaSiteKey
     }
   },
 
@@ -166,6 +173,11 @@ export default Vue.extend({
       if (this.successful) {
         this.$emit('successful')
       }
+    },
+
+    onVerify (response: string) {
+      this.hcaptchaResponse = response
+      this.disabled = false
     },
 
     async submit () {
@@ -201,7 +213,10 @@ export default Vue.extend({
 
         try {
           const verify = await fetchRest(`${config.apiBaseUrl}/v1/accounts/${this.email}/verification-email`, {
-            method: 'POST'
+            method: 'POST',
+            body: JSON.stringify({
+              captcha: this.hcaptchaResponse
+            })
           })
 
           const { detail } = await verify.json()
@@ -237,6 +252,8 @@ export default Vue.extend({
   data: () => ({
     openApiSpec: undefined,
 
+    hcaptchaResponse: '',
+    disabled: config.hCaptchaSiteKey !== '',
     tosVisible: false,
     privacyVisible: false,
 

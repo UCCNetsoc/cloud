@@ -21,9 +21,10 @@
           ></v-text-field>
         </v-form>
       </v-card-text>
+      <vue-hcaptcha v-if="hcaptcha !== ''" :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
       <v-divider/>
       <v-card-actions class="justify-center ma-3">
-        <v-btn v-on:click="submit()" color="green">Confirm</v-btn>
+        <v-btn :disabled='disabled' v-on:click="submit()" color="green">Confirm</v-btn>
         <v-btn v-on:click="$emit('cancelled')" color="red">Cancel</v-btn>
       </v-card-actions>
     </card-dialog>
@@ -46,11 +47,13 @@ import Vue from 'vue'
 import CardDialog from '@/components/CardDialog.vue'
 import { config } from '@/config'
 import { fetchRest } from '@/api/rest'
+import VueHcaptcha from '@hcaptcha/vue-hcaptcha'
 
 export default Vue.extend({
   name: 'PasswordResetDialog',
   components: {
-    CardDialog
+    CardDialog,
+    VueHcaptcha
   },
 
   computed: {
@@ -58,6 +61,9 @@ export default Vue.extend({
       return [
         (v: string) => !!v || 'Required'
       ]
+    },
+    hcaptcha () {
+      return config.hCaptchaSiteKey
     }
   },
 
@@ -70,6 +76,9 @@ export default Vue.extend({
   data: () => ({
     successful: false,
     emailOrUsername: '',
+
+    hcaptchaResponse: '',
+    disabled: config.hCaptchaSiteKey !== '',
 
     resultDialog: {
       visible: false,
@@ -93,11 +102,19 @@ export default Vue.extend({
       }
     },
 
+    onVerify (response: string) {
+      this.hcaptchaResponse = response
+      this.disabled = false
+    },
+
     async submit () {
       if (this.$refs.form.validate()) {
         try {
           const res = await fetchRest(`${config.apiBaseUrl}/v1/accounts/${this.emailOrUsername}/password-reset-email`, {
-            method: 'POST'
+            method: 'POST',
+            body: JSON.stringify({
+              captcha: this.hcaptchaResponse
+            })
           })
 
           const { detail } = await res.json()

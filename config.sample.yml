@@ -1,4 +1,4 @@
-production: false 
+production: false
 auth:
   direct_grant_url: "http://keycloak.netsoc.local:8080/auth/realms/freeipa/protocol/openid-connect/token"
   jwt:
@@ -125,7 +125,7 @@ mentorships:
       teacher: Michael Forde
       description: |
         <img src="https://www.positronx.io/wp-content/uploads/2018/11/positronx-banner-1152-1.jpg" style="width:256px" />
-        
+
         #### A 6 class lesson on TypeScript
 
         The hot new JavaScript replacement that is taking Silicon Valley by storm!
@@ -152,9 +152,9 @@ websites:
   dns:
     base_domain: "netsoc.dev"
     txt_name: "_netsoc"
-    allowed_a_aaaa: 
-    - 84.39.234.50
-    - 84.39.234.51
+    allowed_a_aaaa:
+      - 84.39.234.50
+      - 84.39.234.51
 homedir_consistency:
   scan_interval: 60
 webserver_configurator:
