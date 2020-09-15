@@ -12,7 +12,9 @@ if [ ! -d "./bin" ]; then
 	cd $1/backing-services/freeipa
 	./freeipa-delete-data.sh
 	./freeipa-decompress-data.sh
-	cd - && cd ./ui && npm install && cd ..
+	cd - && cd ./ui
+	npm install
+	cd ..
 fi
 
 WD=`pwd`
