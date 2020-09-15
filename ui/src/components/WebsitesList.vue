@@ -215,6 +215,8 @@ interface ConfirmCancelAction {
   software?: string;
 }
 
+const HostValidation = new RegExp('^((?!-))(xn--)?[a-z0-9][a-z0-9-_]{0,61}[a-z0-9]{0,1}\\.(xn--)?([a-z0-9\\-]{1,61}|[a-z0-9-]{1,30}\\.[a-z]{2,})$')
+
 export default Vue.extend({
   name: 'WebsitesList',
   components: {
@@ -238,7 +240,10 @@ export default Vue.extend({
 
     websiteHostRules () {
       return [
-        (v: string) => !!v || 'Website host required'
+        (v: string) => !!v || 'Website host required',
+        (v: string) => {
+          return HostValidation.test(v) || 'Invalid Host'
+        }
       ]
     }
   },
