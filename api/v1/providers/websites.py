@@ -165,7 +165,10 @@ class HomeDirFolder():
                     remarks.append(f"Host {host} - subdomain {subdomain} must be the same as the website owners username {website.username}")
 
             else: # custom domain
-                info_list = socket.getaddrinfo(host, 80)
+                try:
+                    info_list = socket.getaddrinfo(host, 80)
+                except Exception as e:
+                    remarks.append("Could not verify custom domain: {e}")
                 a_aaaa = set(map(lambda info: info[4][0], filter(lambda x: x[0] in [socket.AddressFamily.AF_INET, socket.AddressFamily.AF_INET6], info_list)))
                 
                 if len(a_aaaa) == 0:
