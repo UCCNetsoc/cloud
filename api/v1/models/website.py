@@ -17,7 +17,7 @@ Name = {
     "alias": "name",
     "title": "Website name",
     "description": "Only lowercase alphabetical characters with hyphens allowed",
-    "regex": r"^[a-zA-Z_-]+$",
+    "regex": r"^[a-zA-Z0-9\_\-]{1,15}$",
 }
 
 Host = {
