@@ -145,7 +145,7 @@ email:
 mysql:
   server: mysql.netsoc.local
   username: root
-  password: netsoc_mysql
+  password: password
 websites:
   folder: "www"
   config_filename: "netsoc.json"
