@@ -8,7 +8,7 @@ auth:
       -----END PUBLIC KEY-----
     signing_algorithm: "RS256"
 links:
-  base_url: "http://admin.netsoc.local:8080"
+  base_url: "http://admin.netsoc.local"
   jwt:
     public_key: |
       -----BEGIN PUBLIC KEY-----
