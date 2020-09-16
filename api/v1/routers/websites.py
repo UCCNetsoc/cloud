@@ -58,7 +58,7 @@ async def create_website(
 )
 async def delete_website(
     email_or_username : str,
-    name: str = Field(models.website.Name),
+    name: str = Path(**models.website.Name),
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 ):
     resource_account = providers.accounts.find_verified_account(email_or_username)
