@@ -44,7 +44,7 @@ const userManager = new UserManager({
 })
 
 userManager.events.addUserLoaded((user: OidcUser) => {
-  console.log("User loaded", user)
+  // console.log("User loaded", user)
   store.commit('auth/setUser', { user: user });
 
   (async () => {

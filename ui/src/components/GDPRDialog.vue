@@ -128,8 +128,10 @@ export default Vue.extend({
     },
 
     async submit () {
+      // @ts-ignore
       this.$refs.form.validate()
 
+      // @ts-ignore
       if (!this.$refs.form.validate()) return
 
       try {
@@ -170,7 +172,7 @@ export default Vue.extend({
 
     resultDialog: {
       visible: false,
-      text: ''
+      msg: ''
     },
 
     request: {

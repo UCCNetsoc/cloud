@@ -94,12 +94,7 @@ import { fetchRest } from '@/api/rest'
 
 import Vue from 'vue'
 
-interface Websiteconfig {
-  Hosts: { [host: string]: {} };
-  Runtime: string;
-}
-
-interface Website {
+interface Database {
   name: string;
 }
 
@@ -121,7 +116,7 @@ export default Vue.extend({
   },
 
   computed: {
-    required () {
+    required (): ((v: string) => (string | boolean))[] {
       return [
         (v: string) => !!v || 'Required'
       ]
@@ -183,7 +178,7 @@ export default Vue.extend({
       this.databases = []
 
       try {
-        console.log(config)
+        // console.log(config)
         const res = await fetchRest(
           `${config.apiBaseUrl}/v1/mysql/${this.$store.state.auth.user.profile.preferred_username}/databases/`, {
             headers: {

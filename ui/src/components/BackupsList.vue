@@ -82,7 +82,7 @@ export default Vue.extend({
           }, [201])
 
         for (const entry of res.headers.entries()) {
-          console.log(entry)
+          // console.log(entry)
         }
         const a = document.createElement('a')
         a.setAttribute('href', `${config.apiBaseUrl}${res.headers.get('location')}`)
@@ -96,7 +96,6 @@ export default Vue.extend({
 
     async loadBackups () {
       this.loading = true
-      this.websites = []
 
       try {
         const res = await fetchRest(`${config.apiBaseUrl}/v1/backups/${this.$store.state.auth.user.profile.preferred_username}`, {

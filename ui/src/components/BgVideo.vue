@@ -68,7 +68,7 @@ export default Vue.extend({
 
   watch: {
     playbackRate: function (newVal: number) {
-      this.$refs.video.playbackRate = newVal
+      (this.$refs.video as HTMLVideoElement).playbackRate = newVal
     }
   }
 })

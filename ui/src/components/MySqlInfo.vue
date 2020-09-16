@@ -80,7 +80,7 @@ export default Vue.extend({
   },
 
   computed: {
-    required () {
+    required (): ((v: string) => (string | boolean))[] {
       return [
         (v: string) => !!v || 'Required'
       ]

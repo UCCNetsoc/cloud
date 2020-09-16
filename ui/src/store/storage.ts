@@ -11,7 +11,7 @@ import { GetterTree, ActionTree, MutationTree, Store, ActionContext } from 'vuex
  * localStorage/sessionStorage. We want to store that info in Vuex instead
  */
 
-interface State {
+export interface State {
   storage: { [key: string]: string};
 }
 

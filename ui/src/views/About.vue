@@ -62,7 +62,7 @@ export default Vue.extend({
     try {
       const contributorsJson = await fetch('https://api.github.com/repos/UCCNetsoc/netsocadmin2/contributors')
       this.contributors = await contributorsJson.json()
-      console.log(this.contributors)
+      // console.log(this.contributors)
     } catch {
 
     }

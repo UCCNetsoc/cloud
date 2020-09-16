@@ -54,7 +54,7 @@ export default Vue.extend({
   },
 
   computed: {
-    required () {
+    required (): ((v: string) => (string | boolean))[] {
       return [
         (v: string) => !!v || 'Required'
       ]
@@ -92,6 +92,7 @@ export default Vue.extend({
     },
 
     async submit () {
+      // @ts-ignore
       if (this.$refs.form.validate()) {
         try {
           const res = await fetchRest(`${config.apiBaseUrl}/v1/accounts/${this.emailOrUsername}/verification-email`, {

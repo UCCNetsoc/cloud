@@ -51,7 +51,7 @@ export function openApiPropertyValidateData (property: Property, input: number|s
   if (property.type !== typeof input) return false
 
   if (property.type === 'string') {
-    // console.log(property)
+    // // console.log(property)
     if (property?.maxLength && (input as string).length > property.maxLength) return false
     if (property?.minLength && (input as string).length < property.minLength) return false
 

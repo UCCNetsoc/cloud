@@ -121,38 +121,38 @@ export default Vue.extend({
   },
 
   computed: {
-    email () {
+    email (): string {
       return `${this.emailPrefix}${this.categories[this.category].emailSuffix}`
     },
 
-    usernameRules () {
+    usernameRules (): ((v: string) => (string | boolean))[] {
       return [
         (v: string) => !!v || 'Username required',
         openApiPropertyValidator(openApiGetSchemaProperty(this.categories[this.category].model, 'username'))
       ]
     },
 
-    passwordRules () {
+    passwordRules (): ((v: string) => (string | boolean))[] {
       return [
         (v: string) => !!v || 'Password required',
         openApiPropertyValidator(openApiGetSchemaProperty(this.categories[this.category].model, 'password'))
       ]
     },
 
-    confirmPasswordRules () {
+    confirmPasswordRules (): ((v: string) => (string | boolean))[] {
       return [
         () => (this.password === this.confirmPassword) || 'Passwords do not match'
       ]
     },
 
-    emailPrefixRules () {
+    emailPrefixRules (): ((v: string) => (string | boolean))[] {
       return [
         (v: string) => !!v || 'Email required',
         (v: string) => openApiPropertyValidator(openApiGetSchemaProperty(this.categories[this.category].model, 'email'))(v + this.categories[this.category].emailSuffix)
       ]
     },
 
-    hcaptcha () {
+    hcaptcha (): string {
       return config.hCaptchaSiteKey
     }
   },
@@ -169,7 +169,7 @@ export default Vue.extend({
     closeResultDialog () {
       this.resultDialog.visible = false
 
-      console.log(this.successful)
+      // console.log(this.successful)
       if (this.successful) {
         this.$emit('successful')
       }
@@ -181,6 +181,7 @@ export default Vue.extend({
     },
 
     async submit () {
+      // @ts-ignore
       this.$refs.form.validate()
 
       if (!this.privacyAccepted) {
@@ -199,6 +200,7 @@ export default Vue.extend({
         return
       }
 
+      // @ts-ignore
       if (!this.$refs.form.validate()) return
 
       try {
@@ -249,32 +251,16 @@ export default Vue.extend({
     //   })
   },
 
-  data: () => ({
-    openApiSpec: undefined,
-
-    hcaptchaResponse: '',
-    disabled: config.hCaptchaSiteKey !== '',
-    tosVisible: false,
-    privacyVisible: false,
-
-    successful: false,
-
-    resultDialog: {
-      visible: false,
-      text: ''
-    },
-
-    category: 'UCC student',
-
-    username: '',
-    emailPrefix: '',
-    password: '',
-    confirmPassword: '',
-    signupReason: '',
-    tosAccepted: false,
-    privacyAccepted: false,
-
-    categories: {
+  data: () => {
+    const categories: { [key: string]: {
+      usernameLabel: string;
+      emailLabel: string;
+      emailSuffix: string;
+      requiresReason: boolean;
+      requiresApproval: boolean;
+      model: string;
+      endpoint: string;
+    }; } = {
       'UCC student': {
         usernameLabel: 'Username',
         emailLabel: 'Student email address',
@@ -303,7 +289,35 @@ export default Vue.extend({
       //   model: 'UccStaff'
       // }
     }
-  })
+
+    return {
+      openApiSpec: undefined,
+
+      hcaptchaResponse: '',
+      disabled: config.hCaptchaSiteKey !== '',
+      tosVisible: false,
+      privacyVisible: false,
+
+      successful: false,
+
+      resultDialog: {
+        visible: false,
+        msg: ''
+      },
+
+      category: 'UCC student',
+
+      username: '',
+      emailPrefix: '',
+      password: '',
+      confirmPassword: '',
+      signupReason: '',
+      tosAccepted: false,
+      privacyAccepted: false,
+
+      categories
+    }
+  }
 
 })
 </script>

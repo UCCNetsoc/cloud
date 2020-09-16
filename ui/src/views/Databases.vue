@@ -47,8 +47,8 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import MySqlList from '@/components/MySqlList'
-import MySqlInfo from '@/components/MySqlInfo'
+import MySqlList from '@/components/MySqlList.vue'
+import MySqlInfo from '@/components/MySqlInfo.vue'
 
 export default Vue.extend({
   name: 'Databases',

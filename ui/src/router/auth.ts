@@ -14,7 +14,7 @@ export function requireAuth (component: VueConstructor) {
   return component.extend({
     beforeRouteEnter (to: Route, from: Route, next: Function) {
       // Render the component
-      next((component: Landing) => {
+      next((component: Vue) => {
         // If they're not authenticated send them to the homepage
         if (component.$store.state.auth.user === null) {
           component.$router.replace('/')
@@ -56,7 +56,7 @@ export function useAuthRoutes (router: Router) {
         // so send them there anyway. The beforeRouteEnter hook on the component they're going to
         // will handle it by forcing them to auth then (assuming it requires auth)
         .catch((e) => {
-          console.error('Signing in silently failed: ', e)
+          // // console.error('Signing in silently failed: ', e)
           next()
         })
     } else {
@@ -112,7 +112,7 @@ export function useAuthRoutes (router: Router) {
           userManager.signoutPopup()
             .then(() => {
               if (from.path !== '/') {
-                next((landing: Landing) => {
+                next((landing: Vue) => {
                   landing.$router.replace('/')
                 })
               } else {
@@ -120,7 +120,7 @@ export function useAuthRoutes (router: Router) {
               }
             })
             .catch(() => {
-              next((landing: Landing) => {
+              next((landing: Vue) => {
                 landing.$router.replace('/')
               })
             })

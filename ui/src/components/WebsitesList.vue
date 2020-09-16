@@ -223,7 +223,7 @@ export default Vue.extend({
   },
 
   computed: {
-    required () {
+    required (): ((v: string) => (string | boolean))[] {
       return [
         (v: string) => !!v || 'Required'
       ]
@@ -302,7 +302,7 @@ export default Vue.extend({
           }
 
           case ConfirmCancelMode.InstallSoftware: {
-            console.log(username)
+            // console.log(username)
             await fetchRest(
               `${config.apiBaseUrl}/v1/websites/${username}/${name}/software/${software}`, {
                 method: 'POST',
@@ -344,7 +344,7 @@ export default Vue.extend({
       this.websites = []
 
       try {
-        console.log(config)
+        // console.log(config)
         const res = await fetchRest(
           `${config.apiBaseUrl}/v1/websites/${this.$store.state.auth.user.profile.preferred_username}`, {
             headers: {

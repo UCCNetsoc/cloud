@@ -76,7 +76,7 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import MessageDialog from '@/components/MessageDialog'
+import MessageDialog from '@/components/MessageDialog.vue'
 import { config } from '@/config'
 import { fetchRest } from '@/api/rest'
 
@@ -88,17 +88,28 @@ interface Mentorship {
   teacher: string;
 }
 
+interface Data {
+  empty: string;
+  mentorships: { [id: string]: Mentorship };
+  selectedIdx: number | undefined;
+  descriptionHtml: string | undefined;
+  loading: boolean;
+  headers: { text: string; value: string}[];
+  enrollReason: string;
+  msg: string;
+}
+
 export default Vue.extend({
   name: 'Mentorships',
   components: {
     MessageDialog
   },
 
-  data: () => ({
+  data: (): Data => ({
     empty: 'All mentorship places have currently been filled, check back again at a later time to see if there any new mentorships are available',
     mentorships: {},
     selectedIdx: undefined,
-    descriptionHtml: undefined,
+    descriptionHtml: '',
     loading: false,
     headers: [
       { text: 'Title', value: 'title' },
@@ -111,8 +122,8 @@ export default Vue.extend({
   watch: {
     selectedIdx () {
       if (this.selectedIdx !== undefined) {
-        let text = Object.values(this.mentorships)[this.selectedIdx].description
-        console.log(text)
+        let text = Object.values(this.mentorships)[this.selectedIdx as number].description
+        // console.log(text)
         // Trim preamble if it's present
         if (text.indexOf('---') === 0) {
           const index = text.indexOf('---', 3)
@@ -134,9 +145,9 @@ export default Vue.extend({
   },
 
   computed: {
-    selectedMentorshipName () {
+    selectedMentorshipName (): string | undefined {
       if (this.selectedIdx !== undefined) {
-        return Object.keys(this.mentorships)[this.selectedIdx]
+        return Object.keys(this.mentorships)[this.selectedIdx as number]
       } else {
         return undefined
       }

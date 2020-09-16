@@ -131,6 +131,10 @@ footer a {
 import Vue from 'vue'
 import BgVideo from '@/components/BgVideo.vue'
 
+interface BgStyle {
+  filter: string;
+}
+
 export default Vue.extend({
   name: 'App',
   components: {
@@ -170,9 +174,9 @@ export default Vue.extend({
   },
 
   computed: {
-    bgStyle () {
+    bgStyle (): BgStyle {
       if (this.$route.path === '/') {
-        return {}
+        return { filter: '' }
       } else {
         return {
           filter: 'brightness(0.4)'
