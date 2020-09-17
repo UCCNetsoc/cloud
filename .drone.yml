@@ -18,7 +18,7 @@ steps:
       target: dev
       context: ui
       dockerfile: ui/Dockerfile
-      repo: uccnetsoc/admin
+      repo: uccnetsoc/admin-ui
       registry: docker.io
       custom_dns: [1.1.1.1]
       username:
@@ -43,7 +43,7 @@ steps:
       context: ui
       target: prod
       dockerfile: ui/Dockerfile
-      repo: uccnetsoc/admin
+      repo: uccnetsoc/admin-ui
       registry: docker.io
       custom_dns: [1.1.1.1]
       username:
@@ -68,7 +68,7 @@ steps:
       target: dev
       context: api
       dockerfile: api/Dockerfile
-      repo: uccnetsoc/admin_api
+      repo: uccnetsoc/admin-api
       registry: docker.io
       custom_dns: [1.1.1.1]
       username:
@@ -93,7 +93,7 @@ steps:
       target: prod
       context: api
       dockerfile: api/Dockerfile
-      repo: uccnetsoc/admin_api
+      repo: uccnetsoc/admin-api
       registry: docker.io
       custom_dns: [1.1.1.1]
       username:
