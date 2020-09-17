@@ -142,6 +142,8 @@ email:
   reply_to_address: "netsoc@uccsocieties.ie"
   sendgrid:
     key: "- no pls -"
+hcaptcha:
+  secret: "- no pls -"
 mysql:
   server: mysql.netsoc.local
   username: root
