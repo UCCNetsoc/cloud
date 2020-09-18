@@ -40,7 +40,7 @@ It consists of an OpenAPI compliant REST API written in FastAPI, a frontend in V
 
    - admin.netsoc.local
      - Vue frontend
-     - http://admin.netsoc.local:8080
+     - http://admin.netsoc.local
    - api.netsoc.local
      - FastAPI API
      - http://api.netsoc.local
