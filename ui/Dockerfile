@@ -11,6 +11,10 @@ COPY --from=dev /app .
 RUN npm run build
 
 FROM nginx:1.18.0 AS prod
+
+ENV VUE_APP_NETSOC_API_URL http://api.netsoc.dev
+ENV VUE_APP_OIDC_AUTHORITY http://keycloak.netsoc.dev/auth/realms/freeipa
+
 RUN mkdir /app
 COPY --from=prod_builder /app/dist /app
 COPY nginx.conf /etc/nginx/nginx.conf
