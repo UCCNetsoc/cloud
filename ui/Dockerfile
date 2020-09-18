@@ -6,8 +6,8 @@ RUN npm install
 
 FROM node:13.10.1-alpine3.11 AS prod_builder
 
-ENV VUE_APP_NETSOC_API_URL http://api.netsoc.dev
-ENV VUE_APP_OIDC_AUTHORITY http://keycloak.netsoc.dev/auth/realms/freeipa
+ENV VUE_APP_NETSOC_API_URL=http://api.netsoc.dev
+ENV VUE_APP_OIDC_AUTHORITY=http://keycloak.netsoc.dev/auth/realms/freeipa
 
 WORKDIR /app
 COPY --from=dev /app .
