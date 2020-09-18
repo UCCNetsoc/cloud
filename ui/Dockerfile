@@ -6,11 +6,15 @@ RUN npm install
 
 FROM node:13.10.1-alpine3.11 AS prod_builder
 
+WORKDIR /app
+
+COPY --from=dev /app .
+
 ENV VUE_APP_NETSOC_API_URL=http://api.netsoc.dev
 ENV VUE_APP_OIDC_AUTHORITY=http://keycloak.netsoc.dev/auth/realms/freeipa
+ENV VUE_APP_HCAPTCHA_SITE_KEY=0e8176fb-1fc2-4d51-a153-773cbd8b9837
+ENV NODE_ENV=production
 
-WORKDIR /app
-COPY --from=dev /app .
 RUN npm run build
 
 FROM nginx:1.18.0 AS prod
