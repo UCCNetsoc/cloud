@@ -10,8 +10,8 @@ WORKDIR /app
 
 COPY --from=dev /app .
 
-ENV VUE_APP_NETSOC_API_URL=http://api.netsoc.dev
-ENV VUE_APP_OIDC_AUTHORITY=http://keycloak.netsoc.dev/auth/realms/freeipa
+ENV VUE_APP_NETSOC_API_URL=https://api.netsoc.dev
+ENV VUE_APP_OIDC_AUTHORITY=https://keycloak.netsoc.dev/auth/realms/freeipa
 ENV VUE_APP_HCAPTCHA_SITE_KEY=0e8176fb-1fc2-4d51-a153-773cbd8b9837
 
 RUN npm run build
