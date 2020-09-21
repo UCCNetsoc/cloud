@@ -7,7 +7,7 @@ import structlog as logging
 
 logger = logging.getLogger(__name__)
 
-def form_flled(content):
+def form_filled(content):
     return execute(config.webhooks.form_filled, content)
 
 def info(content):
