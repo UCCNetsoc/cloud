@@ -37,7 +37,7 @@ def heartbeat():
 def run_configurator():
     logger.info("webserver_configurator began running")
     try:
-        webserver_configurator.configure()
+        #webserver_configurator.configure()
         logger.info("webserver_configurator finished running")
     except Exception as e:
         logging.error("webserver_configurator had an exception while running", e=e, exc_info=True)
@@ -47,7 +47,7 @@ def run_configurator():
 def run_homedir_consistency():
     try:
         logger.info("homedir_consistency began running")
-        homedir_consistency.ensure()
+        #homedir_consistency.ensure()
         logger.info("homedir_consistency finished running")
     except Exception as e:
         logging.error("homedir_consistency had an exception while running", e=e, exc_info=True)
