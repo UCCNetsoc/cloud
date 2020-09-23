@@ -4,6 +4,7 @@ export interface Config {
   hCaptchaSiteKey: string;
 }
 
+// TODO: change defaults to netsoc.co
 export const config: Config = {
   apiBaseUrl: process.env.VUE_APP_NETSOC_API_URL.replace(
     new RegExp('[/]+$'),

@@ -8,7 +8,7 @@ auth:
       -----END PUBLIC KEY-----
     signing_algorithm: "RS256"
 links:
-  base_url: "http://admin.netsoc.local:8080"
+  base_url: "http://admin.netsoc.local"
   jwt:
     public_key: |
       -----BEGIN PUBLIC KEY-----
@@ -142,10 +142,12 @@ email:
   reply_to_address: "netsoc@uccsocieties.ie"
   sendgrid:
     key: "- no pls -"
+hcaptcha:
+  secret: "- no pls -"
 mysql:
   server: mysql.netsoc.local
   username: root
-  password: netsoc_mysql
+  password: password
 websites:
   folder: "www"
   config_filename: "netsoc.json"
