@@ -130,6 +130,7 @@ footer a {
 <script lang="ts">
 import Vue from 'vue'
 import BgVideo from '@/components/BgVideo.vue'
+import MessageDialog from '@/components/MessageDialog.vue'
 
 interface BgStyle {
   filter: string;
@@ -138,7 +139,8 @@ interface BgStyle {
 export default Vue.extend({
   name: 'App',
   components: {
-    BgVideo
+    BgVideo,
+    MessageDialog
   },
 
   data: () => ({
