@@ -19,7 +19,7 @@ const popupWindowFeatures: { [k: string]: string | number } = {
   top: (window.screen.height / 2) - (600 / 2)
 }
 
-const locSplit: string = window.location.href.split("/")
+const locSplit: string[] = window.location.href.split("/")
 const userManager = new UserManager({
   clockSkew: 8 * (60 * 60),
   authority: config.oidcAuthority,
