@@ -19,13 +19,14 @@ const popupWindowFeatures: { [k: string]: string | number } = {
   top: (window.screen.height / 2) - (600 / 2)
 }
 
+const locSplit: string = window.location.href.split("/")
 const userManager = new UserManager({
   clockSkew: 8 * (60 * 60),
   authority: config.oidcAuthority,
   client_id: 'netsocadmin',
-  redirect_uri: `http://${window.location.host}/accounts/login/finish`,
-  silent_redirect_uri: `http://${window.location.host}/accounts/login/finish-silent`,
-  post_logout_redirect_uri: `http://${window.location.host}/accounts/logout/finish`,
+  redirect_uri: `${locSplit[0]}//${locSplit[2]}/accounts/login/finish`,
+  silent_redirect_uri: `${locSplit[0]}//${locSplit[2]}/accounts/login/finish-silent`,
+  post_logout_redirect_uri: `${locSplit[0]}://${locSplit[2]}/accounts/logout/finish`,
   response_type: 'code',
   scope: 'openid profile email roles',
   revokeAccessTokenOnSignout: true,
