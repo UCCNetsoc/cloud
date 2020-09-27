@@ -94,7 +94,14 @@ async def verification(
     resource_account = providers.accounts.find_account(email_or_username)
 
     if resource_account.verified == False:
-        verification = serialized.deserialize_verify(models.sign_up.Verification, config.links.jwt.public_key)
+        try:
+            verification = serialized.deserialize_verify(models.sign_up.Verification, config.links.jwt.public_key)
+        except Exception as e:
+            logger.error(f"Invalid JWT", serialized=serialized, e=e, exc_info=True)
+
+            raise exceptions.rest.Error(status_code=400, detail=models.rest.Detail(
+                msg="Invalid or expired token, please try resending the verification request"
+            ))
 
         if resource_account.username == verification.username:
             providers.accounts.verify_account(resource_account)
@@ -185,7 +192,16 @@ async def set_password(
     new: models.password.New
 ):
     resource_account = providers.accounts.find_account(email_or_username)
-    reset = new.reset.deserialize_verify(models.password.Reset, config.links.jwt.public_key)
+    
+    try:
+        reset = new.reset.deserialize_verify(models.password.Reset, config.links.jwt.public_key)
+    except Exception as e:
+        logger.error(f"Invalid JWT", reset=new.reset, e=e, exc_info=True)
+
+        raise exceptions.rest.Error(status_code=400, detail=models.rest.Detail(
+            msg="Invalid or expired token, please try resending the reset email"
+        ))
+
 
     if resource_account.username == reset.username:
         providers.accounts.change_password(resource_account, new.password)

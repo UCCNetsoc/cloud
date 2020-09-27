@@ -62,8 +62,15 @@ def download_backup(
     backup_name: str,
     token: str
 ):
-    request = models.jwt.Serialized(token=token).deserialize_verify(models.backup.Request, config.links.jwt.public_key)
+    try:
+        request = models.jwt.Serialized(token=token).deserialize_verify(models.backup.Request, config.links.jwt.public_key)
+    except Exception as e:
+        logger.error(f"Invalid JWT", token=token, e=e, exc_info=True)
 
-    # utilities.webhook.info(f"**Downloaded backup** - uid {request.uid}")
+        raise exceptions.rest.Error(status_code=400, detail=models.rest.Detail(
+            msg="Invalid or expired download token"
+        ))
+
+    #utilities.webhook.info(f"**Downloaded backup** - uid {request.uid}")
 
     return providers.backups.stream_backup(request.backup)
