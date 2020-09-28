@@ -24,7 +24,7 @@
       </v-card-text>
       <v-divider/>
       <v-card-actions class="justify-center ma-3">
-        <v-btn v-on:click="submit()" color="green">Confirm</v-btn>
+        <v-btn v-on:click="submit()" :disabled='disabled' color="green">Sign Up</v-btn>
         <v-btn v-on:click="$emit('cancelled')" color="red">Cancel</v-btn>
       </v-card-actions>
     </card-dialog>
