@@ -19,6 +19,7 @@
             :rules='required'
             :disabled='$store.state.auth.user !== null'
           ></v-text-field>
+          <vue-hcaptcha v-if="hcaptcha !== ''" :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
         </v-form>
       </v-card-text>
       <v-divider/>
@@ -46,18 +47,23 @@ import Vue from 'vue'
 import CardDialog from '@/components/CardDialog.vue'
 import { config } from '@/config'
 import { fetchRest } from '@/api/rest'
+import VueHcaptcha from '@hcaptcha/vue-hcaptcha'
 
 export default Vue.extend({
   name: 'SignUpResendVerfyDialog',
   components: {
-    CardDialog
+    CardDialog,
+    VueHcaptcha
   },
 
   computed: {
-    required (): ((v: string) => (string | boolean))[] {
+    required () {
       return [
         (v: string) => !!v || 'Required'
       ]
+    },
+    hcaptcha () {
+      return config.hCaptchaSiteKey
     }
   },
 
@@ -68,6 +74,9 @@ export default Vue.extend({
   data: () => ({
     successful: false,
     emailOrUsername: '',
+
+    hcaptchaResponse: '',
+    disabled: config.hCaptchaSiteKey !== '',
 
     resultDialog: {
       visible: false,
@@ -91,12 +100,19 @@ export default Vue.extend({
       }
     },
 
+    onVerify (response: string) {
+      this.hcaptchaResponse = response
+      this.disabled = false
+    },
+
     async submit () {
-      // @ts-ignore
       if (this.$refs.form.validate()) {
         try {
           const res = await fetchRest(`${config.apiBaseUrl}/v1/accounts/${this.emailOrUsername}/verification-email`, {
-            method: 'POST'
+            method: 'POST',
+            body: JSON.stringify({
+              captcha: this.hcaptchaResponse
+            })
           })
 
           const { detail } = await res.json()
