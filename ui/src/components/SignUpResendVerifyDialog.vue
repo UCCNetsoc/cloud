@@ -106,6 +106,7 @@ export default Vue.extend({
     },
 
     async submit () {
+      // @ts-ignore
       if (this.$refs.form.validate()) {
         try {
           const res = await fetchRest(`${config.apiBaseUrl}/v1/accounts/${this.emailOrUsername}/verification-email`, {
