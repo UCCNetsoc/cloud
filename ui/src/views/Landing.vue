@@ -46,6 +46,9 @@
 .service:hover {
   top: -24px;
 }
+.nowrap {
+  white-space: nowrap;
+}
 
 </style>
 
