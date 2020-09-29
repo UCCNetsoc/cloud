@@ -25,7 +25,7 @@
             <v-icon class="align-center" size="48">{{ item.icon }}</v-icon>
           </v-card-text>
           <v-card-title style="padding-left: 0; padding-right: 0" class="justify-center subtitle-1">
-            <p class="nowrap" style="min-width: 999%">{{ item.name }}</p>
+            <p class="nowrap">{{ item.name }}</p>
           </v-card-title>
         </v-card>
       </v-col>
