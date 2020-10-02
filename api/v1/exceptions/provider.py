@@ -7,8 +7,8 @@ class ProviderException(APIException):
 
 class Unavailable(ProviderException):
     def __init__(self, reason):
-        super().__init__(f"Provider unavailable: {self.reason}")
+        super().__init__(f"Provider unavailable: {reason}")
 
 class Failed(ProviderException):
     def __init__(self, reason):
-        super().__init__(f"Provider failed: {self.reason}")
+        super().__init__(f"Provider failed: {reason}")
