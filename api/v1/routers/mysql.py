@@ -45,6 +45,8 @@ async def create_database(
         name=name
     ))
 
+    utilities.webhook.info(f"**Created database** - {name} - {resource_account.username} ({resource_account.email})")
+
     return models.rest.Info(
         detail=models.rest.Detail(
             msg=f"MySQL database {name} created"
@@ -69,9 +71,11 @@ async def delete_database(
         name=name
     ))
 
+    utilities.webhook.info(f"**Deleted database** - {name} - {resource_account.username} ({resource_account.email})")
+
     return models.rest.Info(
         detail=models.rest.Detail(
-            msg=f"MySQL database {name}"
+            msg=f"MySQL database {name} deleted"
         )
     )
 
@@ -121,6 +125,8 @@ async def create_mysql_user(
 
         providers.mysql.create_account_user(resource_account, password)
 
+        utilities.webhook.info(f"**Created MySQL user** - {resource_account.username} ({resource_account.email})")
+
         return models.rest.Info(
             detail = models.rest.Detail(
                 msg="MySQL user created."
@@ -158,6 +164,8 @@ async def send_mysql_user_password_reset_email(
         ),
         "text/html"
     )
+
+    utilities.webhook.info(f"**(Re)set MySQL user password** - {resource_account.username} ({resource_account.email})")
 
     return models.rest.Info(
         detail=models.rest.Detail(

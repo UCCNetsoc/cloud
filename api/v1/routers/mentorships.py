@@ -28,7 +28,7 @@ async def enroll_in_mentorship(
         mentorship = config.mentorships.available[name]
 
         utilities.webhook.form_filled(
-            f"**{account.username} ({account.email})** enrolled in **{mentorship.title} by {mentorship.teacher}** because: ```{enrollment.reason}```"
+            f"**{account.username}** ({account.email}) enrolled in **{mentorship.title} by {mentorship.teacher}** because: ```{enrollment.reason}```"
         )
 
         providers.email.send(
