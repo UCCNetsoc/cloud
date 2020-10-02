@@ -127,7 +127,7 @@ export default Vue.extend({
     databaseNameRules () {
       return [
         (v: string) => !!v || 'Database name required',
-        openApiPropertyValidator(openApiGetSchemaProperty('Database', 'title'))
+        openApiPropertyValidator(openApiGetSchemaProperty('Database', 'name'))
       ]
     }
   },
