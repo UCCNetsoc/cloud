@@ -7,7 +7,7 @@ from v1.config import config
 router = APIRouter()
 
 @router.get(
-    '/',
+    '/available',
     status_code=200,
     response_model=Dict[str,models.mentorship.Mentorship]
 )

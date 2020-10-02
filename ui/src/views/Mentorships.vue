@@ -182,7 +182,7 @@ export default Vue.extend({
 
       try {
         const res = await fetchRest(
-          `${config.apiBaseUrl}/v1/mentorships`, {
+          `${config.apiBaseUrl}/v1/mentorships/available`, {
             method: 'GET',
             headers: {
               Authorization: `Bearer ${this.$store.state.auth.user.access_token}`
