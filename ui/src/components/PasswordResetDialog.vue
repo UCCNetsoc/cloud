@@ -21,7 +21,7 @@
           ></v-text-field>
         </v-form>
       </v-card-text>
-      <vue-hcaptcha v-if="hcaptcha !== ''" :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
+      <vue-hcaptcha :key="resultDialog.visible" v-if="hcaptcha !== ''" :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
       <v-divider/>
       <v-card-actions class="justify-center ma-3">
         <v-btn :disabled='disabled' v-on:click="submit()" color="green">Confirm</v-btn>
@@ -69,6 +69,8 @@ export default Vue.extend({
   },
 
   mounted () {
+    this.emailOrUsername = this.$route.params.emailOrUsername || ''
+
     if (this.$store.state.auth.user != null) {
       this.emailOrUsername = this.$store.state.auth.user.profile.email
     }
@@ -130,6 +132,7 @@ export default Vue.extend({
             visible: true,
             msg: `Could not send password reset email: ${e.message}`
           }
+          this.successful = false
         }
       }
     }

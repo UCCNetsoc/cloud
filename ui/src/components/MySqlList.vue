@@ -68,6 +68,7 @@
         <v-text-field
           :prefix="$store.state.auth.user.profile.preferred_username + '_'"
           label='Database name'
+          :rules="databaseNameRules"
           v-model='confirmCancel.action.name'
         ></v-text-field>
       </v-form>
@@ -91,6 +92,7 @@ import MessageDialog from '@/components/MessageDialog.vue'
 
 import { config } from '@/config'
 import { fetchRest } from '@/api/rest'
+import { openApiGetSchemaProperty, openApiPropertyValidator } from '@/api/openapi'
 
 import Vue from 'vue'
 
@@ -120,6 +122,13 @@ export default Vue.extend({
       return [
         (v: string) => !!v || 'Required'
       ]
+    },
+
+    databaseNameRules () {
+      return [
+        (v: string) => !!v || 'Database name required',
+        openApiPropertyValidator(openApiGetSchemaProperty('Database', 'title'))
+      ]
     }
   },
 
@@ -135,9 +144,13 @@ export default Vue.extend({
       const { name } = this.confirmCancel.action
 
       this.confirmCancel.loading = true
+
       try {
         switch (this.confirmCancel.mode) {
           case ConfirmCancelMode.CreateDatabase: {
+            // @ts-ignore
+            if (!this.$refs.form.validate()) return
+
             await fetchRest(
               `${config.apiBaseUrl}/v1/mysql/${username}/databases/${username + '_' + name}`, {
                 method: 'POST',

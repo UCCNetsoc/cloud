@@ -19,7 +19,7 @@
             :rules='required'
             :disabled='$store.state.auth.user !== null'
           ></v-text-field>
-          <vue-hcaptcha v-if="hcaptcha !== ''" :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
+          <vue-hcaptcha :key="resultDialog.visible" v-if="hcaptcha !== ''" :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
         </v-form>
       </v-card-text>
       <v-divider/>

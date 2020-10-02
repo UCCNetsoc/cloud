@@ -88,7 +88,8 @@ export default Vue.extend({
 
   computed: {
     url (): string {
-      return `http://portal.netsoc.co/wetty/ssh/${this.$store.state.auth.user.profile.preferred_username}`
+      const locSplit: string[] = window.location.href.split('/')
+      return `${locSplit[0]}//portal.netsoc.co/wetty/ssh/${this.$store.state.auth.user.profile.preferred_username}`
     }
   },
 

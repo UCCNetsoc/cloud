@@ -42,6 +42,7 @@
       <v-divider/>
       <v-card-actions class="justify-center ma-3">
         <v-btn v-on:click="submit()" color="green">Confirm</v-btn>
+        <v-btn v-on:click="$router.push('/accounts/password-reset')" color="warning">Resend</v-btn>
         <v-btn v-on:click="$emit('cancelled')" color="red">Cancel</v-btn>
       </v-card-actions>
     </card-dialog>
@@ -81,7 +82,7 @@ export default Vue.extend({
     passwordRules () {
       return [
         (v: string) => !!v || 'Password required',
-        openApiPropertyValidator(openApiGetSchemaProperty('UCCStudent', 'password'))
+        openApiPropertyValidator(openApiGetSchemaProperty('CompleteReset', 'password'))
       ]
     },
 
@@ -109,7 +110,7 @@ export default Vue.extend({
             method: 'POST',
             body: JSON.stringify({
               password: this.password,
-              reset: {
+              serialized_reset: {
                 token: this.token
               }
             })
@@ -126,6 +127,7 @@ export default Vue.extend({
             visible: true,
             msg: `Could not set your password. ${e.message}`
           }
+          this.successful = false
         }
       }
     }

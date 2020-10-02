@@ -25,11 +25,24 @@
             :rules='required'
             :disabled='$route.params.token !== undefined'
           ></v-text-field>
+           <v-text-field
+            label='Password'
+            v-model='password'
+            :rules='passwordRules'
+            type='password'
+          ></v-text-field>
+          <v-text-field
+            label='Confirm password'
+            v-model='confirmPassword'
+            :rules='confirmPasswordRules'
+            type='password'
+          ></v-text-field>
         </v-form>
       </v-card-text>
       <v-divider/>
       <v-card-actions class="justify-center ma-3">
         <v-btn v-on:click="submit()" color="green">Confirm</v-btn>
+        <v-btn v-on:click="$router.push('/accounts/verification-email')" color="warning">Resend</v-btn>
         <v-btn v-on:click="$emit('cancelled')" color="red">Cancel</v-btn>
       </v-card-actions>
     </card-dialog>
@@ -52,6 +65,7 @@ import Vue from 'vue'
 import CardDialog from '@/components/CardDialog.vue'
 import { config } from '@/config'
 import { fetchRest } from '@/api/rest'
+import { openApiGetSchemaProperty, openApiPropertyValidator } from '@/api/openapi'
 
 export default Vue.extend({
   name: 'SignUpVerifyDialog',
@@ -63,6 +77,19 @@ export default Vue.extend({
     required (): ((v: string) => (string | boolean))[] {
       return [
         (v: string) => !!v || 'Required'
+      ]
+    },
+
+    passwordRules (): ((v: string) => (string | boolean))[] {
+      return [
+        (v: string) => !!v || 'Password required',
+        openApiPropertyValidator(openApiGetSchemaProperty('CompleteVerification', 'password'))
+      ]
+    },
+
+    confirmPasswordRules (): ((v: string) => (string | boolean))[] {
+      return [
+        () => (this.password === this.confirmPassword) || 'Passwords do not match'
       ]
     }
   },
@@ -77,6 +104,8 @@ export default Vue.extend({
     emailOrUsername: '',
     token: '',
 
+    password: '',
+    confirmPassword: '',
     resultDialog: {
       visible: false,
       msg: ''
@@ -106,7 +135,10 @@ export default Vue.extend({
           const res = await fetchRest(`${config.apiBaseUrl}/v1/accounts/${this.emailOrUsername}/verification`, {
             method: 'POST',
             body: JSON.stringify({
-              token: this.token
+              serialized_verification: {
+                token: this.token
+              },
+              password: this.password
             })
           })
 

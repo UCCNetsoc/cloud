@@ -263,6 +263,9 @@ export default Vue.extend({
       try {
         switch (this.confirmCancel.mode) {
           case ConfirmCancelMode.AddWebsite: {
+            // @ts-ignore
+            if (!this.$refs.form.validate()) return
+
             await fetchRest(
               `${config.apiBaseUrl}/v1/websites/${username}/${name}`, {
                 method: 'POST',
@@ -285,6 +288,9 @@ export default Vue.extend({
           }
 
           case ConfirmCancelMode.AddHost: {
+            // @ts-ignore
+            if (!this.$refs.form.validate()) return
+
             await fetchRest(
               `${config.apiBaseUrl}/v1/websites/${username}/${name}/host/${host}`, {
                 method: 'POST',

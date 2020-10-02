@@ -33,18 +33,6 @@
             v-model='username'
             :rules='usernameRules'
           ></v-text-field>
-          <v-text-field
-            label='Password'
-            v-model='password'
-            :rules='passwordRules'
-            type='password'
-          ></v-text-field>
-          <v-text-field
-            label='Confirm password'
-            v-model='confirmPassword'
-            :rules='confirmPasswordRules'
-            type='password'
-          ></v-text-field>
           <v-checkbox
             v-model='tosAccepted'
             @change='tosCheckChange'
@@ -73,7 +61,7 @@
             v-on:decline='tosAccepted = false; tosVisible = false'
             :visible='tosVisible'
           />
-        <vue-hcaptcha v-if="hcaptcha !== ''" :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
+         <vue-hcaptcha :key="resultDialog.visible" v-if="hcaptcha !== ''" :sitekey='hcaptcha' @verify='onVerify'></vue-hcaptcha>
         </v-form>
       </v-card-text>
       <v-divider/>
@@ -129,19 +117,6 @@ export default Vue.extend({
       return [
         (v: string) => !!v || 'Username required',
         openApiPropertyValidator(openApiGetSchemaProperty(this.categories[this.category].model, 'username'))
-      ]
-    },
-
-    passwordRules (): ((v: string) => (string | boolean))[] {
-      return [
-        (v: string) => !!v || 'Password required',
-        openApiPropertyValidator(openApiGetSchemaProperty(this.categories[this.category].model, 'password'))
-      ]
-    },
-
-    confirmPasswordRules (): ((v: string) => (string | boolean))[] {
-      return [
-        () => (this.password === this.confirmPassword) || 'Passwords do not match'
       ]
     },
 
@@ -208,8 +183,7 @@ export default Vue.extend({
           method: 'POST',
           body: JSON.stringify({
             email: this.email,
-            username: this.username,
-            password: this.password
+            username: this.username
           })
         })
 
@@ -309,8 +283,6 @@ export default Vue.extend({
 
       username: '',
       emailPrefix: '',
-      password: '',
-      confirmPassword: '',
       signupReason: '',
       tosAccepted: false,
       privacyAccepted: false,
