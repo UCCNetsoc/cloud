@@ -3,7 +3,7 @@ from pydantic import BaseModel, constr, EmailStr, Field, constr
 
 from .account import Username
 from .password import Password
-from .jwt import Payload
+from .jwt import Payload, Serialized
 
 import time
 
@@ -13,7 +13,6 @@ class SignUp(BaseModel):
     """
     email: EmailStr
     username: str = Field(**Username)
-    password: str = Field(**Password)
 
 UCCStudentEmail = Field(None, alias="email", title="UCC Student Email", description="<student id>@umail.ucc.ie", regex=r"^[0-9]{8,11}@umail\.ucc\.ie$")
 UCCStaffEmail   = Field(None, alias="email", title="UCC Staff Email",   description="<email>@ucc.ie", regex=r"^[a-zA-Z\.]+@ucc.ie$")
@@ -36,3 +35,11 @@ class Verification(Payload):
     """
     sub: constr(regex=r'^admin account verification') = "admin account verification"
     username: str = Username
+
+
+class CompleteVerification(BaseModel):
+    """
+    Represents info to finish account verification
+    """
+    serialized_verification: Serialized 
+    password: str = Field(**Password)

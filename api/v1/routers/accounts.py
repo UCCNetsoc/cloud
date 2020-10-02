@@ -27,7 +27,7 @@ async def get_bearer_account(
     status_code=201,
     response_model=models.rest.Info,
 )
-async def send_verification_email(email_or_username : str, body : models.account.EmailVerification):
+async def send_verification_email(email_or_username : str, body : models.captcha.Captcha):
     if not utilities.hcaptcha.verify_hcaptcha(body.captcha):
         return models.rest.Error(
             detail=models.rest.Detail(
@@ -89,13 +89,13 @@ async def send_verification_email(email_or_username : str, body : models.account
 )
 async def verification(
     email_or_username: str,
-    serialized: models.jwt.Serialized
+    complete: models.sign_up.CompleteVerification
 ):
     resource_account = providers.accounts.find_account(email_or_username)
 
     if resource_account.verified == False:
         try:
-            verification = serialized.deserialize_verify(models.sign_up.Verification, config.links.jwt.public_key)
+            verification = complete.serialized_verification.deserialize_verify(models.sign_up.Verification, config.links.jwt.public_key)
         except Exception as e:
             logger.error(f"Invalid JWT", serialized=serialized, e=e, exc_info=True)
 
@@ -104,7 +104,7 @@ async def verification(
             ))
 
         if resource_account.username == verification.username:
-            providers.accounts.verify_account(resource_account)
+            providers.accounts.verify_account(resource_account, complete.password)
 
             utilities.webhook.info(f"**Account verified** - {resource_account.username} ({resource_account.email})")
             
@@ -128,7 +128,7 @@ async def verification(
 )
 async def send_password_reset_email(
     email_or_username : str,
-    body : models.account.EmailVerification
+    body : models.captcha.Captcha
 ):
     if not utilities.hcaptcha.verify_hcaptcha(body.captcha):
         return models.rest.Error(
@@ -136,6 +136,7 @@ async def send_password_reset_email(
                 msg=f"Invalid captcha"
             )
         )
+        
     resource_account = providers.accounts.find_account(email_or_username)
 
     if resource_account.verified:
@@ -189,14 +190,14 @@ async def send_password_reset_email(
 )
 async def set_password(
     email_or_username : str,
-    new: models.password.New
+    new: models.password.CompleteReset
 ):
     resource_account = providers.accounts.find_account(email_or_username)
     
     try:
-        reset = new.reset.deserialize_verify(models.password.Reset, config.links.jwt.public_key)
+        reset = new.serialized_reset.deserialize_verify(models.password.Reset, config.links.jwt.public_key)
     except Exception as e:
-        logger.error(f"Invalid JWT", reset=new.reset, e=e, exc_info=True)
+        logger.error(f"Invalid JWT", reset=new.serialized_reset, e=e, exc_info=True)
 
         raise exceptions.rest.Error(status_code=400, detail=models.rest.Detail(
             msg="Invalid or expired token, please try resending the reset email"

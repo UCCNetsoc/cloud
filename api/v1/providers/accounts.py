@@ -110,11 +110,13 @@ class FreeIPA:
             #
             # Thankfully, python-freeipa also has a feature that does this
             self._client.change_password(account.username, password, password)
+            self._client.user_mod(a_uid=find['result'][0]['uid'][0], o_krbpasswordexpiration="20381231011529Z")
 
         elif find2['count'] > 0:
             self._client.stageuser_mod(a_uid=find2['result'][0]['uid'][0], o_userpassword=password)
 
             self._client.change_password(account.username, password, password)
+            self._client.stageuser_mod(a_uid=find2['result'][0]['uid'][0], o_krbpasswordexpiration="20381231011529Z")
         else:
             raise exceptions.resource.NotFound("could not find user account")
 
@@ -130,7 +132,7 @@ class FreeIPA:
             account = self.read_account_by_email(email_or_username)
 
         if account is None:
-            raise exceptions.resource.NotFound()
+            raise exceptions.resource.NotFound("could not find user account")
         
         return account
 
@@ -240,7 +242,7 @@ class FreeIPA:
         elif find2['count'] > 0:
             return self._populate_accounts_from_stageuser_find(find2)[username]
         else:
-            raise exceptions.resource.NotFound()
+            raise exceptions.resource.NotFound("could not find user account")
 
     def read_account_by_email(
         self,
@@ -259,7 +261,7 @@ class FreeIPA:
         elif find2['count'] > 0:
             return list(self._populate_accounts_from_stageuser_find(find2).items())[0][1]
         else:
-            raise exceptions.resource.NotFound()
+            raise exceptions.resource.NotFound("could not find user account")
 
 
     def read_accounts_all(
@@ -294,9 +296,8 @@ class FreeIPA:
         # if home_dir.exists():
         #     raise exceptions.resource.AlreadyExists("home directory already exists")
 
-        add = self._client.stageuser_add(
+        self._client.stageuser_add(
             a_uid=sign_up.username,
-            o_userpassword=sign_up.password,
             o_loginshell="/bin/bash",
 
             # first name
@@ -314,7 +315,8 @@ class FreeIPA:
         
     def verify_account(
         self,
-        account: models.account.Account
+        account: models.account.Account,
+        password: str
     ):
         """
         Activates an account
@@ -341,6 +343,9 @@ class FreeIPA:
                 raise exceptions.provider.Failed(f"error adding newly activated user to group: {e}")
 
         account = self.read_account_by_username(account.username)
+
+        # Set their password
+        self.change_password(account, password)
 
     def read_gdpr_data(
         self,

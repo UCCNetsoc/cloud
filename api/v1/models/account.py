@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Union, Optional, Dict
 
 from . import group
+
 from typing import List
 
 
@@ -30,9 +31,3 @@ class Account(BaseModel):
     uid: Optional[int] = 65534
     groups: Dict[str, group.Group] = {}
     home_dir: Union[Path, None] = None
-
-class EmailVerification(BaseModel):
-    """
-        Represents an email verification request
-    """
-    captcha: str = ""

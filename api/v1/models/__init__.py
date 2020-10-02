@@ -9,3 +9,4 @@ from . import sign_up
 from . import backup
 from . import mysql
 from . import mentorship
+from . import captcha

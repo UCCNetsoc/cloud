@@ -143,7 +143,7 @@ email:
   sendgrid:
     key: "- no pls -"
 hcaptcha:
-  secret: "- no pls -"
+  secret: "0xA31cDbEC6b6d1bBB8c83566AdCC84B98F09b6d1c"
 mysql:
   server: mysql.netsoc.local
   username: root

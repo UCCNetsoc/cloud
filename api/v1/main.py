@@ -118,7 +118,7 @@ async def resterror_exception_handler(request: Request, e: Exception):
         status_code=500,
         content=models.rest.Error(
             detail=models.rest.Detail(
-                msg=f"{e}"
+                msg=str(e)
             )
         ).dict()
     )

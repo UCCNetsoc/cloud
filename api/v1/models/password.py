@@ -26,12 +26,12 @@ class Reset(Payload):
     sub: constr(regex=r'^admin password reset') = "admin password reset"
     username: str = Field(**Username)
 
-class New(BaseModel):
+class CompleteReset(BaseModel):
     """
     Information about the new password they want to have
 
     reset contains the serialized JWT of Reset
     password contains the new password they want
     """
-    reset: Serialized 
+    serialized_reset: Serialized 
     password: str = Field(**Password)
