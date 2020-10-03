@@ -86,12 +86,9 @@ class MySQL:
 
         with _DB() as db:
             with db.con.cursor() as cur:
-                try:
-                    # make sure deleting or creating is a valid thing to do
-                    dbs = self.list_by_account(account)
-                    
-                    for db in dbs:
-                        if db.name == database.name:
+                try:              
+                    for existing_database in self.list_by_account(account):
+                        if existing_database.name == database.name:
                             raise exceptions.resource.AlreadyExists("database already exists")
                     
                     cur.execute(f"CREATE DATABASE `{database.name}`;")
@@ -128,10 +125,9 @@ class MySQL:
         with _DB() as db:
             with db.con.cursor() as cur:
                 try:
-                    dbs = self.list_by_account(account)
                     found = False
-                    for db in dbs:
-                        if db.name == database.name:
+                    for existing_database in self.list_by_account(account):
+                        if existing_database.name == database.name:
                             found = True
                     
                     if not found:
