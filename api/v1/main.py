@@ -97,6 +97,12 @@ api.include_router(
     tags=['websites']
 )
 
+api.include_router(
+    routers.filemanager.router,
+    prefix='/v1/files',
+    tags=['filemanager']
+)
+
 """
 Return a Rest error model whenever our API throws exceptions.rest.Error
 """
