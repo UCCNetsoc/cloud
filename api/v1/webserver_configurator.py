@@ -132,7 +132,7 @@ def configure():
                             "host": list(website.config.hosts)
                         },
                         "action": {
-                            "share": "/",
+                            "share": f"{website.root}",
                             "fallback": {
                                 "pass": f"applications/{website_id}/index"
                             }
@@ -144,7 +144,7 @@ def configure():
                             "host": list(website.config.hosts)
                         },
                         "action": {
-                            "share": "/"
+                            "share": f"{website.root}"
                         }
                     })
     
