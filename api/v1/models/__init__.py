@@ -6,7 +6,8 @@ from . import website
 from . import group
 from . import password
 from . import sign_up
-from . import backup
 from . import mysql
 from . import mentorship
 from . import captcha
+from . import filemanager
+from . import download

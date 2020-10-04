@@ -46,8 +46,8 @@ class HomeDirFolder:
         self,
         account: models.account.Account,
         name: str
-    ) -> models.backup.Backup:
-        return models.backup.Backup(
+    ) -> models.download.Download:
+        return models.download.Download(
             name=name,
             path=self._get_account_backup_path(account, name),
             uid=account.uid
@@ -56,7 +56,7 @@ class HomeDirFolder:
     def list_by_account(
         self,
         account: models.account.Account,
-    ) -> List[models.backup.Backup]:
+    ) -> List[models.download.Download]:
         d = self._get_account_backups_path(account)
 
         backups = []
@@ -69,7 +69,7 @@ class HomeDirFolder:
 
     def stream_backup(
         self,
-        backup: models.backup.Backup
+        backup: models.download.Download
     ) -> bytes:
 
         base_path = backup.path

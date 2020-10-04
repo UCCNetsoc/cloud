@@ -13,7 +13,7 @@ router = APIRouter()
 @router.get(
     '/{email_or_username}/',
     status_code=200,
-    response_model=List[models.backup.Backup],
+    response_model=List[models.download.Download],
 )
 def get_user_backups(
     email_or_username: str,
@@ -40,10 +40,10 @@ def create_backup_download_link(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     backup = providers.backups.read_by_account(resource_account, backup_name)
-    request = models.backup.Request(
+    request = models.download.Request(
         iat=time.time(),
         exp=time.time() + 300,
-        backup=backup
+        obj=backup
     )
 
     response.headers["location"] = f"/v1/backups/{email_or_username}/{backup_name}/download/{request.sign_serialize(config.links.jwt.private_key).token}"
@@ -63,7 +63,7 @@ def download_backup(
     token: str
 ):
     try:
-        request = models.jwt.Serialized(token=token).deserialize_verify(models.backup.Request, config.links.jwt.public_key)
+        request = models.jwt.Serialized(token=token).deserialize_verify(models.download.Request, config.links.jwt.public_key)
     except Exception as e:
         logger.error(f"Invalid JWT", token=token, e=e, exc_info=True)
 

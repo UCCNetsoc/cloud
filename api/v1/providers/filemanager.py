@@ -6,56 +6,93 @@ import logging
 import mimetypes
 import selectors
 import subprocess
+import pathlib
 
-from pydantic import List
+import stat as st
+from typing import List
 from v1 import models, utilities, exceptions
 from v1.config import config
 from pathlib import Path
 
 import structlog as logging
 
+from fastapi import Path
 from fastapi.responses import StreamingResponse
 
-class LSDir():
-    logger = logging.getLogger(f"{__name__}.lsdir")
+class FileManager:
+    logger = logging.getLogger(f"{__name__}.filemanager")
+
     def __init__(self):
         pass
-    
+
+    def _is_dir(
+        self,
+        path: str=Path(default="/")
+    ) -> bool:
+        return path.is_dir()
+
     def ls(
         self,
         account: models.account.Account,
-        path: str) -> List(str):
-        if not account.home_dir.exists():
-            raise exceptions.resource.Unavailable(f"Home directory does not exist for {account.username}")
+        path
+    ) -> List[str]:
+
+
+        if account.home_dir.exists(): base_path = account.home_dir
         else:
-            return os.listdir(account.home_dir.joinpath(path))
+            raise exceptions.resouce.Unavailable(f"Home directory does not exist")
 
-class Download():
-    logger = logging.getLogger(f"{__name__}.download")
-    def __init__(self):
-        pass
 
-    def _get_download_path(
+        path = base_path.joinpath(path)
+        # if not account.home_dir.exists():
+        #     raise exceptions.resouce.Unavailable(f"Home directory does not exist for { account.username }")
+        # if path.exists() and self._is_dir(path):
+        #     return os.listdir(path)
+        # else:
+        #     raise exceptions.resouceUnavailable(f"Path '{ path }' is not a directory")
+
+        try:
+            return os.listdir(path)
+        except:
+            raise exceptions.resource.Unavailable(f"Path '{ path }' is not a directory or does not exist")
+
+    def stat(
         self,
         account: models.account.Account,
-        path: str
-    ) -> Path:
-        path = account.home_dir.joinpath(path)
+        path: str=Path(default="/")
+    ) -> os.stat_result:
 
-        if not path.exists():
-            raise exceptions.resource.NotFound(f"could not get path: path {path} does not exist")
+        if not pathlib.Path(path).exists():
+            raise exceptions.resource.NotFound(f"Path '{path}' does not exist")
+        
+        statinfo = os.stat(path)
+
+        return models.filemanager.Stat(
+            perms=str(oct(statinfo.st_mode)[4:]),
+            isdir=st.S_ISDIR(statinfo.st_mode),
+            size=statinfo.st_size,
+            uid=statinfo.st_uid,
+            gid=statinfo.st_gid,
+            edited=statinfo.st_mtime,
+        )
 
     def get_download(
         self,
         account: models.account.Account,
-        path: str
-    ) -> models.filemanager.Download:
-        return models.filemanager.Download(self._get_download_path(account, path), account.uid)
+        path: Path
+    ) -> models.download.Download:
+
+        return models.download.Download(
+            path = path,
+            name = path.split("/")[-1],
+            uid = account.uid,
+        )
 
     def stream_file(
         self,
-        download: models.filemanager.Download
+        download: models.download.Download
     ) -> bytes:
+
         base_path = download.path
 
         if not base_path.exists():
