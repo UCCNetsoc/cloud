@@ -100,7 +100,6 @@ class FileManager:
         download: models.download.Download,
     ) -> bytes:
         base_path = download.obj.path
-
         if not pathlib.Path(base_path).exists():
             raise exceptions.resource.NotFound(f"could not find directory { download.obj.path }: does not exist")
 
@@ -123,8 +122,8 @@ class FileManager:
                     os.setgid(gid)
                     os.setuid(uid)
 
-                tar = subprocess.Popen(["tar", "-cf", "-", base_path.name], stdout=subprocess.PIPE, preexec_fn=demote(download.uid, download.uid), cwd=base_path.parent)
-                pigz = subprocess.Popen(["pigz", "--best", "-c", "-f"], stdin=tar.stdout, stdout=subprocess.PIPE, preexec_fn=demote(download.uid, download.uid), cwd=base_path.parent)
+                tar = subprocess.Popen(["tar", "-cf", "-", base_path], stdout=subprocess.PIPE, preexec_fn=demote(download.obj.uid, download.obj.uid), cwd=pathlib.Path(base_path).parent)
+                pigz = subprocess.Popen(["pigz", "--best", "-c", "-f"], stdin=tar.stdout, stdout=subprocess.PIPE, preexec_fn=demote(download.obj.uid, download.obj.uid), cwd=pathlib.Path(base_path).parent)
 
                 sel = selectors.DefaultSelector()
                 sel.register(pigz.stdout, selectors.EVENT_READ)

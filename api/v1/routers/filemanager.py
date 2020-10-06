@@ -93,5 +93,4 @@ def download_backup(
         ))
 
     #utilities.webhook.info(f"**Downloaded backup** - uid {request.uid}")
-
     return providers.filemanager.stream_download(request)
