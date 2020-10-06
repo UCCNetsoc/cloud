@@ -14,7 +14,7 @@ class Download(BaseModel):
     """
 
     name: str
-    path: Path
+    path: str=Path(default="/")
     uid: int
 
 class Request(Payload):

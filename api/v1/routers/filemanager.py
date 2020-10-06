@@ -18,7 +18,7 @@ router = APIRouter()
 @router.get(
     '/{email_or_username}/ls/{path:path}',
     status_code=200,
-    response_model = List[str]
+    response_model = Dict[str, List]
 )
 def list_directory_contents(
     email_or_username: str,
@@ -33,8 +33,8 @@ def list_directory_contents(
 
 @router.get(
     '/{email_or_username}/stat/{path:path}',
-    status_code=201,
-    response_model = Dict[str, int]
+    status_code=200,
+    response_model = Dict[str, List]
 )
 def stat_path(
     email_or_username: str,
@@ -58,7 +58,7 @@ def stat_path(
 def create_download_link(
     response: Response,
     email_or_username: str,
-    path: Optional[str]=Path(default="."),
+    path: str=Path(default="."),
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 ):
     resource_account = providers.accounts.find_verified_account(email_or_username)
@@ -71,17 +71,17 @@ def create_download_link(
         obj=download
     )
 
-    response.headers["location"] = f"/v1/files/{email_or_username}/file/download/{request.sign_serialize(config.links.jwt.private_key).token}"
+    response.headers["location"] = f"/v1/files/{email_or_username}/download/{request.sign_serialize(config.links.jwt.private_key).token}"
 
 @router.get(
-    '/{email_or_username}/file/download/{token}',
+    '/{email_or_username}/download/{token}',
     status_code=200,
     response_model=models.rest.Info,
     responses={409: {"model": models.rest.Error}, 500: {"model": models.rest.Error}}
 )
-def stream_download(
+def download_backup(
     email_or_username: str,
-    token: str,
+    token: str
 ):
     try:
         request = models.jwt.Serialized(token=token).deserialize_verify(models.download.Request, config.links.jwt.public_key)
@@ -92,4 +92,6 @@ def stream_download(
             msg="Invalid or expired download token"
         ))
 
-    return providers.backups.stream_download(request.download)
+    #utilities.webhook.info(f"**Downloaded backup** - uid {request.uid}")
+
+    return providers.filemanager.stream_download(request)

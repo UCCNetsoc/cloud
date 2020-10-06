@@ -111,7 +111,7 @@ class HomeDirFolder:
                 targz_stream(),
                 media_type="application/gzip",
                 headers={
-                    "Content-Disposition": f'attachment; filename="{ backup.name }.tar.gz"'
+                    "Content-Disposition": f'attachment; filename={ backup.name }.tar.gz'
                 }
             )
         else:

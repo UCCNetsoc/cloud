@@ -50,7 +50,6 @@ def create_backup_download_link(
 
     utilities.webhook.info(f"**Requested backup download link** - {resource_account.username} ({resource_account.email})")
 
-
 @router.get(
     '/{email_or_username}/{backup_name}/download/{token}',
     status_code=200,
@@ -73,4 +72,4 @@ def download_backup(
 
     #utilities.webhook.info(f"**Downloaded backup** - uid {request.uid}")
 
-    return providers.backups.stream_backup(request.backup)
+    return providers.backups.stream_backup(request.obj)
