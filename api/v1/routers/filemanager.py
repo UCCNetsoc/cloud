@@ -18,7 +18,7 @@ router = APIRouter()
 @router.get(
     '/{email_or_username}/ls/{path:path}',
     status_code=200,
-    response_model = Dict[str, List]
+    response_model = Dict[str, Dict]
 )
 def list_directory_contents(
     email_or_username: str,
