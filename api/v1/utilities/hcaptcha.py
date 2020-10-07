@@ -2,8 +2,9 @@ import requests
 from ..config import config
 
 def verify_hcaptcha(token: str) -> bool:
-    if not config.production:
+    if config.captcha.enabled == False:
         return True
+
     try:
         response = requests.post(config.hcaptcha.url, {'response': token, 'secret': config.hcaptcha.secret})
         response.raise_for_status()
