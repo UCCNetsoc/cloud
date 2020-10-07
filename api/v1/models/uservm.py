@@ -51,7 +51,7 @@ class Image(BaseModel):
     description: str
     logo_url: str
     disk_url: str
-    disk_sha256: str
+    disk_sha256sums_url: str
     disk_format: str = DiskFormat.QCOW2
     specs: Specs
 
@@ -99,13 +99,14 @@ class Inactivity(BaseModel):
     impending_deletion_email_count: int = 0
 
 class NICAllocation(BaseModel):
-    addresses: List[ipaddress.IPv4Network]
-    gateway4: List[ipaddress.IPv4Address]
+    addresses: List[ipaddress.IPv4Interface] = []
+    gateway4: ipaddress.IPv4Address
+    macaddress: str
 
 class Network(BaseModel):
     ports: List[PortMapping] = []
     domains: List[str] = []
-    nic_allocation: NICAllocation
+    nic_allocation: NICAllocation 
 
 class Metadata(BaseModel):
     groups: List[str] = ["vm", "uservm"]
@@ -123,11 +124,8 @@ class Metadata(BaseModel):
     # Inactivity data
     inactivity: Inactivity
 
-    # List of exposed ports
-    ports: List[PortMapping] = []
-
-    # List of domains to pass through
-    domains: List[str] = []
+    # Network
+    network: Network
 
 class Status(str, Enum):
     NotApplicable = 'N/A'

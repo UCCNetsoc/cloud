@@ -8,6 +8,7 @@ import os
 import socket
 import shutil
 import paramiko
+import ipaddress
 import structlog as logging
 
 from urllib.parse import urlparse, unquote
@@ -245,6 +246,19 @@ class Proxmox():
         node_name = self._select_best_node(image.specs)
         fqdn = self._get_fqdn_for_account(account, hostname)
 
+        # Allocate the VM on an IP address that is not the gateway, network or broadcast address
+        # TODO - don't use random
+        offset_ip = (config.proxmox.uservm.network.ip + 1) + random.randint(1,config.proxmox.uservm.network.network.num_addresses-3)
+        assigned_ip_and_netmask = f"{offset_ip}/{config.proxmox.uservm.network.network.prefixlen}"
+
+        nic_allocation=models.uservm.NICAllocation(
+            addresses=[
+                ipaddress.IPv4Interface(assigned_ip_and_netmask)
+            ],
+            gateway4=config.proxmox.uservm.network.ip + 1, # router address is assumed to be .1 of the subnet
+            macaddress="02:00:00:%02x:%02x:%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        )
+
         metadata = models.uservm.Metadata(
             owner=account.username,
             provision=models.uservm.Provision(
@@ -257,11 +271,7 @@ class Proxmox():
             network=models.uservm.Network(
                 ports=[],
                 domains=[],
-                nic_allocation=models.uservm.NICAllocation(
-                    addresses=config.prox.uservm.network[random.randint(2,254)],
-                    gateway4=config.proxmox.uservm.network[1], # router address is assumed to be .1 of the subnet
-                    mac="02:00:00:%02x:%02x:%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-                )
+                nic_allocation=nic_allocation
             )
         )
 

@@ -119,7 +119,7 @@ class Proxmox(BaseModel):
         password: str
 
     class UserVM(BaseModel):
-        network: ipaddress.IPv4Network = ipaddress.IPv4Network("10.69.0.0/16")
+        network: ipaddress.IPv4Interface = ipaddress.IPv4Interface("10.69.0.0/16")
         base_fqdn: str = "uservm.netsoc.co"
         images: Dict[str, Image]
 
