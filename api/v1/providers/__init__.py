@@ -8,7 +8,7 @@ import random
 from pathlib import Path
 
 from v1 import exceptions
-from . import accounts, websites, email, backups, mysql, mkhomedir
+from . import accounts, websites, email, backups, mysql, mkhomedir, uservm
 
 from v1.config import config
 
@@ -29,6 +29,8 @@ try:
 
   backups = backups.HomeDirFolder()
   mysql = mysql.MySQL()
+  uservm = uservm.Proxmox()
+
 except exceptions.provider.Unavailable as e:
   # Kills the docker container
   t = random.randint(2,6)
