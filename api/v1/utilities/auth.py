@@ -72,3 +72,23 @@ def ensure_sysadmin_or_acting_on_self(
             )
         )
     
+
+def ensure_sysadmin(
+    bearer_account: models.account.Account,
+):
+    """
+    Raises an Unauthorized exception if the Bearer account (i.e the currently logged in user) is modifying an account other than itself
+
+    If the bearer user is a SysAdmin, this check is ignored
+    """
+    for groupname, group in bearer_account.groups.items():
+        if group.gid == models.group.NetsocSysAdmin.gid:
+            return
+
+    raise exceptions.rest.Error(
+        401, 
+        models.rest.Detail(
+            msg=f"You do not have permission to access this resource"
+        )
+    )
+    
