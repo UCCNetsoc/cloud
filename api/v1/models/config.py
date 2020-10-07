@@ -1,4 +1,6 @@
 
+import ipaddress
+
 from pydantic import BaseModel
 from pathlib import Path
 from typing import Set, List, Dict, Optional
@@ -102,11 +104,28 @@ class Captcha(BaseModel):
     hcaptcha: Optional[Hcaptcha]
     enabled: bool = False
 
+from .uservm import Image
 class Proxmox(BaseModel):
-    hostname: str
-    ssh_port: int
-    username: str
-    password: str
+    class SSH(BaseModel):
+        server: str
+        port: str
+        username: str
+        password: str
+
+    class API(BaseModel):
+        server: str
+        port: str
+        username: str
+        password: str
+
+    class UserVM(BaseModel):
+        network: ipaddress.IPv4Network = ipaddress.IPv4Network("10.69.0.0/16")
+        base_fqdn: str = "uservm.netsoc.co"
+        images: Dict[str, Image]
+
+    ssh: SSH
+    api: API
+    uservm: UserVM
 
 class Config(BaseModel):
     production: bool = False

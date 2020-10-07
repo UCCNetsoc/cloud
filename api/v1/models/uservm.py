@@ -61,21 +61,6 @@ ImageID = {
     "max_length": 32
 }
 
-images = {}
-images["ubuntu-20.04"] = Image(   
-    title="Ubuntu 20.04",
-    description="Ubuntu 20.04",
-    logo_url="https://assets.ubuntu.com/v1/29985a98-ubuntu-logo32.png",
-    disk_url="https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64-disk-kvm.img",
-    disk_sha256="8d6924f0718a72ef000b5a9fe535a4002f6312913db4f203f2f31e62cf3",
-    disk_format="qcow2",
-    specs=Specs(
-        cores=1,
-        disk_space=1,
-        memory=512
-    )
-)
-
 class Provision(BaseModel):
     class Stage(str, Enum):
         # VM request status
@@ -116,7 +101,7 @@ class NICAllocation(BaseModel):
 class Network(BaseModel):
     ports: List[PortMapping] = []
     domains: List[str] = []
-    nic_allocation: AllocatedNIC
+    nic_allocation: NICAllocation
 
 class Metadata(BaseModel):
     groups: List[str] = ["vm", "uservm"]
