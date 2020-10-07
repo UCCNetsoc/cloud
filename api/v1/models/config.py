@@ -94,9 +94,19 @@ class Backups(BaseModel):
 class HomeDirConsistency(BaseModel):
     scan_interval: int
 
-class Hcaptcha(BaseModel):
-    secret: Optional[str]
-    url = "https://hcaptcha.com/siteverify"
+class Captcha(BaseModel):
+    class Hcaptcha(BaseModel):
+        secret: Optional[str]
+        url: str = "https://hcaptcha.com/siteverify"
+    
+    hcaptcha: Optional[Hcaptcha]
+    enabled: bool = False
+
+class Proxmox(BaseModel):
+    hostname: str
+    ssh_port: int
+    username: str
+    password: str
 
 class Config(BaseModel):
     production: bool = False
@@ -113,4 +123,5 @@ class Config(BaseModel):
     webserver_configurator: WebserverConfigurator
     homedir_consistency: HomeDirConsistency
     metrics: Metrics
-    hcaptcha: Optional[Hcaptcha]
+    captcha: Optional[Captcha]
+    proxmox: Proxmox
