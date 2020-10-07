@@ -92,6 +92,12 @@ api.include_router(
 )
 
 api.include_router(
+    routers.uservm.router,
+    prefix='/v1/uservm',
+    tags=['uservm']
+)
+
+api.include_router(
     routers.websites.router,
     prefix='/v1/websites',
     tags=['websites']
