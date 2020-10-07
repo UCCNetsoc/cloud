@@ -43,12 +43,16 @@ class Specs(BaseModel):
     memory: int
 
 class Image(BaseModel):
+    class DiskFormat(str, Enum):
+        QCOW2: str = "qcow2"
+
+    
     title: str
     description: str
     logo_url: str
     disk_url: str
     disk_sha256: str
-    disk_format: str = "qcow2"
+    disk_format: str = DiskFormat.QCOW2
     specs: Specs
 
 
