@@ -1,12 +1,15 @@
 import requests
 from ..config import config
 
-def verify_hcaptcha(token: str) -> bool:
+def verify_captcha(token: str) -> bool:
     if config.captcha.enabled == False:
         return True
 
     try:
-        response = requests.post(config.hcaptcha.url, {'response': token, 'secret': config.hcaptcha.secret})
+        response = requests.post(
+            config.captcha.hcaptcha.url,
+            {'response': token, 'secret': config.captcha.hcaptcha.secret}
+        )
         response.raise_for_status()
         data = response.json()
         return data["success"]
