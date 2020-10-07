@@ -112,7 +112,7 @@ class Proxmox():
         username: str,
         hostname: str
     ) -> str:
-        return f"{hostname}.{username}.{models.uservm.fqdn}"
+        return f"{hostname}.{username}.{config.proxmox.uservm.base_fqdn}"
 
     def _get_fqdn_for_account(
         self,
@@ -253,6 +253,15 @@ class Proxmox():
             reason=reason,
             inactivity=models.uservm.Inactivity(
                 last_marked_active=datetime.date.today()
+            ),
+            network=models.uservm.Network(
+                ports=[],
+                domains=[],
+                nic_allocation=models.uservm.NICAllocation(
+                    addresses=config.prox.uservm.network[random.randint(2,254)],
+                    gateway4=config.proxmox.uservm.network[1], # router address is assumed to be .1 of the subnet
+                    mac="02:00:00:%02x:%02x:%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+                )
             )
         )
 
@@ -294,7 +303,13 @@ class Proxmox():
         self,
         vm: models.uservm.UserVM
     ):
-        pass
+        # Don't allow installations on unapproved VMs
+        if vm.metadata.provision.stage == models.uservm.Provision.Stage.AwaitingApproval:
+            raise exceptions.resource.Unavailable("Cannot uninstall VM. VM requires approval")
+
+        vm.metadata.provision.stage = models.uservm.Provision.Stage.Approved
+        vm.metadata.provision.remarks = []
+        self.write_out_metadata(vm)
 
     def install_vm(
         self,
@@ -315,33 +330,111 @@ class Proxmox():
 
         def provision_remark(line: str):
             vm.metadata.provision.remarks.append(line)
+            self.write_out_metadata(vm)
 
-        provision_stage(models.uservm.Provision.Stage.DownloadImage)
+        def provision_failed(reason: str):
+            provision_stage(models.uservm.Provision.Failed)
+            provision_remark(reason)
+
+        #provision_stage(models.uservm.Provision.Stage.DownloadImage)
+
+        # Strip url down to the filename
+        filename = os.path.basename(
+            unquote(
+                urlparse(vm.metadata.provision.image.disk_url).path
+            ).split('?')[0]
+        )
+
+        # This happens when they submit a link that's like somelink.com/vmdisk1/
+        # # i.e has no basepath
+        # so we set it to the <url sha256 hash>.<format>
+        if filename == "":
+            filename = f"{hashlib.sha256(vm.metadata.provision.image.disk_url).hexdigest()}.{vm.metadata.provision.image.disk_format}"
+
+        image_path = f"/tmp/{filename}"
+
+        # should be unique per API worker
+        download_folder = f"/tmp/admin-{socket.gethostname()}-{os.getpid()}/{filename}/"
 
         try:
             with ProxmoxNodeSSH(vm.node) as con:
-                stdin, stdout, stderr = con.ssh.exec_command("hostname")
-                for line in stdout.read().split(b'\n'):
-                    logger.info(str(line))
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"mkdir -p {download_folder} && cd {download_folder} && wget {vm.metadata.provision.image.disk_sha256sums_url}"
+                )
+                status = stdout.channel.recv_exit_status()
+                
+                if status != 0:
+                    provision_failed(f"Could not download image SHA256 sums: ")
+                
+
+
+                # try:
+                #     con.sftp.stat(image_path)
+                # except FileNotFoundError as 
+
         except Exception as e:
             provision_stage(models.uservm.Provision.Stage.Failed)
             provision_remark(f"Could not download image: {e}")
                 
             raise exceptions.resource.Unavailable(f"VM {vm.hostname} installation failed, check remarks")
 
-        
-        # # Strip url down to the filename
-        # filename = os.path.basename(
-        #     unquote(
-        #         urlparse(vm.metadata.provision.image.disk_url).path
-        #     ).split('?')[0]
-        # )
 
-        # # This happens when they submit a link that's like somelink.com/vmdisk1/
-        # # i.e has no basepath
-        # if filename == "":
-        #     filename = f"{hashlib.sha256(vm.metadata.provision.image.disk_url).hexdigest()}.{vm.metadata.provision.image.disk_format}"
+        # # First check if it's already been downloaded
+        # if not image_path.exists() or utilities.hash.file_sha256(image_path) != vm.metadata.provision.image.disk_sha256:
+        #     # Gotta download to a unique filename to ensure we don't conflict with the other workers/containers
+        #     download_path = Path(f"/tmp/{socket.gethostname()}-{os.getpid()}-{filename}")
 
+        #     with requests.get(vm.metadata.provision.image.disk_url, stream=True) as r:
+        #         r.raw.decode_content = True
+
+        #         with open(download_path, 'wb') as f:
+        #             shutil.copyfileobj(r.raw, f)
+
+        #     os.fsync()
+
+        #     if utilities.hash.file_sha256(download_path) != vm.metadata.provision.image.disk_sha256:
+        #         provision_stage(models.uservm.Provision.Stage.Failed)
+        #         provision_remark(f"Downloaded image does not match SHA256 hash {vm.metadata.provision.image.disk_sha256}")
+                
+        #         raise exceptions.resource.Unavailable("Installation failed, check remarks")
+
+
+
+
+
+        #provision_stage(models.uservm.Provision.Stage.PushImage)
+
+        # image_path = Path(f"/tmp/{filename}")
+
+        # # should be unique per API worker
+        # download_folder = f"/tmp/{socket.gethostname()}-{os.getpid()}/"
+
+        # try:
+        #     with ProxmoxNodeSSH(vm.node) as con:
+                
+        #         try:
+        #             con.sftp.mkdir(download_folder)
+
+        #             stdin, stdout, stderr = con.ssh.exec_command(
+        #                 f"cd {download_folder} && wget {vm.metadata.provision.image.disk_sha256sums_url} && "
+        #             )
+
+        #         except FileNotFoundError as e:
+        #             # Image does not exist 
+                
+
+        #         stdin, stdout, stderr = con.ssh.exec_command("")
+        #         exit = stdout.channel.recv_exit_status()
+
+        #         for line in stdout.read().split(b'\n'):
+        #             logger.info(str(line))
+        # except Exception as e:
+        #     provision_stage(models.uservm.Provision.Stage.Failed)
+        #     provision_remark(f"Could not download image: {e}")
+                
+        #     raise exceptions.resource.Unavailable(f"VM {vm.hostname} installation failed, check remarks")
+
+    
         # image_path = Path(f"/tmp/{filename}")
         
         # # First check if it's already been downloaded
