@@ -10,3 +10,4 @@ from . import backup
 from . import mysql
 from . import mentorship
 from . import captcha
+from . import uservm

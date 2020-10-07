@@ -1,4 +1,5 @@
 from . import auth
 from . import su
 from . import webhook
-from . import hcaptcha
+from . import captcha
+from . import hash
