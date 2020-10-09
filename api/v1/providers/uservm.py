@@ -25,7 +25,7 @@ class ProxmoxNodeSSH:
     """Paramiko SSH client that will first SSH into an exposed Proxmox node, then jump into any of the nodes in the Cluster"""
 
     jump: paramiko.SSHClient
-    node: paramiko.SSHClient
+    ssh: paramiko.SSHClient
     node_name: str
 
     ssh: paramiko.SSHClient
@@ -33,7 +33,7 @@ class ProxmoxNodeSSH:
 
     def __init__(self, node_name: str):
         self.jump = paramiko.SSHClient()
-        self.node = paramiko.SSHClient()
+        self.ssh = paramiko.SSHClient()
         self.node_name = node_name
 
     def __enter__(self):
@@ -49,8 +49,8 @@ class ProxmoxNodeSSH:
         self.jump_transport = self.jump.get_transport()
         self.jump_channel = self.jump_transport.open_channel("direct-tcpip", (self.node_name, 22), ("127.0.0.1", 22))
 
-        self.node.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.node.connect(
+        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.ssh.connect(
             self.node_name, # nodes should be setup in /etc/hosts correctly
             username=config.proxmox.ssh.username,
             password=config.proxmox.ssh.password,
@@ -58,13 +58,13 @@ class ProxmoxNodeSSH:
             sock=self.jump_channel
         )
 
-        self.ssh = self.node
         self.sftp = self.ssh.open_sftp()
 
         return self
 
     def __exit__(self, type, value, traceback):
-        self.node.close()
+        self.sftp.close()
+        self.ssh.close()
         self.jump.close()
 
 class Proxmox():
@@ -266,6 +266,7 @@ class Proxmox():
             ),
             reason=reason,
             inactivity=models.uservm.Inactivity(
+                requested_at=datetime.date.today(),
                 last_marked_active=datetime.date.today()
             ),
             network=models.uservm.Network(
@@ -329,6 +330,9 @@ class Proxmox():
         if vm.metadata.provision.stage == models.uservm.Provision.Stage.AwaitingApproval:
             raise exceptions.resource.Unavailable("Cannot install VM. VM requires approval")
         
+        if vm.metadata.provision.stage == models.uservm.Provision.Stage.Failed:
+            raise exceptions.resource.Unavailable("Cannot install VM. Uninstall VM ")
+
         # # Approved is the base "approved but not installed" state
         if vm.metadata.provision.stage != models.uservm.Provision.Stage.Approved:
             raise exceptions.resource.Unavailable("VM is currently installing/already installed")
@@ -343,8 +347,9 @@ class Proxmox():
             self.write_out_metadata(vm)
 
         def provision_failed(reason: str):
-            provision_stage(models.uservm.Provision.Failed)
+            provision_stage(models.uservm.Provision.Stage.Failed)
             provision_remark(reason)
+            raise exceptions.resource.Unavailable(f"VM {vm.hostname} installation failed, check remarks")
 
         #provision_stage(models.uservm.Provision.Stage.DownloadImage)
 
@@ -356,131 +361,114 @@ class Proxmox():
         )
 
         # This happens when they submit a link that's like somelink.com/vmdisk1/
-        # # i.e has no basepath
-        # so we set it to the <url sha256 hash>.<format>
         if filename == "":
             filename = f"{hashlib.sha256(vm.metadata.provision.image.disk_url).hexdigest()}.{vm.metadata.provision.image.disk_format}"
 
-        image_path = f"/tmp/{filename}"
+        image_folder = f"/tmp/admin-api/"
+        image_path = f"/tmp/admin-api/{filename}"
 
         # should be unique per API worker
-        download_folder = f"/tmp/admin-{socket.gethostname()}-{os.getpid()}/{filename}/"
+        download_folder = f"/tmp/admin-api-{socket.gethostname()}-{os.getpid()}/"
+        download_path = f"/tmp/admin-api-{socket.gethostname()}-{os.getpid()}/{filename}"
 
-        try:
-            with ProxmoxNodeSSH(vm.node) as con:
+        with ProxmoxNodeSSH(vm.node) as con:
+
+            # See if the image exists
+            try:
+                con.sftp.stat(image_path)
+
+                # Checksum image    
                 stdin, stdout, stderr = con.ssh.exec_command(
-                    f"mkdir -p {download_folder} && cd {download_folder} && wget {vm.metadata.provision.image.disk_sha256sums_url}"
+                    f"sha256sum {image_path} | cut -f 1 -d' '"
+                )
+
+                if vm.metadata.provision.image.disk_sha256sum not in str(stdout.read()):
+                    provision_failed(f"Downloaded image does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
+
+            except Exception as e:
+                # Original image does not exist, we gotta download it
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"rm -f {download_path} || mkdir -p {download_folder} && wget {vm.metadata.provision.image.disk_url} -O {download_path}"
                 )
                 status = stdout.channel.recv_exit_status()
-                
+
                 if status != 0:
-                    provision_failed(f"Could not download image SHA256 sums: ")
-                
+                    provision_failed(f"Could not download image: error {status}: {stderr.read()} {stdout.read()}")
 
+                # Checksum image    
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"sha256sum {download_path} | cut -f 1 -d' '"
+                )
 
-                # try:
-                #     con.sftp.stat(image_path)
-                # except FileNotFoundError as 
+                if vm.metadata.provision.image.disk_sha256sum not in str(stdout.read()):
+                    provision_failed(f"Downloaded image does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
 
-        except Exception as e:
-            provision_stage(models.uservm.Provision.Stage.Failed)
-            provision_remark(f"Could not download image: {e}")
-                
-            raise exceptions.resource.Unavailable(f"VM {vm.hostname} installation failed, check remarks")
+                # Move image
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"mkdir -p {image_folder} && rm -rf {image_path} && mv {download_path} {image_path}"
+                )
 
+                status = stdout.channel.recv_exit_status()
+                if status != 0:
+                    provision_failed(f"Couldn't rename VM image {status}: {stderr.read()} {stdout.read()}")
+            
+            vm_image_dir = self.prox.storage(config.proxmox.uservm.dir_pool).path
+  
+            # Move disk image
+            stdin, stdout, stderr = con.ssh.exec_command(
+                f"cd {vm_image_dir} && mkdir -p {vm.fqdn} && cd {vm.fqdn} && rm -rf ./primary && cp {image_path} ./primary"
+            )
+            status = stdout.channel.recv_exit_status()
+            
+            if status != 0:
+                provision_failed(f"Couldn't copy VM image {status}: {stderr.read()} {stdout.read()}")
 
-        # # First check if it's already been downloaded
-        # if not image_path.exists() or utilities.hash.file_sha256(image_path) != vm.metadata.provision.image.disk_sha256:
-        #     # Gotta download to a unique filename to ensure we don't conflict with the other workers/containers
-        #     download_path = Path(f"/tmp/{socket.gethostname()}-{os.getpid()}-{filename}")
+            # Create disk for EFI
+            stdin, stdout, stderr = con.ssh.exec_command(
+                f"cd {vm_image_dir}/{vm.fqdn} && qemu-img create -f qcow2 efi 512M"
+            )
+            status = stdout.channel.recv_exit_status()
+            
+            if status != 0:
+                provision_failed(f"Couldn't create EFI image {status}: {stderr.read()} {stdout.read()}")
 
-        #     with requests.get(vm.metadata.provision.image.disk_url, stream=True) as r:
-        #         r.raw.decode_content = True
+            # Set specs
+            self.prox.nodes(f"{vm.node}").qemu("{vm.id}/config").put(**{
+                'virtio0': f"{config.proxmox.uservm.dir_pool}:{vm.fqdn}/primary,size={vm.metadata.provision.image.specs.disk_space}G"
+                'cores': vm.metadata.provision.image.specs.cores,
+                'memory': vm.metadata.provision.image.specs.memory,
+                'bios': 'ovmf',
+                'efidisk0': f"{config.proxmox.uservm.dir_pool}:{vm.fqdn}/efi,size=512M",
+                'scsihw': 'virtio-scsi-pci',
+                'machine': 'q35',
+                'serial0': 'socket',
+                'vga': 'serial0'
+            })
+            
+    def start_vm(
+        self,
+        vm : models.uservm.UserVM
+    ):
+        pass
 
-        #         with open(download_path, 'wb') as f:
-        #             shutil.copyfileobj(r.raw, f)
-
-        #     os.fsync()
-
-        #     if utilities.hash.file_sha256(download_path) != vm.metadata.provision.image.disk_sha256:
-        #         provision_stage(models.uservm.Provision.Stage.Failed)
-        #         provision_remark(f"Downloaded image does not match SHA256 hash {vm.metadata.provision.image.disk_sha256}")
-                
-        #         raise exceptions.resource.Unavailable("Installation failed, check remarks")
-
-
-
-
-
-        #provision_stage(models.uservm.Provision.Stage.PushImage)
-
-        # image_path = Path(f"/tmp/{filename}")
-
-        # # should be unique per API worker
-        # download_folder = f"/tmp/{socket.gethostname()}-{os.getpid()}/"
-
-        # try:
-        #     with ProxmoxNodeSSH(vm.node) as con:
-                
-        #         try:
-        #             con.sftp.mkdir(download_folder)
-
-        #             stdin, stdout, stderr = con.ssh.exec_command(
-        #                 f"cd {download_folder} && wget {vm.metadata.provision.image.disk_sha256sums_url} && "
-        #             )
-
-        #         except FileNotFoundError as e:
-        #             # Image does not exist 
-                
-
-        #         stdin, stdout, stderr = con.ssh.exec_command("")
-        #         exit = stdout.channel.recv_exit_status()
-
-        #         for line in stdout.read().split(b'\n'):
-        #             logger.info(str(line))
-        # except Exception as e:
-        #     provision_stage(models.uservm.Provision.Stage.Failed)
-        #     provision_remark(f"Could not download image: {e}")
-                
-        #     raise exceptions.resource.Unavailable(f"VM {vm.hostname} installation failed, check remarks")
+    def stop_vm(
+        self,
+        vm : models.uservm.UserVM
+    ):
+        pass
 
     
-        # image_path = Path(f"/tmp/{filename}")
-        
-        # # First check if it's already been downloaded
-        # if not image_path.exists() or utilities.hash.file_sha256(image_path) != vm.metadata.provision.image.disk_sha256:
-        #     # Gotta download to a unique filename to ensure we don't conflict with the other workers/containers
-        #     download_path = Path(f"/tmp/{socket.gethostname()}-{os.getpid()}-{filename}")
+    def restart_vm(
+        self,
+        vm : models.uservm.UserVM
+    ):
+        pass
 
-        #     with requests.get(vm.metadata.provision.image.disk_url, stream=True) as r:
-        #         r.raw.decode_content = True
+    
+    def shutdown_vm(
+        self,
+        vm : models.uservm.UserVM
+    ):
+        pass
 
-        #         with open(download_path, 'wb') as f:
-        #             shutil.copyfileobj(r.raw, f)
-
-        #     os.fsync()
-
-        #     if utilities.hash.file_sha256(download_path) != vm.metadata.provision.image.disk_sha256:
-        #         provision_stage(models.uservm.Provision.Stage.Failed)
-        #         provision_remark(f"Downloaded image does not match SHA256 hash {vm.metadata.provision.image.disk_sha256}")
-                
-        #         raise exceptions.resource.Unavailable("Installation failed, check remarks")
-
-
-        #     os.replace(download_path, image_path)
-  
-        # # Push image to proxmox host
-        # provision_stage(models.uservm.Provision.Stage.PushImage)
-        # provision_remark(f"Downloaded image does not match SHA256 hash {vm.metadata.provision.image.disk_sha256}")
-
-        # local_storage = proxmox.nodes(vm.node).storage('local')
-        # local_storage.upload.create(content='vztmpl',
-        #     filename=open(image_path))
-            
-
-        # # 
-        # # local_storage.upload.create(
-        # #     content="iso",
-        # #     filename=open(os.path.expanduser('~/templates/debian-6-my-core_1.0-1_i386.tar.gz')))
-        # # )
             
