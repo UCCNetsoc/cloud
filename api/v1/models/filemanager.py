@@ -13,5 +13,5 @@ class Stat(BaseModel):
     size: int
     uid: int
     gid: int
-    edited: int
-    perms: int
+    last_edited: int
+    perms: str
