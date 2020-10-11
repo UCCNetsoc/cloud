@@ -153,6 +153,7 @@ export default Vue.extend({
       { icon: 'mdi-web', name: 'Blogs & Websites', route: '/websites' },
       // { icon: 'mdi-cloud', name: 'Cloud', route: '/cloud' },
       { icon: 'mdi-database', name: 'Databases', route: '/databases' },
+      { icon: 'mdi-file-multiple', name: 'File Manager', route: '/files' },
       { icon: 'mdi-gamepad-square', name: 'Games', route: '/games' },
       { icon: 'mdi-teach', name: 'Mentorships', route: '/mentorships' },
       { icon: 'mdi-console-line', name: 'Terminal', route: '/terminal' },

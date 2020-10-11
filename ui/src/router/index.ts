@@ -12,6 +12,7 @@ import About from '@/views/About.vue'
 import Backups from '@/views/Backups.vue'
 import Cloud from '@/views/Cloud.vue'
 import Databases from '@/views/Databases.vue'
+import FileManager from '@/views/FileManager.vue'
 import Help from '@/views/Help.vue'
 import Mentorships from '@/views/Mentorships.vue'
 import Terminal from '@/views/Terminal.vue'
@@ -123,6 +124,11 @@ const routes = [
     path: '/backups',
     name: 'Backups',
     component: requireAuth(Backups)
+  },
+  {
+    path: '/files',
+    name: 'File Manager',
+    component: requireAuth(FileManager)
   },
   {
     path: '/cloud',
