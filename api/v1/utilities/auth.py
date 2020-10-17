@@ -77,9 +77,7 @@ def ensure_sysadmin(
     bearer_account: models.account.Account,
 ):
     """
-    Raises an Unauthorized exception if the Bearer account (i.e the currently logged in user) is modifying an account other than itself
-
-    If the bearer user is a SysAdmin, this check is ignored
+    Raises an Unauthorized exception if the Bearer account (i.e the currently logged in user) is not a SysAdmin
     """
     for groupname, group in bearer_account.groups.items():
         if group.gid == models.group.NetsocSysAdmin.gid:
