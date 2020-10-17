@@ -6,7 +6,7 @@
       overlay-opacity="0.1"
     >
       <v-card-title class="justify-center text-center white--text font-weight-light">
-        our services
+        what we offer
       </v-card-title>
       <v-divider/>
       <v-card-text style="margin-top: -0.5em; margin-bottom: -0.5em">
@@ -61,14 +61,11 @@ export default Vue.extend({
 
   data: () => ({
     features: [
-
-      { icon: 'mdi-book', title: 'Blogs', description: 'Launch and host your own blog in minutes' },
-      // { icon: 'mdi-cloud', title: 'Cloud', description: 'Launch and deploy your own VPS\' and servers on demand' },
-      { icon: 'mdi-database', title: 'Databases', description: 'MySQL on demand' },
-      { icon: 'mdi-controller-classic', title: 'Gameservers', description: 'Host Minecraft, Garry\'s Mod, CS:GO, Terraria, FiveM servers and more' },
-      { icon: 'mdi-teach', title: 'Mentorships', description: 'Sign up to our mentorships and learn stuff you won\'t see in college' },
-      { icon: 'mdi-console', title: 'User Server', description: 'Gain access to portal.netsoc.co, our Linux server offered to all of our members' },
-      { icon: 'mdi-web', title: 'Websites', description: 'Host your own website at username.netsoc.co or use your own custom domain' }
+      { icon: 'mdi-web', title: 'Custom & Free Domains', description: 'Use our free subdomains like <username>.netsoc.co and mywebsite.<username>.netsoc.co or use your own domain' },
+      { icon: 'mdi-console-network', title: 'Development Tools', description: 'Boot a container with support for any programming language you can think of' },
+      { icon: 'mdi-controller-classic', title: 'Gameservers', description: 'Spin up a game server and play games like Minecraft with your friends in seconds' },
+      { icon: 'mdi-server-network', title: 'Virtual Private Servers', description: 'Launch a Linux host like Debian / Ubuntu / Arch / CentOS and run tools like Docker, LXD and more' },
+      { icon: 'mdi-web', title: 'Web Services', description: 'Easily deploy a web service with a few clicks. Pre-configured templates include WordPress, Ghost CMS and more' }
     ]
   })
 })

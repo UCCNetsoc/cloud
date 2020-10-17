@@ -1,7 +1,7 @@
 <template>
   <v-app id="inspire">
     <bg-video :playbackRate="bgRate" :additionalStyle="bgStyle" />
-    <v-navigation-drawer
+    <!-- <v-navigation-drawer
       v-model="drawer"
       app
       clipped
@@ -28,22 +28,22 @@
           </v-list-item>
         </v-list-item-group>
       </v-list>
-    </v-navigation-drawer>
+    </v-navigation-drawer> -->
 
     <v-app-bar app color="primary" dark clipped-left v-if="this.$store.state.auth.user !== null">
-      <v-app-bar-nav-icon @click.stop="drawer = !drawer" v-if="drawer == true">
+      <!-- <v-app-bar-nav-icon @click.stop="drawer = !drawer" v-if="drawer == true">
         <v-icon>mdi-close</v-icon>
       </v-app-bar-nav-icon>
       <v-app-bar-nav-icon @click.stop="drawer = !drawer" v-else>
         <v-icon>mdi-menu</v-icon>
-      </v-app-bar-nav-icon>
+      </v-app-bar-nav-icon> -->
       <v-toolbar-title>
         <div class="d-flex align-center">
           <v-img
             alt="logo"
             class="shrink mr-2"
             contain
-            :src="require('@/assets/admin-logo.svg')"
+            :src="require('@/assets/cloud-logo.svg')"
             transition="scale-transition"
             aspect-ratio="1"
             width="120"

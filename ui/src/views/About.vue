@@ -7,7 +7,7 @@
             alt="admin logo"
             class="shrink"
             contain
-            src="@/assets/admin-logo.svg"
+            src="@/assets/cloud-logo.svg"
             transition="scale-transition"
             width="160"
           />

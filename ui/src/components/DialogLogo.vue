@@ -8,10 +8,9 @@
       primary-title
     >
       <v-img
-        alt="admin logo"
         class="shrink"
         contain
-        :src="require('@/assets/admin-logo.svg')"
+        :src="require('@/assets/cloud-logo.svg')"
         transition="none"
         width="160"
         height="64"

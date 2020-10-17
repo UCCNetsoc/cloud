@@ -72,12 +72,12 @@ export default Vue.extend({
     selectedMenu: 0,
     menu: [
       { icon: 'mdi-account-circle', name: 'Account & User Server', route: '/account' },
-      { icon: 'mdi-backup-restore', name: 'Backups', route: '/backups' },
-      { icon: 'mdi-web', name: 'Blogs & Websites', route: '/websites' },
+      { icon: 'mdi-cloud', name: 'Cloud', route: '/cloud' },
+      // { icon: 'mdi-web', name: 'Blogs & Websites', route: '/websites' },
       // { icon: 'mdi-cloud', name: 'Cloud', route: '/cloud' },
-      { icon: 'mdi-database', name: 'Databases', route: '/databases' },
-      { icon: 'mdi-gamepad-square', name: 'Games', route: '/games' },
-      { icon: 'mdi-teach', name: 'Mentorships', route: '/mentorships' },
+      // { icon: 'mdi-database', name: 'Databases', route: '/databases' },
+      // { icon: 'mdi-gamepad-square', name: 'Games', route: '/games' },
+      // { icon: 'mdi-teach', name: 'Mentorships', route: '/mentorships' },
       { icon: 'mdi-console-line', name: 'Terminal', route: '/terminal' },
       { icon: 'mdi-lifebuoy', name: 'Tutorial', route: '/tutorial' },
       { icon: 'mdi-book', name: 'Wiki', route: '/wiki' }

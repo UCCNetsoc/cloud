@@ -1,6 +1,6 @@
 <template>
   <v-container fluid>
-    <v-row>
+    <!-- <v-row>
       <v-col cols="12" sm="12">
         <v-card>
           <v-container fluid class="d-flex flex-xs-wrap flex-sm-wrap flex-md-nowrap py-2">
@@ -89,7 +89,7 @@
           </v-container>
         </v-card>
       </v-col>
-    </v-row>
+    </v-row> -->
     <v-row>
       <v-col cols="12" sm="12" align="stretch">
         <v-card>
@@ -102,12 +102,12 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import WebsitesList from '@/components/WebsitesList.vue'
+import CloudServicesList from '@/components/CloudServicesList.vue'
 
 export default Vue.extend({
   name: 'Websites',
   components: {
-    WebsitesList
+    CloudServicesList
   },
 
   data: () => ({

@@ -112,47 +112,14 @@ const routes = [
     }
   },
   {
-    path: '/games',
-    name: 'Games',
-    beforeEnter (_to: Route, _from: Route, next: Function) {
-      window.open('https://games.netsoc.co')
-      next(false)
-    }
-  },
-  {
-    path: '/backups',
-    name: 'Backups',
-    component: requireAuth(Backups)
-  },
-  {
     path: '/cloud',
     name: 'Cloud',
     component: requireAuth(Cloud)
   },
   {
-    path: '/databases',
-    name: 'Databases',
-    component: requireAuth(Databases)
-  },
-  {
-    path: '/mentorships',
-    name: 'Mentorships',
-    component: requireAuth(Mentorships)
-  },
-  {
-    path: '/websites',
-    name: 'Websites',
-    component: requireAuth(Websites)
-  },
-  {
-    path: '/help',
-    name: 'Help',
-    component: requireAuth(Help)
-  },
-  {
-    path: '/status',
-    name: 'Status',
-    component: requireAuth(Status)
+    path: '/file-manager',
+    name: 'File Manager',
+    component: requireAuth(Terminal)
   },
   {
     path: '/about',
@@ -181,9 +148,9 @@ useAuthRoutes(router)
 router.afterEach((to: Route) => {
   Vue.nextTick(() => {
     if (to?.name) {
-      document.title = `${to?.name} | Netsoc Admin`
+      document.title = `${to?.name} | Netsoc Cloud`
     } else {
-      document.title = 'Netsoc Admin | UCC Netsoc'
+      document.title = 'Netsoc Cloud | UCC Netsoc'
     }
   })
 })

@@ -61,10 +61,11 @@
             </span>
           </v-checkbox> -->
         </v-form>
-        <p class="text-center">
+        <p class="text-center red--text">
           <b class="red--text">
-            The files you download may contain sensitive information.<br/><br/>Do not share them with others or they may be able to use your data to gain access to your account
+            The files you download may contain sensitive information.<br/><br/>
           </b>
+          Do not share them with others or they may be able to use your data to gain access to your account
         </p>
       </v-card-text>
       <v-divider/>
