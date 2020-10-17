@@ -5,6 +5,5 @@ from . import rest
 from . import group
 from . import password
 from . import sign_up
-from . import mentorship
 from . import captcha
 from . import proxmox

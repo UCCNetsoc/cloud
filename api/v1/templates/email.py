@@ -53,9 +53,11 @@ netsoc = Template("""
                 {% endif %}
 
                 <footer style="color: white;font-size: .8em;text-align: center;max-width: 500px;margin: 1em auto 3em auto;padding-bottom:3em;">
-                    <a target="_blank" clicktracking="off" style="color: white;" href="https://wiki.netsoc.co/en/services/terms-of-service">Terms of Service</a>
+                    <a target="_blank" clicktracking="off" style="color: white;" href="https://discord.netsoc.co">Discord</a>
                     <span> &bull; </span>
                     <a target="_blank" clicktracking="off" style="color: white;" href="https://wiki.netsoc.co/en/services/privacy-policy">Privacy Policy</a>
+                    <span> &bull; </span>
+                    <a target="_blank" clicktracking="off" style="color: white;" href="https://wiki.netsoc.co/en/services/terms-of-service">Terms of Service</a>
                 </footer>
             </div>
         </div>

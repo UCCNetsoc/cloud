@@ -3,7 +3,7 @@ import ipaddress
 
 from pydantic import BaseModel
 from pathlib import Path
-from typing import Set, List, Dict, Optional
+from typing import Set, List, Dict, Optional, Tuple
 from v1 import models
 
 class Auth(BaseModel):
@@ -25,7 +25,6 @@ class Accounts(BaseModel):
 
     freeipa: FreeIPA
 
-
 class Email(BaseModel):
     from_name: str = "UCC Netsoc Admin"
     from_address: str = "netsocadmin@netsoc.co"
@@ -45,41 +44,6 @@ class Links(BaseModel):
 
     jwt: JWT
 
-class MySQL(BaseModel):
-    server: str
-    username: str
-    password: str
-
-class Websites(BaseModel):
-    folder: str = "www"
-    config_filename: str = "netsoc.json"
-    
-    class DNS(BaseModel):
-        base_domain: str = "netsoc.co"
-        txt_name: str = "_netsoc"
-        allowed_a_aaaa: Set[str] = set(["84.39.234.50", "84.39.234.51"])
-    
-    dns: DNS 
-
-from . import mentorship
-
-class Mentorships(BaseModel):
-    available: Dict[str, mentorship.Mentorship]
-
-class WebserverConfigurator(BaseModel):
-    push_interval: int = 25
-
-    class Unit(BaseModel):
-        class BasicAuth(BaseModel):
-            username: str
-            password: str
-
-        basic_auth: BasicAuth
-        targets: List[str]
-
-    unit: Unit
-
-
 class Metrics(BaseModel):
     port: int = 8000
 
@@ -90,12 +54,6 @@ class Webhooks(BaseModel):
 class MkHomeDir(BaseModel):
     pass
 
-class Backups(BaseModel):
-    folder: str = ".snaps"
-
-class HomeDirConsistency(BaseModel):
-    scan_interval: int
-
 class Captcha(BaseModel):
     class Hcaptcha(BaseModel):
         secret: Optional[str]
@@ -104,7 +62,10 @@ class Captcha(BaseModel):
     hcaptcha: Optional[Hcaptcha]
     enabled: bool = False
 
-from .uservm import Image
+class HomeDirConsistency(BaseModel):
+    scan_interval: int
+
+from .proxmox import Template
 class Proxmox(BaseModel):
     class SSH(BaseModel):
         server: str
@@ -118,14 +79,52 @@ class Proxmox(BaseModel):
         username: str
         password: str
 
-    class UserVM(BaseModel):
+    class VPS(BaseModel):
         network: ipaddress.IPv4Interface = ipaddress.IPv4Interface("10.69.0.0/16")
-        base_fqdn: str = "uservm.netsoc.co"
-        images: Dict[str, Image]
+        bridge: str = "vmbr0"
+        vlan: int = 69
+        base_fqdn: str = "vps.cloud.netsoc.co"
+        templates: Dict[str, Template] = {}
+        dir_pool: str = "local"
+
+        inactivity_shutdown_warning_num_days: int = 30
+        inactivity_shutdown_num_days: int = 60
+        inactivity_deletion_warning_num_days: int = 90
+        inactivity_deletion_num_days: int = 120
+
+    class LXC(BaseModel):
+        network: ipaddress.IPv4Interface = ipaddress.IPv4Interface("10.68.0.0/16")
+        bridge: str = "vmbr0"
+        vlan: int = 68
+        base_fqdn: str = "lxc.cloud.netsoc.co"
+        templates: Dict[str, Template] = {}
+        dir_pool: str = "local"
+
+        inactivity_shutdown_warning_num_days: int = 60
+        inactivity_shutdown_num_days: int = 90
+        inactivity_deletion_warning_num_days: int = 120
+        inactivity_deletion_num_days: int = 150
+
+    class PortForward(BaseModel):
+        range: Tuple[int,int] = (16384,32767)
+
+    class VHosts(BaseModel):
+        class UserSupplied(BaseModel):
+            verification_txt_name: str = "_netsoc"
+            allowed_a_aaaa: Set[str] = set(["84.39.234.52"])
+
+        class NetsocSupplied(BaseModel):
+            base_domain: str = "netsoc.co"
+
+        netsoc_supplied: NetsocSupplied = NetsocSupplied()
+        user_supplied: UserSupplied = UserSupplied()
 
     ssh: SSH
     api: API
-    uservm: UserVM
+    vps: VPS
+    lxc: LXC
+    port_forward: PortForward = PortForward()
+    vhosts: VHosts = VHosts()
 
 class Config(BaseModel):
     production: bool = False
@@ -134,12 +133,7 @@ class Config(BaseModel):
     auth: Auth
     email: Email
     links: Links
-    mysql: MySQL
-    backups: Backups
-    websites: Websites
     webhooks: Webhooks
-    mentorships: Mentorships
-    webserver_configurator: WebserverConfigurator
     homedir_consistency: HomeDirConsistency
     metrics: Metrics
     captcha: Optional[Captcha]

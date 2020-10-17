@@ -2,35 +2,55 @@
 import datetime
 import ipaddress
 
-
-from typing import Optional, Union, List
-from pydantic import BaseModel, constr, EmailStr, Field, constr
+from typing import Optional, Union, List, Dict, Tuple, Set
+from pydantic import BaseModel, constr, EmailStr, Field, conint
 from enum import Enum
 
 from .account import Username
-
-fqdn = "uservm.netsoc.co"
-
-class PortMapping(BaseModel):
-    target: int
-    published: int
 
 Hostname = {
     "default": None,
     "title": "VM Hostname",
     "description": "",
-    "regex": r"^[a-z0-9-.]+$",
+    "regex": r"^[a-z0-9-]+$",
     "max_length": 24
+}
+
+Reason = {
+    "default": None,
+    "title": "Reason",
+    "description": "A concise reason as to what you will use the VM/Container for",
+    "max_length": 280
 }
 
 FQDN = {
     "default": None,
-    "title": "VM FQDN",
+    "title": "FQDN",
     "description": "",
-    "regex": r"^[a-z0-9-.]+." + fqdn + r"$",
+    "regex": r"^[a-z0-9-.]+.netsoc.co$",
     "max_length": 150 
 }
 
+VHost = {  
+    "default": None,
+    "alias": "domain",
+    "title": "Website domain/hostname",
+    "description": "Any valid domain name",
+    "regex": r"^((?!-))(xn--)?[a-z0-9][a-z0-9-_]{0,61}[a-z0-9]{0,1}\.(xn--)?([a-z0-9\-]{1,61}|[a-z0-9-]{1,30}\.[a-z]{2,})$"
+}
+
+TemplateID = {
+    "default": None,
+    "title": "Template ID",
+    "description": "",
+    "regex": r"^[a-z0-9-.]+$",
+    "min_length": 1,
+    "max_length": 32
+}
+
+class RootUserReset(BaseModel):
+    password: str
+    private_key: str
 
 class Specs(BaseModel):
     # number of vcores
@@ -42,69 +62,71 @@ class Specs(BaseModel):
     # number of mb of ram
     memory: int
 
-class Image(BaseModel):
+    # swap
+    swap: int = 0
+
+class Template(BaseModel):
     class DiskFormat(str, Enum):
         QCOW2: str = "qcow2"
-
+        TarGZ: str = "tar.gz"
     
     title: str
     description: str
     logo_url: str
     disk_url: str
     disk_sha256sum: str
-    disk_format: str = DiskFormat.QCOW2
+    disk_format: str
     specs: Specs
 
+from .account import Username
+from .jwt import Payload, Serialized
 
-ImageID = {
-    "default": None,
-    "title": "VM Hostname",
-    "description": "",
-    "regex": r"^[a-z0-9-.]+$",
-    "min_length": 1,
-    "max_length": 32
-}
+class RequestDetail(BaseModel):
+    template_id: str = Field(**TemplateID)
+    reason: str = Field(**Reason)
 
-class Provision(BaseModel):
-    class Stage(str, Enum):
-        # VM request status
-        AwaitingApproval = "awaiting-approval"
-        Approved = "approved"
-        DownloadImage = "installation-downloading-image"
-        PushImage = "installation-push-image"
-        SetSpecs = "installation-set-specs"
-        FlashImage = "installation-flash-image"
-        CloudInitSetup = "installation-setup-cloud-init"
-        Installed = "installed"
-        Failed = "installation-failed"
+class VPSRequest(Payload):
+    sub: constr(regex=r'^admin vps request$') = "admin vps request"
+    username: str = Field(**Username)
+    hostname: str = Field(**Hostname)
+    detail: RequestDetail
 
-    stage: Stage = Stage.AwaitingApproval
-    remarks: List[str] = []
-    image: Image
+class LXCRequest(Payload):
+    sub: constr(regex=r'^admin lxc request$') = "admin lxc request"
+    username: str = Field(**Username)
+    hostname: str = Field(**Hostname)
+    detail: RequestDetail
+    
+class ToS(BaseModel):
+    suspended: bool = False
+    reason: Optional[str] = None
 
 class Inactivity(BaseModel):
-    requested_at: datetime.date
+    marked_active_at: datetime.date
 
-    installed_at: datetime.date = None
+    # The last time we emailed them about the VM impending inactivity shutdown
+    emailed_shutdown_warning_at: datetime.date = None
 
-    last_started: datetime.date = None
-
-    last_stopped: datetime.date = None
-
-    # The date they last set the VM as active
-    last_marked_active: datetime.date
-
-    # The last time we emailed them about the VM being inactive
-    last_emailed_about_inactivity: datetime.date = None
+    # The last time we emailed them that the VM is now inactive and shutdown
+    emailed_shutdown_at: datetime.date = None
 
     # The last time we emailed them about impending deletion
-    last_emailed_about_deletion: datetime.date = None
+    emailed_deletion_warning_at: datetime.date = None
 
-    # Number of inactive emails we've sent
-    inactivity_warning_email_count: int = 0
+    # Number of inactive shutdown emails we've sent
+    shutdown_warning_email_count: int = 0
+
+    # Number of 'VM now inactive and shutdown' emails we've sent
+    shutdown_email_count: int = 0
 
     # Number of deletion warning emails we've sent
     deletion_warning_email_count: int = 0
+
+class RootUser(BaseModel):
+    password_hash: str
+    ssh_public_key: str
+    mgmt_ssh_public_key: str
+    mgmt_ssh_private_key: str
 
 class NICAllocation(BaseModel):
     addresses: List[ipaddress.IPv4Interface] = []
@@ -112,28 +134,18 @@ class NICAllocation(BaseModel):
     macaddress: str
 
 class Network(BaseModel):
-    ports: List[PortMapping] = []
-    domains: List[str] = []
+    vhosts: Set[str] = set()
+    ports: Dict[int, int] = {}
     nic_allocation: NICAllocation 
 
-class RootUser(BaseModel):
-    user_ssh_password_hash: str
-    user_ssh_public_key: Optional[str]
-    management_ssh_public_key: str
-    management_ssh_private_key: str
-
-class Metadata(BaseModel):
-    groups: List[str] = ["vm", "uservm"]
+class LXCMetadata(BaseModel):
+    groups: List[str] = ["lxc", "cloudlxc"]
     host_vars: dict = {}
 
-    # VM owner
     owner: str = Field(**Username)
 
-    # Why the VM exists
-    reason: str 
-
-    # Info about the VM provisioning
-    provision: Provision
+    # Tracks ToS suspension status
+    tos: ToS = ToS()
 
     # Inactivity data
     inactivity: Inactivity
@@ -141,16 +153,18 @@ class Metadata(BaseModel):
     # Network
     network: Network
 
-    root_user: RootUser 
+    # Root user info
+    root_user: RootUser
+
+    # Details about the original request
+    request_detail: RequestDetail
 
 class Status(str, Enum):
-    NotApplicable = 'N/A'
-    Stopped = 'Stopped'
-    Starting = 'Starting'
-    Running = 'Running'
-    Failed = 'Failed - Restart / Contact SysAdmins'
+    NotApplicable = 'n/a'
+    Stopped = 'stopped'
+    Running = 'running'
 
-class UserVM(BaseModel):
+class LXC(BaseModel):
     # Proxmox node
     node: str 
 
@@ -166,11 +180,107 @@ class UserVM(BaseModel):
     # Specs
     specs: Specs
 
+    # If the VM is currently active
+    active: bool
+
     # Metadata
-    metadata: Metadata
+    metadata: LXCMetadata
 
     # Remarks about the VM and it's configuration we return to the user
     remarks: List[str] = []
 
     status: Status
 
+class Provision(BaseModel):
+    class Stage(str, Enum):
+        # VM request status
+        Began = "provision-began"
+        DownloadImage = "provision-download-image"
+        FlashImage = "provision-flash-image"
+        SetSpecs = "provision-set-specs"
+        Installed = "provision-installed"
+        Failed = "provision-failed"
+
+    # stage: Stage = Stage.AwaitingApproval
+    remarks: List[str] = []
+    template_id: str = Field(**TemplateID)
+
+
+class VPSMetadata(BaseModel):
+    groups: List[str] = ["vm", "uservm"]
+    host_vars: dict = {}
+
+    # VM owner
+    owner: str = Field(**Username)
+
+    # Why the VM exists
+    reason: str 
+
+    # Info about the VM provisioning
+    provision: Provision
+
+    tos: ToS = ToS()
+
+    # Inactivity data
+    inactivity: Inactivity
+
+    # Network
+    network: Network
+
+    # Root user info
+    root_user: RootUser
+
+    # Repply cloud-init settings on next boot
+    # Used to set passwords, network settings, will also rotate host keys
+    reapply_cloudinit_on_next_boot: str = False
+
+# class UserVM(BaseModel):
+#     # Proxmox node
+#     node: str 
+
+#     # VM id
+#     id: int
+
+#     # VM hostname
+#     hostname: str = Field(**Hostname)
+
+#     # VM fqdn
+#     fqdn: str = Field(**FQDN)
+
+#     # Specs
+#     specs: Specs
+
+#     # Metadata
+#     metadata: Metadata
+
+#     # Remarks about the VM and it's configuration we return to the user
+#     remarks: List[str] = []
+
+#     status: Status
+
+#     # Returns true if the VM is considered active i.e not in danger of being shut off or deletion
+#     active: bool
+
+# class UserLXC(BaseModel):
+#     # Proxmox node
+#     node: str 
+
+#     # VM id
+#     id: int
+
+#     # VM hostname
+#     hostname: str = Field(**Hostname)
+
+#     # VM fqdn
+#     fqdn: str = Field(**FQDN)
+
+#     # Specs
+#     specs: Specs
+
+#     # Metadata
+#     metadata: Metadata
+
+#     # Remarks about the VM and it's configuration we return to the user
+#     remarks: List[str] = []
+
+#     status: Status
