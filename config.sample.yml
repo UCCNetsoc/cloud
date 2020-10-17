@@ -7,6 +7,47 @@ auth:
       MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC rVrCuTtArbgaZzL1hvh0xtL5mc7o0NqPVnYXkLvgcwiC3BjLGw1tGEGoJaXDuSaRllobm53JBhjx33UNv+5z/UMG4kytBWxheNVKnL6GgqlNabMaFfPLPCF8kAgKnsi79NMo+n6KnSY8YeUmec/p2vjO2NjsSAVcWEQMVhJ31LwIDAQAB
       -----END PUBLIC KEY-----
     signing_algorithm: "RS256"
+proxmox:
+  ssh:
+    server: "feynman.netsoc.co"
+    port: 2222
+    username: "root"
+    password: "lolno"
+  api:
+    server: "feynman.netsoc.co"
+    port: 8006
+    username: "root@pam"
+    password: "lolno"
+  vps:
+    dir_pool: local
+    templates: {}
+      # ubuntu-20.04:
+      #   title: "Ubuntu 20.04"
+      #   description: "Ubuntu 20.04"
+      #   logo_url: "https://assets.ubuntu.com/v1/29985a98-ubuntu-logo32.png"
+      #   disk_url: "https://cloud-images.ubuntu.com/releases/focal/release-20200921.1/ubuntu-20.04-server-cloudimg-amd64.img"
+      #   disk_sha256sum: "d18a9d2b890d3c1401e70a281cae44b61816aa669c4936f7a99c168e572ec8cb"
+      #   disk_format: "qcow"
+      #   specs:
+      #     cores: 1
+      #     disk_space: 10
+      #     memory: 512
+  lxc:
+    dir_pool: local
+    templates:
+      ubuntu-19.10:
+        title: "Ubuntu 19.10"
+        description: "Ubuntu 19.10"
+        logo_url: "https://assets.ubuntu.com/v1/29985a98-ubuntu-logo32.png"
+        disk_url: "http://download.proxmox.com/images/system/ubuntu-19.10-standard_19.10-1_amd64.tar.gz"
+        disk_sha256sum: "6df31f74b031fc831b774b1b0f8f7f43cbc0dd422a400671d4703dde3092b829"
+        disk_format: "tar.gz"
+        specs:
+          cores: 1
+          disk_space: 10
+          memory: 512
+          swap: 512
+
 links:
   base_url: "http://admin.netsoc.local"
   jwt:
@@ -54,6 +95,8 @@ accounts:
     - admin
     - blog
     - ldap
+    - cloud
+    - api
     - feynman
     - lovelace
     - leela
@@ -116,21 +159,6 @@ accounts:
     server: "ipa.netsoc.local"
     username: "admin"
     password: "netsoc_freeipa"
-backups:
-  folder: ".snaps"
-mentorships:
-  available:
-    typescript:
-      title: Typescript with Forde
-      teacher: Michael Forde
-      description: |
-        <img src="https://www.positronx.io/wp-content/uploads/2018/11/positronx-banner-1152-1.jpg" style="width:256px" />
-
-        #### A 6 class lesson on TypeScript
-
-        The hot new JavaScript replacement that is taking Silicon Valley by storm!
-
-        Tear the hairs out of your eyelids and watch as eslint crashes inside vscode for the 7th time today!
 webhooks:
   info: https://discordapp.com/api/webhooks/732754216883585059/6LqFp1ZsomNdlMT78PBJCQNXN5hq_luwiec4UxTVcRpLErSnLWCi7SRnMKztIYRoSK-t
   form_filled: https://discordapp.com/api/webhooks/732754216883585059/6LqFp1ZsomNdlMT78PBJCQNXN5hq_luwiec4UxTVcRpLErSnLWCi7SRnMKztIYRoSK-t
@@ -142,28 +170,9 @@ email:
   reply_to_address: "netsoc@uccsocieties.ie"
   sendgrid:
     key: "- no pls -"
-hcaptcha:
-  secret: "0xA31cDbEC6b6d1bBB8c83566AdCC84B98F09b6d1c"
-mysql:
-  server: mysql.netsoc.local
-  username: root
-  password: password
-websites:
-  folder: "www"
-  config_filename: "netsoc.json"
-  dns:
-    base_domain: "netsoc.dev"
-    txt_name: "_netsoc"
-    allowed_a_aaaa:
-      - 84.39.234.50
-      - 84.39.234.51
+captcha:
+  enabled: true
+  hcaptcha:
+    secret: "0xA31cDbEC6b6d1bBB8c83566AdCC84B98F09b6d1c"
 homedir_consistency:
   scan_interval: 60
-webserver_configurator:
-  push_interval: 120
-  unit:
-    basic_auth:
-      username: netsoc_unit
-      password: netsoc_unit
-    targets:
-      - unitproxy.netsoc.local:8080
