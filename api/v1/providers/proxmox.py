@@ -651,13 +651,13 @@ class Proxmox():
                 txt_res = set(map(lambda x: str(x).strip('"'),q))
 
                 if txt_content not in txt_res:
-                    remarks.append(f"Host {domain} - could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}, instead found {txt_res}!")
+                    remarks.append(f"Domain {domain} - could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}, instead found {txt_res}!")
             except dns.resolver.NXDOMAIN:
-                remarks.append(f"Host {domain} - could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}")
+                remarks.append(f"Domain {domain} - could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}")
             except dns.exception.DNSException as e:
-                remarks.append(f"Host {domain} - unable to lookup record ({txt_name}.{custom_base}): ({e})")
+                remarks.append(f"Domain {domain} - unable to lookup record ({txt_name}.{custom_base}): ({e})")
             except Exception as e:
-                remarks.append(f"Host {domain} - error {e} (contact SysAdmins)")
+                remarks.append(f"Domain {domain} - error {e} (contact SysAdmins)")
 
         if len(remarks) == 0:
             return (True, None)
