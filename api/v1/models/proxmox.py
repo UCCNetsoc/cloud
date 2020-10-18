@@ -64,10 +64,6 @@ Port = {
     "le": 65535
 }
 
-class RootUserReset(BaseModel):
-    password: str
-    private_key: str
-
 class Specs(BaseModel):
     # number of vcores
     cores: int

@@ -499,7 +499,6 @@ class Proxmox():
             mgmt_ssh_public_key=mgmt_ssh_public_key,
             mgmt_ssh_private_key=mgmt_ssh_private_key
         )
-        lxc.metadata.apply_root_reset_on_next_boot = True
         self.write_out_lxc_metadata(lxc)
 
         with ProxmoxNodeSSH(lxc.node) as con:
