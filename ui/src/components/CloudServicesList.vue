@@ -95,7 +95,7 @@
             mdi-plus
           </v-icon>
         </v-btn>
-        <v-btn @click="uiReloadWebsites()" icon>
+        <v-btn @click="uiReloadLxc()" icon>
           <v-icon>
             mdi-refresh
           </v-icon>
@@ -142,9 +142,57 @@
             <span>{{ item.title }}</span>
           </template>
         </v-select>
+        <v-card-text style="margin-top: -2.5em; margin-bottom: -0.5em">
+          <v-card flat>
+            <v-container>
+              <v-row no-gutters justify="start" align="center">
+                <v-col>
+                  <v-avatar
+                    size="32"
+                    tile
+                  >
+                    <v-icon large>mdi-web</v-icon>
+                  </v-avatar>
+                </v-col>
+                <v-col sm="10">
+                  <h3>
+                    No commerical use
+                  </h3>
+                  <span>
+                    Don't host facebook or listen.moe, etc
+                  </span>
+                </v-col>
+              </v-row>
+            </v-container>
+          </v-card>
+          <v-card flat>
+            <v-container>
+              <v-row no-gutters justify="start" align="center">
+                <v-col>
+                  <v-avatar
+                    size="32"
+                    tile
+                  >
+                    <v-icon large>mdi-briefcase-account-outline</v-icon>
+                  </v-avatar>
+                </v-col>
+                <v-col sm="10">
+                  <h3>
+                    No adult material
+                  </h3>
+                  <span>
+                    Find somewhere else
+                  </span>
+                </v-col>
+              </v-row>
+            </v-container>
+          </v-card>
+        </v-card-text>
+        <span style="margin: auto;">Check the Terms of service for an exhaustive list of acceptable usages.</span>
         <v-textarea
           label='Reason'
           outlined
+          style="margin-top: 1em"
           :rules="requiredRules"
           v-model='confirmCancel.action.reason'
         ></v-textarea>
@@ -366,7 +414,7 @@ export default Vue.extend({
                 body: JSON.stringify({ template_id, reason })
               })
 
-            this.msg = 'Service request successfully sent!'
+            this.msg = 'Service request successfully sent! We will review your request and get back to you soon.'
             break
           }
         }
@@ -375,7 +423,7 @@ export default Vue.extend({
       } finally {
         this.confirmCancel.loading = false
         this.confirmCancel.mode = ConfirmCancelMode.Hidden
-        this.uiReloadWebsites()
+        this.uiReloadLxc()
       }
     },
 
@@ -384,29 +432,29 @@ export default Vue.extend({
       this.confirmCancel.mode = ConfirmCancelMode.Hidden
     },
 
-    async uiReloadWebsites () {
-      this.loading = true
-      this.websites = []
+    async uiReloadLxc () {
+      this.lxcLoading = true
+      this.lxcs = []
 
       try {
         // console.log(config)
         const res = await fetchRest(
-          `${config.apiBaseUrl}/v1/websites/${this.$store.state.auth.user.profile.preferred_username}`, {
+          `${config.apiBaseUrl}/v1/proxmox/lxc/${this.$store.state.auth.user.profile.preferred_username}`, {
             headers: {
               Authorization: `Bearer ${this.$store.state.auth.user.access_token}`
             }
           })
 
-        this.loading = false
-        const websites: { [name: string]: Website } = await res.json()
-        this.websites = Object.values(websites)
+        this.lxcLoading = false
+        const lxcs: { [name: string]: LXC } = await res.json()
+        this.lxcs = Object.values(lxcs)
 
-        if (this.websites.length === 0) {
-          this.empty = 'You have no websites, try adding one!'
+        if (this.lxcs.length === 0) {
+          this.empty = 'You have no services, try requesting one!'
         }
       } catch (e) {
-        this.loading = false
-        this.websites = []
+        this.lxcLoading = false
+        this.lxcs = []
         this.empty = e.message
       }
     },
@@ -438,16 +486,16 @@ export default Vue.extend({
   },
 
   data () {
-    // const websites: Website[] = []
+    const lxcs: LXC[] = []
     const action: ConfirmCancelAction = {}
     const lxcTemplates: Template[] = []
 
     return {
       ConfirmCancelMode, // Needed to use the enum in the rendered template
-      loading: true,
       empty: '',
       msg: '',
-      websites: [],
+      lxcs,
+      lxcLoading: true,
       lxcTemplates,
 
       confirmCancel: {
@@ -469,7 +517,7 @@ export default Vue.extend({
   },
 
   mounted () {
-    this.uiReloadWebsites()
+    this.uiReloadLxc()
     this.uiReloadLxcTemplates()
   }
 })
