@@ -132,10 +132,26 @@ class Proxmox():
     def _allocate_ip_lxc(
         self
     ) -> ipaddress.IPv4Interface:
-        offset_ip = (config.proxmox.lxc.network.ip + 1) + random.randint(1,config.proxmox.lxc.network.network.num_addresses-3)
-        assigned_ip_and_netmask = f"{offset_ip}/{config.proxmox.lxc.network.network.prefixlen}"
+        # world's most ghetto ip allocation algorithm
 
-        return ipaddress.IPv4Interface(assigned_ip_and_netmask)
+        # returns set with network and broadcast address removed
+        ips = set(config.proxmox.lxc.network.network.hosts())
+
+        # remove router address
+        ips.remove(config.proxmox.lxc.network.ip + 1)
+
+        # remove any addresses assigned to any of the lxcs
+        for fqdn, lxc in self.read_lxcs().items():
+            for address in lxc.metadata.network.nic_allocation.addresses:
+                if address.ip in ips:
+                    ips.remove(address.ip)
+
+        if len(ips) > 0:
+            ip = next(iter(ips))
+
+            return ipaddress.IPv4Interface(f"{ip}/{config.proxmox.lxc.network.network.prefixlen}")
+        else:
+            raise exception.resource.Unavailable("Could not allocate an IP for the LXC. No IPs available")
 
     def _random_password(
         self,
