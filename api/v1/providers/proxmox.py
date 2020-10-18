@@ -16,6 +16,7 @@ import io
 import crypt
 import string
 import time
+
 import structlog as logging
 
 from urllib.parse import urlparse, unquote
@@ -421,7 +422,7 @@ class Proxmox():
 
         # Build remarks about the thing, problems, etc...
         for vhost in lxc.metadata.network.vhosts:
-            valid, remarks = self.is_valid_domain(lxc.metadata.owner, vhost)
+            valid, remarks = self.validate_domain(lxc.metadata.owner, vhost)
 
             if valid is not True:
                 lxc.remarks += remarks
@@ -567,9 +568,10 @@ class Proxmox():
     def add_vhost_lxc(
         self,
         lxc: models.proxmox.LXC,
-        vhost: str
+        vhost: str,
+        options: models.proxmox.VHostOptions
     ):
-        lxc.metadata.network.vhosts.add(vhost)
+        lxc.metadata.network.vhosts[vhost] = options
         self.write_out_lxc_metadata(lxc)
 
     def remove_vhost_lxc(
@@ -578,7 +580,7 @@ class Proxmox():
         vhost: str
     ):
         if vhost in lxc.metadata.network.vhosts:
-            lxc.metadata.network.vhosts.remove(vhost)
+            del lxc.metadata.network.vhosts[vhost]
 
             self.write_out_lxc_metadata(lxc)
         else:
@@ -607,7 +609,7 @@ class Proxmox():
         
         return port_map
 
-    def is_valid_domain(
+    def validate_domain(
         self,
         username: models.account.Username,
         domain: str
@@ -715,6 +717,49 @@ class Proxmox():
             del lxc.metadata.network.ports[external]
         self.write_out_lxc_metadata(lxc)
 
+    def build_traefik_config(
+        self,
+        web_entrypoints: List[str]
+    ) -> dict:
+        services = {}
+        routers = {}
+
+        for fqdn, lxc in self.read_lxcs().items():
+            valid_vhosts = set()
+
+            for vhost in lxc.metadata.network.vhosts:
+                valid, remarks = self.validate_domain(lxc.metadata.owner, vhost)
+
+                if valid is True:
+                    valid_vhosts.add(vhost)
+
+            if len(valid_vhosts) > 0:
+                routers[fqdn] = {
+                    "entrypoints": web_entrypoints,
+                    "rule": f"Host(`{ '`, `'.join(valid_vhosts) }`)",
+                    "service": fqdn,
+                    "tls": {
+                        "certResolver": "letsencrypt"
+                    }
+                }
+
+                services[fqdn] = {
+                    "loadBalancer": {
+                        "servers": [{ 
+                            "url": f"http://{lxc.metadata.network.nic_allocation.addresses[0].ip}"
+                        }]
+                    }
+                }
+    
+
+        config = {
+            "http": {
+                "routers": routers,
+                "services": services
+            }
+        }
+
+        return config
 
     def _get_vps_fqdn_for_username(
         self,

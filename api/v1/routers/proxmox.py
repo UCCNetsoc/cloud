@@ -15,6 +15,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get(
+    '/traefik-config',
+    status_code=200,
+    response_model=dict,
+    responses={400: {"model": models.rest.Error}}
+)
+async def get_traefik_config():
+    return providers.proxmox.build_traefik_config("web-secure")
+
+@router.get(
     '/lxc-templates',
     status_code=200,
     response_model=Dict[str,models.proxmox.Template],
@@ -350,13 +359,14 @@ async def add_vhost_lxc(
     email_or_username: str,
     hostname: str = Path(**models.proxmox.Hostname),
     vhost: str = Path(**models.proxmox.VHost),
+    options: models.proxmox.VHostOptions = models.proxmox.VHostOptions(),
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 ):
     resource_account = providers.accounts.find_verified_account(email_or_username)
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     lxc = providers.proxmox.read_lxc_by_account(resource_account, hostname)
-    providers.proxmox.add_vhost_lxc(lxc, vhost)
+    providers.proxmox.add_vhost_lxc(lxc, vhost, options)
 
 @router.delete(
     '/lxc/{email_or_username}/{hostname}/vhost/{vhost}',

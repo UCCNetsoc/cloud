@@ -145,8 +145,12 @@ class NICAllocation(BaseModel):
     gateway4: ipaddress.IPv4Address
     macaddress: str
 
+class VHostOptions(BaseModel):
+    port: int = 80
+    https: bool = False
+
 class Network(BaseModel):
-    vhosts: Set[str] = set()
+    vhosts: Dict[str,VHostOptions] = {}
     ports: Dict[int, int] = {}
     nic_allocation: NICAllocation 
 
