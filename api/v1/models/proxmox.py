@@ -33,10 +33,9 @@ FQDN = {
 
 VHost = {  
     "default": None,
-    "alias": "domain",
     "title": "Website domain/hostname",
     "description": "Any valid domain name",
-    "regex": r"^((?!-))(xn--)?[a-z0-9][a-z0-9-_]{0,61}[a-z0-9]{0,1}\.(xn--)?([a-z0-9\-]{1,61}|[a-z0-9-]{1,30}\.[a-z]{2,})$"
+    "regex": r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
 }
 
 TemplateID = {
@@ -46,6 +45,23 @@ TemplateID = {
     "regex": r"^[a-z0-9-.]+$",
     "min_length": 1,
     "max_length": 32
+}
+
+def generate_ranged_port_field_args(gte, lte):
+    return {
+        "default": None,
+        "title": "Port number",
+        "description": "Port number in range [{gte},{lte}]",
+        "ge": gte,
+        "le": lte
+    }
+
+Port = {
+    "default": None,
+    "title": "Port number",
+    "description": "Any port number",
+    "ge": 0,
+    "le": 65535
 }
 
 class RootUserReset(BaseModel):

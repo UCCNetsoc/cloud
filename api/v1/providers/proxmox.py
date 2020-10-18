@@ -405,9 +405,9 @@ class Proxmox():
 
         # Build remarks about the thing, problems, etc...
         for vhost in lxc.metadata.network.vhosts:
-            remarks = self._validate_domain(vhost)
+            valid, remarks = self.is_valid_domain(lxc.metadata.owner, vhost)
 
-            if remarks is not None:
+            if valid is not True:
                 lxc.remarks += remarks
 
         return lxc
@@ -518,8 +518,6 @@ class Proxmox():
         lxc: models.proxmox.LXC
     ):
         if lxc.status != models.proxmox.Status.Running:
-            logger.info(f"rate=100,name=eth0,bridge={config.proxmox.lxc.bridge},tag={config.proxmox.lxc.vlan},hwaddr={lxc.metadata.network.nic_allocation.macaddress},ip={lxc.metadata.network.nic_allocation.addresses[0]},mtu=1450")
-
             self.prox.nodes(lxc.node).lxc(f"{lxc.id}/config").put(**{
                 "nameserver": "1.1.1.1",
                 "net0": f"rate=100,name=eth0,bridge={config.proxmox.lxc.bridge},tag={config.proxmox.lxc.vlan},hwaddr={lxc.metadata.network.nic_allocation.macaddress},ip={lxc.metadata.network.nic_allocation.addresses[0]},mtu=1450",
@@ -569,7 +567,7 @@ class Proxmox():
 
             self.write_out_lxc_metadata(lxc)
         else:
-            raise exceptions.resource.NotFound(f"Could not find {vhost} on resource")
+            raise exceptions.resource.NotFound(f"Could not find {vhost} vhost on resource")
 
     def get_port_forward_map(
         self
@@ -578,10 +576,10 @@ class Proxmox():
 
         port_map = {}
 
-        for fqdn, lxc in lxcs:
+        for fqdn, lxc in lxcs.items():
             ip = lxc.metadata.network.nic_allocation.addresses[0]
 
-            for external_port, internal_port in lxc.metadata.network.ports:
+            for external_port, internal_port in lxc.metadata.network.ports.items():
                 if external_port in port_map:
                     logger.warning(f"warning, conflicting port map: {lxc.fqdn} tried to map {external_port} but it's already taken!")
                     continue
@@ -594,76 +592,77 @@ class Proxmox():
         
         return port_map
 
-    def _validate_domain(
+    def is_valid_domain(
         self,
         username: models.account.Username,
         domain: str
-    ) -> Optional[List[str]]:
+    ) -> (bool, Optional[List[str]]):
         """
         Verifies a single domain, if the domain is valid, None is returned
         If the domain is invalid, a list of remarks is returned
         """
-        return None
+        txt_name = config.proxmox.vhosts.user_supplied.verification_txt_name
+        txt_content = username
 
-        # txt_name = config.proxmox.user_domains.user_supplied.verification_txt_name
-        # txt_content = username
+        base_domain = config.proxmox.vhosts.netsoc_supplied.base_domain
+        allowed_a_aaaa = config.proxmox.vhosts.user_supplied.allowed_a_aaaa
 
-        # base_domain = config.proxmox.user_domains.netsoc_supplied.base_domain
-        # allowed_a_aaaa = config.proxmox.user_domains.user_supplied.allowed_a_aaaa
+        split = domain.split(".")
 
-        # split_domain = domain.split(".")
-
-        # remarks = []
+        remarks = []
             
-        # # *.netsoc.co etc
-        # if domain.endswith(f".{base_domain}"):
-        #     # the stuff at the start, i.e if they specified blog.ocanty.netsoc.co
-        #     # prefix is blog.ocanty
-        #     prefix = domain[:-len(f".{base_domain}")]
-        #     split_prefix = prefix.split(".")
+        # *.netsoc.co etc
+        if domain.endswith(f".{base_domain}"):
+            # the stuff at the start, i.e if they specified blog.ocanty.netsoc.co
+            # prefix is blog.ocanty
+            prefix = domain[:-len(f".{base_domain}")]
+            split_prefix = prefix.split(".")
             
-        #     # extract last part, i.e blog.ocanty => ocanty
-        #     if split_prefix[-1] == user:
-        #         # Valid domain
-        #         return None
-        #     else:
-        #         remarks.append(f"Domain {domain} - subdomain {split_prefix[:len(split_prefix)-1]} must end with one of {username}.{base_domain}")
-        # else: # custom domain
-        #     try:
-        #         info_list = socket.getaddrinfo(domain, 80)
-        #     except Exception as e:
-        #         remarks.append("Could not verify custom domain: {e}")
+            # extract last part, i.e blog.ocanty => ocanty
+            if split_prefix[-1] == username:
+                # Valid domain
+                return (True, None)
+            else:
+                remarks.append(f"Domain {domain} - subdomain {split_prefix[:len(split_prefix)-1]} must end with one of {username}.{base_domain}")
+        else: # custom domain
+            try:
+                info_list = socket.getaddrinfo(domain, 80)
+            except Exception as e:
+                remarks.append("Could not verify custom domain: {e}")
 
-        #     a_aaaa = set(map(lambda info: info[4][0], filter(lambda x: x[0] in [socket.AddressFamily.AF_INET, socket.AddressFamily.AF_INET6], info_list)))
+            a_aaaa = set(map(lambda info: info[4][0], filter(lambda x: x[0] in [socket.AddressFamily.AF_INET, socket.AddressFamily.AF_INET6], info_list)))
             
-        #     if len(a_aaaa) == 0:
-        #         remarks.append(f"Domain {domain} - no A or AAAA records present")
+            if len(a_aaaa) == 0:
+                remarks.append(f"Domain {domain} - no A or AAAA records present")
 
-        #     for record in a_aaaa:
-        #         if record not in allowed_a_aaaa:
-        #             remarks.append(f"Domain {domain} - unknown A/AAAA record on domain ({record}), must be one of {allowed_a_aaaa}")
+            for record in a_aaaa:
+                if record not in allowed_a_aaaa:
+                    remarks.append(f"Domain {domain} - unknown A/AAAA record on domain ({record}), must be one of {allowed_a_aaaa}")
 
-        #     # we need to check if they have the appropiate TXT record with the correct value
-        #     custom_base = f"{split[len(split)-2]}.{split[len(split)-1]}"
+            # we need to check if they have the appropiate TXT record with the correct value
+            custom_base = f"{split[len(split)-2]}.{split[len(split)-1]}"
 
-        #     # check for _netsoc.theirdomain.com 
-        #     try:
-        #         q = dns.resolver.resolve(f"{txt_name}.{custom_base}", 'TXT')
+            # check for _netsoc.theirdomain.com 
+            try:
+                q = dns.resolver.resolve(f"{txt_name}.{custom_base}", 'TXT')
 
-        #         # dnspython returns the TXT record value enclosed in quotation marks
-        #         # we will need to remove these
-        #         txt_res = set(map(lambda x: str(x).strip('"'),q))
+                # dnspython returns the TXT record value enclosed in quotation marks
+                # we will need to remove these
+                txt_res = set(map(lambda x: str(x).strip('"'),q))
 
-        #         if txt_content not in txt_res:
-        #             remarks.append(f"Host {domain} - could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}, instead found {txt_res}!")
-        #     except dns.resolver.NXDOMAIN:
-        #         remarks.append(f"Host {domain} - could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}")
-        #     except dns.exception.DNSException as e:
-        #         remarks.append(f"Host {domain} - unable to lookup record ({txt_name}.{custom_base}): ({e})")
-        #     except Exception as e:
-        #         remarks.append(f"Host {domain} - error {e} (contact SysAdmins)")
+                if txt_content not in txt_res:
+                    remarks.append(f"Host {domain} - could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}, instead found {txt_res}!")
+            except dns.resolver.NXDOMAIN:
+                remarks.append(f"Host {domain} - could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}")
+            except dns.exception.DNSException as e:
+                remarks.append(f"Host {domain} - unable to lookup record ({txt_name}.{custom_base}): ({e})")
+            except Exception as e:
+                remarks.append(f"Host {domain} - error {e} (contact SysAdmins)")
 
-        # return remarks
+        if len(remarks) == 0:
+            return (True, None)
+        
+        return (False, remarks)
 
     def get_vhost_forward_map(
         self
@@ -687,17 +686,19 @@ class Proxmox():
         port_map = self.get_port_forward_map()
 
         if external in port_map:
-            raise exceptions.resource.Unavailable("Cannot map port {external}, this port is currently taken by another user/another one of your VMs/LXCs")
+            raise exceptions.resource.Unavailable(f"Cannot map port {external} to {internal}, this port is currently taken by another user/another one of your VMs/LXCs")
             
         lxc.metadata.network.ports[external] = internal
+        self.write_out_lxc_metadata(lxc)
 
     def remove_port_lxc(
         self, 
-        vm: models.proxmox.LXC,
+        lxc: models.proxmox.LXC,
         external: int
     ):
         if external in lxc.metadata.network.ports:
             del lxc.metadata.network.ports[external]
+        self.write_out_lxc_metadata(lxc)
 
 
     def _get_vps_fqdn_for_username(

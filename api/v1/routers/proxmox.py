@@ -307,6 +307,8 @@ async def shutdown_lxc(
     lxc = providers.proxmox.read_lxc_by_account(resource_account, hostname)
     providers.proxmox.shutdown_lxc(lxc)
 
+ranged_port = models.proxmox.generate_ranged_port_field_args(config.proxmox.port_forward.range[0], config.proxmox.port_forward.range[1])
+
 @router.post(
     '/lxc/{email_or_username}/{hostname}/port/{external_port}/{internal_port}',
     status_code=200,
@@ -314,6 +316,8 @@ async def shutdown_lxc(
 async def add_port_lxc(
     email_or_username: str,
     hostname: str = Path(**models.proxmox.Hostname),
+    external_port: int = Path(**ranged_port),
+    internal_port: int = Path(**models.proxmox.Port),
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 ):
     resource_account = providers.accounts.find_verified_account(email_or_username)
@@ -326,39 +330,26 @@ async def add_port_lxc(
     '/lxc/{email_or_username}/{hostname}/port/{external_port}',
     status_code=200,
 )
-async def shutdown_lxc(
+async def remove_port_lxc(
     email_or_username: str,
     hostname: str = Path(**models.proxmox.Hostname),
+    external_port: int = Path(**models.proxmox.Port), # don't need to worry about them deleting non-ranged ports
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 ):
     resource_account = providers.accounts.find_verified_account(email_or_username)
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     lxc = providers.proxmox.read_lxc_by_account(resource_account, hostname)
-    providers.proxmox.remove_port_lxc(lxc, external_port, internal_port)
-
-# @router.delete(
-#     '/lxc/{email_or_username}/{hostname}/port/{external_port}',
-#     status_code=200,
-# )
-# async def shutdown_lxc(
-#     email_or_username: str,
-#     hostname: str = Path(**models.proxmox.Hostname),
-#     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
-# ):
-#     resource_account = providers.accounts.find_verified_account(email_or_username)
-#     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
-
-#     lxc = providers.proxmox.read_lxc_by_account(resource_account, hostname)
-#     providers.proxmox.shutdown_lxc(lxc)
+    providers.proxmox.remove_port_lxc(lxc, external_port)
 
 @router.post(
     '/lxc/{email_or_username}/{hostname}/vhost/{vhost}',
     status_code=200,
 )
-async def shutdown_lxc(
+async def add_vhost_lxc(
     email_or_username: str,
     hostname: str = Path(**models.proxmox.Hostname),
+    vhost: str = Path(**models.proxmox.VHost),
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 ):
     resource_account = providers.accounts.find_verified_account(email_or_username)
@@ -371,9 +362,10 @@ async def shutdown_lxc(
     '/lxc/{email_or_username}/{hostname}/vhost/{vhost}',
     status_code=200,
 )
-async def shutdown_lxc(
+async def remove_vhost_lxc(
     email_or_username: str,
     hostname: str = Path(**models.proxmox.Hostname),
+    vhost: str = Path(**models.proxmox.VHost),
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 ):
     resource_account = providers.accounts.find_verified_account(email_or_username)
