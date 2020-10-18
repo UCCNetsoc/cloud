@@ -60,7 +60,7 @@ Port = {
     "default": None,
     "title": "Port number",
     "description": "Any port number",
-    "ge": 0,
+    "gt": 0,
     "le": 65535
 }
 
@@ -146,7 +146,7 @@ class NICAllocation(BaseModel):
     macaddress: str
 
 class VHostOptions(BaseModel):
-    port: int = 80
+    port: int = Field(**{"default": 80,**Port})
     https: bool = False
 
 class Network(BaseModel):

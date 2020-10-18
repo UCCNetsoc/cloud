@@ -725,31 +725,31 @@ class Proxmox():
         routers = {}
 
         for fqdn, lxc in self.read_lxcs().items():
-            valid_vhosts = set()
-
-            for vhost in lxc.metadata.network.vhosts:
+            for vhost, options in lxc.metadata.network.vhosts.items():
                 valid, remarks = self.validate_domain(lxc.metadata.owner, vhost)
 
                 if valid is True:
-                    valid_vhosts.add(vhost)
-
-            if len(valid_vhosts) > 0:
-                routers[fqdn] = {
-                    "entrypoints": web_entrypoints,
-                    "rule": f"Host(`{ '`, `'.join(valid_vhosts) }`)",
-                    "service": fqdn,
-                    "tls": {
-                        "certResolver": "letsencrypt"
+                    routers[f"{fqdn}[{vhost}]"] = {
+                        "entrypoints": web_entrypoints,
+                        "rule": f"Host(`{vhost}`)",
+                        "service": f"{fqdn}[{vhost}]",
+                        "tls": {
+                            "certResolver": "letsencrypt"
+                        }
                     }
-                }
 
-                services[fqdn] = {
-                    "loadBalancer": {
-                        "servers": [{ 
-                            "url": f"http://{lxc.metadata.network.nic_allocation.addresses[0].ip}"
-                        }]
+                    proto = "http"
+
+                    if options.https is True:
+                        proto = "https"
+
+                    services[f"{fqdn}[{vhost}]"] = {
+                        "loadBalancer": {
+                            "servers": [{ 
+                                "url": f"{ proto }://{lxc.metadata.network.nic_allocation.addresses[0].ip}:{ options.port }"
+                            }]
+                        }
                     }
-                }
     
 
         config = {
