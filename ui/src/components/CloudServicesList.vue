@@ -90,7 +90,7 @@
     </v-row>
     <v-row class="center ml-1" style="margin-top: -1em">
       <v-col class="d-flex  justify-end" cols="12" sm="12">
-        <v-btn @click="popConfirmCancel(ConfirmCancelMode.AddWebsite, { })" icon>
+        <v-btn @click="popConfirmCancel(ConfirmCancelMode.RequestService, { })" icon>
           <v-icon>
             mdi-plus
           </v-icon>
@@ -114,7 +114,43 @@
       class="confirmCancel"
     >
       <v-form
-        v-if="confirmCancel.mode == ConfirmCancelMode.AddWebsite"
+        v-if="confirmCancel.mode == ConfirmCancelMode.RequestService"
+        lazy-validation
+        ref="form"
+        @submit="confirm()"
+      >
+        <!-- :suffix="'.'+$store.state.auth.user.profile.preferred_username+'.lxc.cloud.netsoc.co'" -->
+        <v-text-field
+          label='Hostname'
+          outlined
+          style="margin-bottom: -1em"
+          v-model='confirmCancel.action.host'
+          :rules="requiredRules"
+        ></v-text-field>
+        <v-select
+          :items='lxcTemplates'
+          label='Template'
+          outlined
+          :rules="requiredRules"
+          v-model='confirmCancel.action.template_id'
+          class="mt-4"
+          item-text="title"
+          item-value="id"
+        >
+          <template v-slot:item="{ item }">
+            <img style="width: 2em; margin-right: 1em;" :src="item.logo_url" />
+            <span>{{ item.title }}</span>
+          </template>
+        </v-select>
+        <v-textarea
+          label='Reason'
+          outlined
+          :rules="requiredRules"
+          v-model='confirmCancel.action.reason'
+        ></v-textarea>
+      </v-form>
+      <v-form
+        v-else-if="confirmCancel.mode == ConfirmCancelMode.AddWebsite"
         lazy-validation
         ref="form"
         @submit="confirm()"
@@ -185,6 +221,7 @@ import { fetchRest } from '@/api/rest'
 import Vue from 'vue'
 
 interface Template {
+  id?: string;
   title: string;
   description: string;
   logo_url: string;
@@ -259,13 +296,13 @@ interface LXC {
 
 enum ConfirmCancelMode {
   Hidden = '-',
-  RequestService = 'request service'
+  RequestService = 'request a service'
 }
 
 interface ConfirmCancelAction {
-  name?: string;
   host?: string;
-  software?: string;
+  template_id?: string;
+  reason?: string;
 }
 
 // const HostValidation = new RegExp('^((?!-))(xn--)?[a-z0-9][a-z0-9-_]{0,61}[a-z0-9]{0,1}\\.(xn--)?([a-z0-9\\-]{1,61}|[a-z0-9-]{1,30}\\.[a-z]{2,})$')
@@ -282,7 +319,7 @@ export default Vue.extend({
       return [
         (v: string) => !!v || 'Required'
       ]
-    }
+    },
 
     // websiteNameRules () {
     //   return [
@@ -291,6 +328,11 @@ export default Vue.extend({
     //   ]
     // },
 
+    requiredRules () {
+      return [
+        (v: string) => !!v || 'This field is required'
+      ]
+    }
     // websiteHostRules () {
     //   return [
     //     (v: string) => !!v || 'Website host required',
@@ -304,98 +346,37 @@ export default Vue.extend({
   methods: {
     async confirm () {
       // Extract username from profile
-      // const username = this.$store.state.auth.user.profile.preferred_username
-      // const headers = {
-      //   Authorization: `Bearer ${this.$store.state.auth.user.access_token}`
-      // }
+      const username = this.$store.state.auth.user.profile.preferred_username
+      const headers = {
+        Authorization: `Bearer ${this.$store.state.auth.user.access_token}`
+      }
 
       // // Extract action
-      // const { name, host, software } = this.confirmCancel.action
+      const { host, template_id, reason } = this.confirmCancel.action
 
-      // this.confirmCancel.loading = true
-      // try {
-      //   switch (this.confirmCancel.mode) {
-      //     case ConfirmCancelMode.AddWebsite: {
-      //       // @ts-ignore
-      //       if (!this.$refs.form.validate()) return
+      this.confirmCancel.loading = true
+      try {
+        switch (this.confirmCancel.mode) {
+          case ConfirmCancelMode.RequestService: {
+            // console.log(username)
+            await fetchRest(
+              `${config.apiBaseUrl}/v1/proxmox/lxc-request/${username}/${host}`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ template_id, reason })
+              })
 
-      //       await fetchRest(
-      //         `${config.apiBaseUrl}/v1/websites/${username}/${name}`, {
-      //           method: 'POST',
-      //           headers
-      //         })
-
-      //       this.msg = 'Website created successfully!'
-      //       break
-      //     }
-
-      //     case ConfirmCancelMode.RemoveWebsite: {
-      //       await fetchRest(
-      //         `${config.apiBaseUrl}/v1/websites/${username}/${name}`, {
-      //           method: 'DELETE',
-      //           headers
-      //         })
-
-      //       this.msg = 'Website deleted successfully!'
-      //       break
-      //     }
-
-      //     case ConfirmCancelMode.AddHost: {
-      //       // @ts-ignore
-      //       if (!this.$refs.form.validate()) return
-
-      //       await fetchRest(
-      //         `${config.apiBaseUrl}/v1/websites/${username}/${name}/host/${host}`, {
-      //           method: 'POST',
-      //           headers
-      //         })
-
-      //       this.msg = 'Added host successfully!'
-      //       break
-      //     }
-
-      //     case ConfirmCancelMode.RemoveHost: {
-      //       await fetchRest(
-      //         `${config.apiBaseUrl}/v1/websites/${username}/${name}/host/${host}`, {
-      //           method: 'DELETE',
-      //           headers
-      //         })
-
-      //       this.msg = 'Removed host successfully!'
-      //       break
-      //     }
-
-      //     case ConfirmCancelMode.InstallSoftware: {
-      //       // console.log(username)
-      //       await fetchRest(
-      //         `${config.apiBaseUrl}/v1/websites/${username}/${name}/software/${software}`, {
-      //           method: 'POST',
-      //           headers,
-      //           body: JSON.stringify({})
-      //         })
-
-      //       this.msg = 'Software installed successfully!'
-      //       break
-      //     }
-
-      //     case ConfirmCancelMode.UninstallSoftware: {
-      //       await fetchRest(
-      //         `${config.apiBaseUrl}/v1/websites/${username}/${name}/software`, {
-      //           method: 'DELETE',
-      //           headers
-      //         })
-
-      //       this.msg = 'Software uninstalled successfully!'
-      //       break
-      //     }
-      //   }
-      // } catch (e) {
-      //   this.msg = e.message
-      // } finally {
-      //   this.confirmCancel.loading = false
-      //   this.confirmCancel.mode = ConfirmCancelMode.Hidden
-      //   this.uiReloadWebsites()
-      // }
+            this.msg = 'Service request successfully sent!'
+            break
+          }
+        }
+      } catch (e) {
+        this.msg = e.message
+      } finally {
+        this.confirmCancel.loading = false
+        this.confirmCancel.mode = ConfirmCancelMode.Hidden
+        this.uiReloadWebsites()
+      }
     },
 
     async cancel () {
@@ -433,12 +414,33 @@ export default Vue.extend({
     async popConfirmCancel (mode: ConfirmCancelMode, action: ConfirmCancelAction) {
       this.confirmCancel.action = action
       this.confirmCancel.mode = mode
+    },
+
+    async uiReloadLxcTemplates () {
+      this.lxcTemplates = []
+
+      try {
+        const res = await fetchRest(
+          `${config.apiBaseUrl}/v1/proxmox/lxc-templates`, {
+            headers: {
+              Authorization: `Bearer ${this.$store.state.auth.user.access_token}`
+            }
+          })
+        const templates: {[name: string]: Template} = await res.json()
+        for (const k of Object.keys(templates)) {
+          this.lxcTemplates.push(Object.assign(templates[k], { id: k }))
+        }
+        this.lxcTemplates = Object.values(templates)
+      } catch (e) {
+        console.error(e)
+      }
     }
   },
 
   data () {
     // const websites: Website[] = []
     const action: ConfirmCancelAction = {}
+    const lxcTemplates: Template[] = []
 
     return {
       ConfirmCancelMode, // Needed to use the enum in the rendered template
@@ -446,6 +448,7 @@ export default Vue.extend({
       empty: '',
       msg: '',
       websites: [],
+      lxcTemplates,
 
       confirmCancel: {
         mode: ConfirmCancelMode.Hidden,
@@ -467,6 +470,7 @@ export default Vue.extend({
 
   mounted () {
     this.uiReloadWebsites()
+    this.uiReloadLxcTemplates()
   }
 })
 </script>
