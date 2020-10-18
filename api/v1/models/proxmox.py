@@ -146,7 +146,7 @@ class NICAllocation(BaseModel):
     macaddress: str
 
 class VHostOptions(BaseModel):
-    port: int = Field(**{"default": 80,**Port})
+    port: int = Field(**{**{"default": 80},**Port})
     https: bool = False
 
 class Network(BaseModel):
