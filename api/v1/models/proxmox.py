@@ -60,13 +60,9 @@ Port = {
     "default": None,
     "title": "Port number",
     "description": "Any port number",
-    "ge": 0,
+    "gt": 0,
     "le": 65535
 }
-
-class RootUserReset(BaseModel):
-    password: str
-    private_key: str
 
 class Specs(BaseModel):
     # number of vcores
@@ -149,8 +145,12 @@ class NICAllocation(BaseModel):
     gateway4: ipaddress.IPv4Address
     macaddress: str
 
+class VHostOptions(BaseModel):
+    port: int = Field(**{**{"default": 80},**Port})
+    https: bool = False
+
 class Network(BaseModel):
-    vhosts: Set[str] = set()
+    vhosts: Dict[str,VHostOptions] = {}
     ports: Dict[int, int] = {}
     nic_allocation: NICAllocation 
 

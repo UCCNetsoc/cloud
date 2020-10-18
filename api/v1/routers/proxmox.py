@@ -15,6 +15,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get(
+    '/traefik-config',
+    status_code=200,
+    response_model=dict,
+    responses={400: {"model": models.rest.Error}}
+)
+async def get_traefik_config():
+    return providers.proxmox.build_traefik_config("web-secure")
+
+@router.get(
     '/lxc-templates',
     status_code=200,
     response_model=Dict[str,models.proxmox.Template],
@@ -350,13 +359,14 @@ async def add_vhost_lxc(
     email_or_username: str,
     hostname: str = Path(**models.proxmox.Hostname),
     vhost: str = Path(**models.proxmox.VHost),
+    options: models.proxmox.VHostOptions = models.proxmox.VHostOptions(),
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 ):
     resource_account = providers.accounts.find_verified_account(email_or_username)
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     lxc = providers.proxmox.read_lxc_by_account(resource_account, hostname)
-    providers.proxmox.add_vhost_lxc(lxc, vhost)
+    providers.proxmox.add_vhost_lxc(lxc, vhost, options)
 
 @router.delete(
     '/lxc/{email_or_username}/{hostname}/vhost/{vhost}',
@@ -378,12 +388,13 @@ async def remove_vhost_lxc(
 @router.post(
     '/lxc/{email_or_username}/{hostname}/reset-root-user',
     status_code=200,
+    response_model=models.rest.Info
 )
 async def reset_root_user_lxc(
     email_or_username: str,
     hostname: str = Path(**models.proxmox.Hostname),
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
-) -> models.proxmox.RootUserReset:
+) -> models.rest.Info:
     resource_account = providers.accounts.find_verified_account(email_or_username)
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
@@ -391,9 +402,28 @@ async def reset_root_user_lxc(
 
     password, private_key = providers.proxmox.reset_root_user_lxc(lxc)
 
-    return models.proxmox.RootUserReset(
-        password=password,
-        private_key=private_key
+    providers.email.send(
+        [resource_account.email],
+        f"Linux Container '{hostname}' password reset",
+        templates.email.netsoc.render(
+            heading=f"Linux Container - '{hostname}' ",
+            paragraph=
+            f"""Hi {resource_account.username}!<br/><br/>
+                We successfully reset the password and SSH identity for the root user on a Linux Container (LXC) named '{hostname}'<br/>
+                You will find them the password followed by the SSH private key below:<br/><br/>
+            """,
+            embeds=[
+                { "text": password },
+                { "text": private_key }
+            ]
+        ),
+        "text/html"
+    )
+
+    return models.rest.Info(
+        detail=models.rest.Detail(
+            msg="A new password and private key have been sent to the email associated with the account"
+        )
     )
 
 @router.get(

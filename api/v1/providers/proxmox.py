@@ -16,6 +16,7 @@ import io
 import crypt
 import string
 import time
+
 import structlog as logging
 
 from urllib.parse import urlparse, unquote
@@ -132,10 +133,26 @@ class Proxmox():
     def _allocate_ip_lxc(
         self
     ) -> ipaddress.IPv4Interface:
-        offset_ip = (config.proxmox.lxc.network.ip + 1) + random.randint(1,config.proxmox.lxc.network.network.num_addresses-3)
-        assigned_ip_and_netmask = f"{offset_ip}/{config.proxmox.lxc.network.network.prefixlen}"
+        # world's most ghetto ip allocation algorithm
 
-        return ipaddress.IPv4Interface(assigned_ip_and_netmask)
+        # returns set with network and broadcast address removed
+        ips = set(config.proxmox.lxc.network.network.hosts())
+
+        # remove router address
+        ips.remove(config.proxmox.lxc.network.ip + 1)
+
+        # remove any addresses assigned to any of the lxcs
+        for fqdn, lxc in self.read_lxcs().items():
+            for address in lxc.metadata.network.nic_allocation.addresses:
+                if address.ip in ips:
+                    ips.remove(address.ip)
+
+        if len(ips) > 0:
+            ip = next(iter(ips))
+
+            return ipaddress.IPv4Interface(f"{ip}/{config.proxmox.lxc.network.network.prefixlen}")
+        else:
+            raise exception.resource.Unavailable("Could not allocate an IP for the LXC. No IPs available")
 
     def _random_password(
         self,
@@ -405,7 +422,7 @@ class Proxmox():
 
         # Build remarks about the thing, problems, etc...
         for vhost in lxc.metadata.network.vhosts:
-            valid, remarks = self.is_valid_domain(lxc.metadata.owner, vhost)
+            valid, remarks = self.validate_domain(lxc.metadata.owner, vhost)
 
             if valid is not True:
                 lxc.remarks += remarks
@@ -483,7 +500,6 @@ class Proxmox():
             mgmt_ssh_public_key=mgmt_ssh_public_key,
             mgmt_ssh_private_key=mgmt_ssh_private_key
         )
-        lxc.metadata.apply_root_reset_on_next_boot = True
         self.write_out_lxc_metadata(lxc)
 
         with ProxmoxNodeSSH(lxc.node) as con:
@@ -552,9 +568,10 @@ class Proxmox():
     def add_vhost_lxc(
         self,
         lxc: models.proxmox.LXC,
-        vhost: str
+        vhost: str,
+        options: models.proxmox.VHostOptions
     ):
-        lxc.metadata.network.vhosts.add(vhost)
+        lxc.metadata.network.vhosts[vhost] = options
         self.write_out_lxc_metadata(lxc)
 
     def remove_vhost_lxc(
@@ -563,7 +580,7 @@ class Proxmox():
         vhost: str
     ):
         if vhost in lxc.metadata.network.vhosts:
-            lxc.metadata.network.vhosts.remove(vhost)
+            del lxc.metadata.network.vhosts[vhost]
 
             self.write_out_lxc_metadata(lxc)
         else:
@@ -592,7 +609,7 @@ class Proxmox():
         
         return port_map
 
-    def is_valid_domain(
+    def validate_domain(
         self,
         username: models.account.Username,
         domain: str
@@ -700,6 +717,49 @@ class Proxmox():
             del lxc.metadata.network.ports[external]
         self.write_out_lxc_metadata(lxc)
 
+    def build_traefik_config(
+        self,
+        web_entrypoints: List[str]
+    ) -> dict:
+        services = {}
+        routers = {}
+
+        for fqdn, lxc in self.read_lxcs().items():
+            for vhost, options in lxc.metadata.network.vhosts.items():
+                valid, remarks = self.validate_domain(lxc.metadata.owner, vhost)
+
+                if valid is True:
+                    routers[f"{fqdn}[{vhost}]"] = {
+                        "entrypoints": web_entrypoints,
+                        "rule": f"Host(`{vhost}`)",
+                        "service": f"{fqdn}[{vhost}]",
+                        "tls": {
+                            "certResolver": "letsencrypt"
+                        }
+                    }
+
+                    proto = "http"
+
+                    if options.https is True:
+                        proto = "https"
+
+                    services[f"{fqdn}[{vhost}]"] = {
+                        "loadBalancer": {
+                            "servers": [{ 
+                                "url": f"{ proto }://{lxc.metadata.network.nic_allocation.addresses[0].ip}:{ options.port }"
+                            }]
+                        }
+                    }
+    
+
+        config = {
+            "http": {
+                "routers": routers,
+                "services": services
+            }
+        }
+
+        return config
 
     def _get_vps_fqdn_for_username(
         self,
