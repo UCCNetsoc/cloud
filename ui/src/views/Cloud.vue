@@ -13,11 +13,8 @@
               </v-card-subtitle>
               <v-card-text>
                 <p>
-                  We can host any content you store inside the <code>www</code> folder in your home directory<br>
-                  By having a folder named after a domain name in this directory, anyone with Internet access
-                  will be able to visit it (given that the domain is setup correctly)<br>
-                  <br>
-                  PHP is also served alongside static content. More runtimes such as Python WSGI, NodeJS and Go are coming soon
+                  You can host either a service or Virtual Private Server that's been spawned from a template such as
+                  WordPress, Ghost CMS, static hosting and more.
                 </p>
                 <p>
                   <a>Need help?</a><br>
