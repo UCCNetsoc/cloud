@@ -253,9 +253,37 @@ class Proxmox():
         node_name = self._select_best_node(template.specs)
         fqdn = self._get_instance_fqdn_for_account(instance_type, account, hostname)
 
+        user_ssh_public_key, user_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
+        mgmt_ssh_public_key, mgmt_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
+        password = self._random_password()
+
+        metadata = models.proxmox.Metadata(
+            owner=account.username,
+            request_detail=request_detail,
+            inactivity=models.proxmox.Inactivity(
+                marked_active_at=datetime.date.today()
+            ),
+            network=models.proxmox.Network(
+                nic_allocation=self._allocate_nic(instance_type)
+            ),
+            root_user=models.proxmox.RootUser(
+                password_hash=self._hash_password(password),
+                ssh_public_key=user_ssh_public_key,
+                mgmt_ssh_public_key=mgmt_ssh_public_key,
+                mgmt_ssh_private_key=mgmt_ssh_private_key
+            )
+        )
+
+        random.seed(f"{fqdn}-{node_name}")
+        hash_id = random.randint(1000, 5000000)
+        random.seed()
+
+        # Store VM metadata in the description field
+        yaml_description = self._serialize_metadata(metadata)
+
         if instance_type == models.proxmox.Type.LXC:
             if template.disk_format != models.proxmox.Template.DiskFormat.TarGZ:
-                raise exceptions.resource.Unavailable(f"Template (on LXC) {detail.template_id} must use TarGZ of RootFS format!")
+                raise exceptions.resource.Unavailable(f"Templates (on LXC instances) {detail.template_id} must use TarGZ of RootFS format!")
 
             lxc_images_path = self.prox.storage(config.proxmox.lxc.dir_pool).get()['path'] + "/template/cache"
             image_path = f"{lxc_images_path}/{template.disk_sha256sum}.{template.disk_format}"
@@ -307,39 +335,8 @@ class Proxmox():
                     status = stdout.channel.recv_exit_status()
                     if status != 0:
                         provision_failed(f"Couldn't rename template {status}: {stderr.read()} {stdout.read()}")
-
-            user_ssh_public_key, user_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
-            mgmt_ssh_public_key, mgmt_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
-            password = self._random_password()
-
-            metadata = models.proxmox.Metadata(
-                owner=account.username,
-                request_detail=request_detail,
-                inactivity=models.proxmox.Inactivity(
-                    marked_active_at=datetime.date.today()
-                ),
-                network=models.proxmox.Network(
-                    nic_allocation=self._allocate_nic(instance_type)
-                ),
-                root_user=models.proxmox.RootUser(
-                    password_hash=self._hash_password(password),
-                    ssh_public_key=user_ssh_public_key,
-                    mgmt_ssh_public_key=mgmt_ssh_public_key,
-                    mgmt_ssh_private_key=mgmt_ssh_private_key
-                )
-            )
-
-            # reserve a VM, but don't set any of the specs yet
-            # just setup the metadata we'll need later
-            random.seed(f"{fqdn}-{node_name}")
-            hash_id = random.randint(1000, 5000000)
-            random.seed()
-
-            # Store VM metadata in the description field
-            # https://github.com/samuelcolvin/pydantic/issues/1043
-            yaml_description = self._serialize_metadata(metadata)
             
-            result = self.prox.nodes(f"{node_name}/lxc").post(**{
+            self.prox.nodes(f"{node_name}/lxc").post(**{
                 "hostname": fqdn,
                 "vmid": hash_id,
                 "description": yaml_description,
@@ -368,99 +365,136 @@ class Proxmox():
 
             return password, user_ssh_private_key
         elif instance_type == models.proxmox.Type.VPS:
-            download_images_path = self.prox.storage(config.proxmox.lxc.dir_pool).get()['path'] + "/template/qcow2"
-            vms_image_path = f"/tmp/admin-api/{vm.metadata.provision.image.disk_sha256sum}"
-            download_path = f"{images_path}/{socket.gethostname()}-{os.getpid()}-{vm.metadata.provision.image.disk_sha256sum}"
+            if template.disk_format != models.proxmox.Template.DiskFormat.QCOW2:
+                raise exceptions.resource.Unavailable(f"Templates (on VPS instances) {detail.template_id} must use QCOW2 disk image format!")
 
-            with ProxmoxNodeSSH(vm.node) as con:
-                stdin, stdout, stderr = con.ssh.exec_command(
-                    f"mkdir -p {images_path}"
-                )
-                status = stdout.channel.recv_exit_status()
+            stub_vm_name = f"stub-{fqdn}-{socket.gethostname()}-{os.getpid()}-{time.time()}"
 
-                if status != 0:
-                    provision_failed(f"Could not download image: could not reserve download dir")
+            # we need to create a 'stub' vm to reserve an id
+            # the vm disk image is stored in a folder named as the id so we need to create the vm before we configure it to discover this id
+            self.prox.nodes(f"{node_name}/qemu").post(
+                name=stub_vm_name,
+                vmid=hash_id
+            )
 
+            # now find the vm by its name, we can't trust the hash_id because if there's a collision it'l be + 1
+            vm_id = None
+
+            for vm in self.prox.nodes(node_name).qemu.get():
+                if vm['name'] == stub_vm_name:
+                    vm_id = vm['vmid']
+                    break
+
+            if vm_id is None:
+                raise exceptions.resource.Unavailable(f"Unable to find created stub vm")
+
+            # if theres an error anywhere in the process, we will call this function to nuke the stub vm
+            def cleanup_stub():
+                self.prox.nodes(instance.node).qemu(vm_id).delete()
+
+            vps_templates_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/template/vps"
+            template_path = f"{vps_templates_path}/{template.disk_sha256sum}"
+            download_path = f"{vps_templates_path}/{socket.gethostname()}-{os.getpid()}-{template.disk_sha256sum}"
+
+            with ProxmoxNodeSSH(node_name) as con:
                 # See if the image exists
                 try:
-                    con.sftp.stat(image_path)
+                    con.sftp.stat(template_path)
 
                     # Checksum image    
                     stdin, stdout, stderr = con.ssh.exec_command(
-                        f"sha256sum {image_path} | cut -f 1 -d' '"
+                        f"sha256sum {template_path} | cut -f 1 -d' '"
                     )
 
-                    if vm.metadata.provision.image.disk_sha256sum not in str(stdout.read()):
-                        provision_failed(f"Downloaded image does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
+                    if template.disk_sha256sum not in str(stdout.read()):
+                        cleanup_stub()
+                        raise exceptions.resource.Unavailable(f"Downloaded image does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
 
                 except FileNotFoundError as e:
-                    provision_stage(models.proxmox.Provision.Stage.DownloadImage)
-
-                    # Original image does not exist, we gotta download it
                     stdin, stdout, stderr = con.ssh.exec_command(
-                        f"wget {vm.metadata.provision.image.disk_url} -O {download_path}"
+                        f"mkdir -p {vps_templates_path}"
                     )
                     status = stdout.channel.recv_exit_status()
 
                     if status != 0:
-                        provision_failed(f"Could not download image: error {status}: {stderr.read()} {stdout.read()}")
+                        cleanup_stub()
+                        raise exceptions.resource.Unavailable(f"Could not download template: could not reserve download dir")
+
+                    # Original image does not exist, we gotta download it
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"wget {template.disk_url} -O {download_path}"
+                    )
+                    status = stdout.channel.recv_exit_status()
+
+                    if status != 0:
+                        cleanup_stub()
+                        raise exceptions.resource.Unavailable(f"Could not download template: error {status}: {stderr.read()} {stdout.read()}")
 
                     # Checksum image    
                     stdin, stdout, stderr = con.ssh.exec_command(
                         f"sha256sum {download_path} | cut -f 1 -d' '"
                     )
 
-                    if vm.metadata.provision.image.disk_sha256sum not in str(stdout.read()):
-                        provision_failed(f"Downloaded image does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
+                    if template.disk_sha256sum not in str(stdout.read()):
+                        cleanup_stub()
+                        raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
 
                     # Move image
                     stdin, stdout, stderr = con.ssh.exec_command(
-                        f"rm -rf {image_path} && mv {download_path} {image_path}"
+                        f"rm -f {template_path} && mv {download_path} {template_path}"
                     )
 
                     status = stdout.channel.recv_exit_status()
                     if status != 0:
-                        provision_failed(f"Couldn't rename VM image {status}: {stderr.read()} {stdout.read()}")
-                
-                provision_stage(models.proxmox.Provision.Stage.FlashImage)
+                        cleanup_stub()
+                        raise exceptions.resource.Unavailable(f"Couldn't rename instance template {status}: {stderr.read()} {stdout.read()}")
 
                 # Images path for installed VMs
-                vms_images_path = self.prox.storage(config.proxmox.uservm.dir_pool).get()['path'] + "/images"
+                vms_images_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/images"
 
-                # Move disk image
+                # Copy disk image
                 stdin, stdout, stderr = con.ssh.exec_command(
-                    f"cd {vms_images_path} && rm -rf {vm.id} && mkdir {vm.id} && cd {vm.id} && cp {image_path} ./primary.{ vm.metadata.provision.image.disk_format }"
+                    f"cd {vms_images_path} && rm -f {vm_id} && mkdir {vm_id} && cd {vm_id} && cp {template_path} ./primary.{ template.disk_format }"
                 )
                 status = stdout.channel.recv_exit_status()
                 
                 if status != 0:
-                    provision_failed(f"Couldn't copy VM image {status}: {stderr.read()} {stdout.read()}")
+                    cleanup_stub()
+                    raise exceptions.resource.Unavailable(f"Couldn't create instance disk image {status}: {stderr.read()} {stdout.read()}")
 
                 # Create disk for EFI
                 stdin, stdout, stderr = con.ssh.exec_command(
-                    f"cd {vms_images_path}/{vm.id} && qemu-img create -f qcow2 efi.qcow2 128K"
+                    f"cd {vms_images_path}/{vm_id} && qemu-img create -f qcow2 efi.qcow2 128K"
                 )
                 status = stdout.channel.recv_exit_status()
                 
                 if status != 0:
-                    provision_failed(f"Couldn't create EFI image {status}: {stderr.read()} {stdout.read()}")
+                    cleanup_stub()
+                    raise exceptions.resource.Unavailable(f"Couldn't create instance EFI image {status}: {stderr.read()} {stdout.read()}")
 
-                self.prox.nodes(vm.node).qemu(f"{vm.id}/config").put(
-                    virtio0=f"{config.proxmox.uservm.dir_pool}:{vm.id}/primary.{ vm.metadata.provision.image.disk_format }",
-                    cores=vm.metadata.provision.image.specs.cores,
-                    memory=vm.metadata.provision.image.specs.memory,
-                    bios='ovmf',
-                    efidisk0=f"{config.proxmox.uservm.dir_pool}:{vm.id}/efi.qcow2",
-                    scsihw='virtio-scsi-pci',
-                    machine='q35',
-                    serial0='socket',
-                    bootdisk='virtio0'
-                )
+            # Reconfigure stub
+            self.prox.nodes(f"{node_name}/qemu/{vm_id}/config").put(
+                name=fqdn,
+                description=yaml_description,
+                virtio0=f"{config.proxmox.vps.dir_pool}:{vm_id}/primary.{ template.disk_format }",
+                cores=template.specs.cores,
+                memory=template.specs.memory,
+                bios='ovmf',
+                efidisk0=f"{config.proxmox.vps.dir_pool}:{vm_id}/efi.qcow2",
+                scsihw='virtio-scsi-pci',
+                machine='q35',
+                serial0='socket',
+                bootdisk='virtio0'
+            )
 
-                self.prox.nodes(vm.node).qemu(f"{vm.id}/resize").put(
-                    disk='virtio0',
-                    size=f'{vm.metadata.provision.image.specs.disk_space}G'
-                )
+            self._wait_vmid_lock(instance_type, node_name, vm_id)
+
+            self.prox.nodes(node_name).qemu(f"{vm_id}/resize").put(
+                disk='virtio0',
+                size=f'{template.specs.disk_space}G'
+            )
+
+            self._wait_vmid_lock(instance_type, node_name, vm_id)
 
     def delete_instance(
         self,
@@ -498,7 +532,7 @@ class Proxmox():
             if instance_type == models.proxmox.Type.LXC:
                 res = self.prox.nodes(node_name).lxc(f"{vm_id}/config").get()
             elif instance_type == models.proxmox.Type.VPS:
-                res = self.prox.nodes(node_name).lxc(f"{vm_id}/config").get()
+                res = self.prox.nodes(node_name).qemu(f"{vm_id}/config").get()
 
             now = time.time()
 
@@ -612,7 +646,6 @@ class Proxmox():
                     f"Instance is unavailable, malformed metadata description: {e}"
                 )
 
-            # for user ocanty, returns .ocanty.uservm.netsoc.co
             suffix = self._get_instance_fqdn_for_username(instance_type, metadata.owner, "")
 
             # trim suffix
@@ -623,7 +656,7 @@ class Proxmox():
 
             hostname = fqdn[:-len(suffix)]
 
-            if (datetime.date.today() - metadata.inactivity.marked_active_at).days > config.proxmox.uservm.inactivity_shutdown_num_days:
+            if (datetime.date.today() - metadata.inactivity.marked_active_at).days > config.proxmox.vps.inactivity_shutdown_num_days:
                 active = False
             else:
                 active = True 
@@ -637,7 +670,7 @@ class Proxmox():
             specs = models.proxmox.Specs(
                 cores=vm_config['cores'],
                 memory=vm_config['memory'],
-                swap=vm_config['swap'],
+                swap=vm_config['swap'] if 'swap' in vm_config else 0,
                 disk_space=disk_space
             )
 
@@ -710,7 +743,6 @@ class Proxmox():
         instance_type: models.proxmox.Type,
         account: models.account.Account
     ) -> Dict[str, models.proxmox.Instance]:
-        """Returns a dict indexed by hostname of uservms owned by user account"""
         if instance_type == models.proxmox.Type.LXC:
             ret = { }
             
@@ -752,7 +784,7 @@ class Proxmox():
             ret = {}
 
             for node in self.prox.nodes().get():
-                for vps_dict in self.prox.nodes(node['node']).vps.get():
+                for vps_dict in self.prox.nodes(node['node']).qemu.get():
                     if vps_dict['name'].endswith(config.proxmox.vps.base_fqdn):
                         vps = self._read_instance_on_node(instance_type, node['node'], vps_dict['vmid'])
                         ret[vps.fqdn] = vps
@@ -904,7 +936,7 @@ ethernets:
             addresses:
                 - 1.1.1.1
                 - 8.8.8.8
-        gateway4: { config.proxmox.uservm.network.ip + 1 }
+        gateway4: { config.proxmox.vps.network.ip + 1 }
         optional: true
         addresses:
             - { instance.metadata.network.nic_allocation.addresses[0] }
@@ -1170,220 +1202,3 @@ version: 2
         }
 
         return config
-
-
-
-
-
-#     def request_uservm(
-#         self,
-#         account: models.account.Account,
-#         hostname: str,
-#         image: models.proxmox.Image,
-#         reason: str
-#     ):
-#         try:
-#             existing_vm = self.read_uservm_by_account(account, hostname)
-#             raise exceptions.resource.AlreadyExists(f"VM {hostname} already exists")
-#         except exceptions.resource.NotFound as e:
-#             pass
-
-#         node_name = self._select_best_node(image.specs)
-#         fqdn = self._get_uservm_fqdn_for_account(account, hostname)
-#         # Allocate the VM on an IP address that is not the gateway, network or broadcast address
-#         # TODO - don't use random
-#         offset_ip = (config.proxmox.uservm.network.ip + 1) + random.randint(1,config.proxmox.uservm.network.network.num_addresses-3)
-#         assigned_ip_and_netmask = f"{offset_ip}/{config.proxmox.uservm.network.network.prefixlen}"
-
-#         nic_allocation=models.proxmox.NICAllocation(
-#             addresses=[
-#                 ipaddress.IPv4Interface(assigned_ip_and_netmask)
-#             ],
-#             gateway4=config.proxmox.uservm.network.ip + 1, # router address is assumed to be .1 of the subnet
-#             macaddress="02:00:00:%02x:%02x:%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-#         )
-
-#         user_public_key, user_private_key = utilities.auth.generate_rsa_public_private_key_pair()
-#         mgmt_public_key, mgmt_private_key = utilities.auth.generate_rsa_public_private_key_pair()
-
-#         metadata = models.proxmox.Metadata(
-#             owner=account.username,
-#             provision=models.proxmox.Provision(
-#                 image=image
-#             ),
-#             reason=reason,
-#             inactivity=models.proxmox.Inactivity(
-#                 requested_at=datetime.date.today(),
-#                 marked_active_at=datetime.date.today()
-#             ),
-#             network=models.proxmox.Network(
-#                 ports=[],
-#                 domains=[],
-#                 nic_allocation=nic_allocation
-#             ),
-#             root_user=models.proxmox.RootUser(
-#                 password_hash=self._hash_password(self._random_password()),
-#                 ssh_public_key=user_public_key,
-#                 mgmt_ssh_public_key=mgmt_public_key,
-#                 mgmt_ssh_private_key=mgmt_private_key
-#             )
-#         )
-
-#         # reserve a VM, but don't set any of the specs yet
-#         # just setup the metadata we'll need later
-#         random.seed(f"{fqdn}-{node_name}")
-#         vm_hash_id = random.randint(1000, 5000000)
-#         random.seed()
-
-#         # Store VM metadata in the description field
-#         # https://github.com/samuelcolvin/pydantic/issues/1043
-#         yaml_description = self._serialize_uservm_metadata(metadata)
-        
-#         self.prox.nodes(f"{node_name}/qemu").post(
-#             name=fqdn,
-#             vmid=vm_hash_id,
-#             description=yaml_description
-#         )
-
-
-    
-#     def flash_uservm_image(
-#         self,
-#         vm: models.proxmox.UserVM
-#     ):
-#         if vm.metadata.provision.stage == models.proxmox.Provision.Stage.AwaitingApproval:
-#             raise exceptions.resource.Unavailable("Cannot flash VM. VM is currently awaiting approval Check your email")
-
-#         if vm.metadata.suspension.status is True:   
-#             raise exceptions.resource.Unavailable("Cannot flash VM. VM is suspended for ToS violation!")
-
-#         if vm.status == models.proxmox.Status.Running:
-#             raise exceptions.resource.Unavailable("Cannot flash VM. VM is running! Stop VM and try again")
-
-        
-#         # if vm.metadata.provision.stage == models.proxmox.Provision.Stage.Failed:
-#         #     raise exceptions.resource.Unavailable("Cannot install VM. Uninstall VM ")
-
-#         # # Approved is the base "approved but not installed" state
-#         # if vm.metadata.provision.stage != models.proxmox.Provision.Stage.Approved or :
-#         #     raise exceptions.resource.Unavailable("VM is currently installing/already installed")
-
-#         def provision_stage(stage: models.proxmox.Provision.Stage):
-#             vm.metadata.provision.stage = stage
-#             vm.metadata.provision.remarks = []
-#             self.write_out_uservm_metadata(vm)
-
-#         def provision_remark(line: str):
-#             vm.metadata.provision.remarks.append(line)
-#             self.write_out_uservm_metadata(vm)
-
-#         def provision_failed(reason: str):
-#             provision_stage(models.proxmox.Provision.Stage.Failed)
-#             provision_remark(reason)
-#             self.write_out_uservm_metadata(vm)
-
-#             raise exceptions.resource.Unavailable(f"VM {vm.hostname} installation failed, check remarks")
-
-#         provision_stage(models.proxmox.Provision.Stage.Began)
-        
-#         images_path = f"/tmp/admin-api/"
-#         image_path = f"/tmp/admin-api/{vm.metadata.provision.image.disk_sha256sum}"
-#         download_path = f"{images_path}/{socket.gethostname()}-{os.getpid()}-{vm.metadata.provision.image.disk_sha256sum}"
-
-#         with ProxmoxNodeSSH(vm.node) as con:
-#             stdin, stdout, stderr = con.ssh.exec_command(
-#                 f"mkdir -p {images_path}"
-#             )
-#             status = stdout.channel.recv_exit_status()
-
-#             if status != 0:
-#                 provision_failed(f"Could not download image: could not reserve download dir")
-
-#             # See if the image exists
-#             try:
-#                 con.sftp.stat(image_path)
-
-#                 # Checksum image    
-#                 stdin, stdout, stderr = con.ssh.exec_command(
-#                     f"sha256sum {image_path} | cut -f 1 -d' '"
-#                 )
-
-#                 if vm.metadata.provision.image.disk_sha256sum not in str(stdout.read()):
-#                     provision_failed(f"Downloaded image does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
-
-#             except FileNotFoundError as e:
-#                 provision_stage(models.proxmox.Provision.Stage.DownloadImage)
-
-#                 # Original image does not exist, we gotta download it
-#                 stdin, stdout, stderr = con.ssh.exec_command(
-#                     f"wget {vm.metadata.provision.image.disk_url} -O {download_path}"
-#                 )
-#                 status = stdout.channel.recv_exit_status()
-
-#                 if status != 0:
-#                     provision_failed(f"Could not download image: error {status}: {stderr.read()} {stdout.read()}")
-
-#                 # Checksum image    
-#                 stdin, stdout, stderr = con.ssh.exec_command(
-#                     f"sha256sum {download_path} | cut -f 1 -d' '"
-#                 )
-
-#                 if vm.metadata.provision.image.disk_sha256sum not in str(stdout.read()):
-#                     provision_failed(f"Downloaded image does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
-
-#                 # Move image
-#                 stdin, stdout, stderr = con.ssh.exec_command(
-#                     f"rm -rf {image_path} && mv {download_path} {image_path}"
-#                 )
-
-#                 status = stdout.channel.recv_exit_status()
-#                 if status != 0:
-#                     provision_failed(f"Couldn't rename VM image {status}: {stderr.read()} {stdout.read()}")
-            
-#             provision_stage(models.proxmox.Provision.Stage.FlashImage)
-
-#             # Images path for installed VMs
-#             vms_images_path = self.prox.storage(config.proxmox.uservm.dir_pool).get()['path'] + "/images"
-
-#             # Move disk image
-#             stdin, stdout, stderr = con.ssh.exec_command(
-#                 f"cd {vms_images_path} && rm -rf {vm.id} && mkdir {vm.id} && cd {vm.id} && cp {image_path} ./primary.{ vm.metadata.provision.image.disk_format }"
-#             )
-#             status = stdout.channel.recv_exit_status()
-            
-#             if status != 0:
-#                 provision_failed(f"Couldn't copy VM image {status}: {stderr.read()} {stdout.read()}")
-
-#             # Create disk for EFI
-#             stdin, stdout, stderr = con.ssh.exec_command(
-#                 f"cd {vms_images_path}/{vm.id} && qemu-img create -f qcow2 efi.qcow2 128K"
-#             )
-#             status = stdout.channel.recv_exit_status()
-            
-#             if status != 0:
-#                 provision_failed(f"Couldn't create EFI image {status}: {stderr.read()} {stdout.read()}")
-
-#             provision_stage(models.proxmox.Provision.Stage.SetSpecs)
-
-#             self.prox.nodes(vm.node).qemu(f"{vm.id}/config").put(
-#                 virtio0=f"{config.proxmox.uservm.dir_pool}:{vm.id}/primary.{ vm.metadata.provision.image.disk_format }",
-#                 cores=vm.metadata.provision.image.specs.cores,
-#                 memory=vm.metadata.provision.image.specs.memory,
-#                 bios='ovmf',
-#                 efidisk0=f"{config.proxmox.uservm.dir_pool}:{vm.id}/efi.qcow2",
-#                 scsihw='virtio-scsi-pci',
-#                 machine='q35',
-#                 serial0='socket',
-#                 bootdisk='virtio0'
-#             )
-
-#             self.prox.nodes(vm.node).qemu(f"{vm.id}/resize").put(
-#                 disk='virtio0',
-#                 size=f'{vm.metadata.provision.image.specs.disk_space}G'
-#             )
-
-#             provision_stage(models.proxmox.Provision.Stage.Installed)
-
-
-
-

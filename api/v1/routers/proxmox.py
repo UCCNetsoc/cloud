@@ -182,7 +182,7 @@ async def approve_instance_request(
     status_code=201,
     responses={400: {"model": models.rest.Error}}
 )
-async def deny_lxc_request(
+async def deny_instance_request(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     serialized: models.jwt.Serialized,
