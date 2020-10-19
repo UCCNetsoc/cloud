@@ -247,8 +247,6 @@ class VPSMetadata(BaseModel):
     # Details about the original request
     request_detail: RequestDetail
 
-    reapply_cloudinit_on_next_boot: str = False
-
 class VPS(BaseModel):
     node: int
     
