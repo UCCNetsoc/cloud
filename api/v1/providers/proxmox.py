@@ -201,9 +201,9 @@ class Proxmox():
 
     def _random_password(
         self,
-        length=24
+        length=8
     ) -> str:
-        return ''.join(random.choice(string.ascii_letters) for i in range(length))
+        return 'ayylmao2' #''.join(random.choice(string.ascii_letters) for i in range(length))
 
     def _hash_password(
         self,
@@ -819,9 +819,8 @@ class Proxmox():
                 raise exceptions.resource.Unavailable("The instance must be running to reset the root password")
 
             with ProxmoxNodeSSH(instance.node) as con:
-                escaped_hash = root_user.password_hash.replace('$','$')
                 stdin, stdout, stderr = con.ssh.exec_command(
-                    f"echo -e 'root:{escaped_hash}' | pct exec {instance.id} -- chpasswd -e"
+                    f"echo -e 'root:{root_user.password_hash}' | pct exec {instance.id} -- chpasswd -e"
                 )
                 status = stdout.channel.recv_exit_status()
 
@@ -844,7 +843,7 @@ class Proxmox():
             self.write_out_instance_metadata(instance)
 
         elif instance.type == models.proxmox.Type.VPS:
-            if instance.status == models.proxmox.Status.Started:
+            if instance.status == models.proxmox.Status.Running:
                 # VPS needs to be stopped because we set the root pw using cloudinit on boot
                 raise exceptions.resource.Unavailable("The instance must be stopped to reset the root password")
 
@@ -878,7 +877,7 @@ class Proxmox():
                 )
 
                 # install cloud-init data
-                with ProxmoxNodeSSH(vm.node) as con:
+                with ProxmoxNodeSSH(instance.node) as con:
                     snippets_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/snippets"
 
                     con.sftp.putfo(
@@ -886,38 +885,43 @@ class Proxmox():
                         f'{ snippets_path }/{instance.fqdn}.metadata.yml'
                     )
 
+                    escaped_hash = instance.metadata.root_user.password_hash.replace('$','\\$')
                     userdata_config = f"""#cloud-config
 preserve_hostname: false
 manage_etc_hosts: true
 fqdn: { instance.fqdn }
 ssh_pwauth: 1
 disable_root: 0
+lock_passwd: false
 packages:
     - qemu-guest-agent
 runcmd:
+    - sed -i'.orig' -e's/without-password/yes/' /etc/ssh/sshd_config
+    - service sshd restart
+    - bash -c "passwd -u root && echo -e 'root:{ escaped_hash }' | chpasswd -e"
     - [ systemctl, enable, qemu-guest-agent ]
     - [ systemctl, start, qemu-guest-agent, --no-block ]  
 users:
-    -   name: root
+    -   name: ubuntu
         lock_passwd: false
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        passwd: { instance.metadata.root_user.password_hash }
         shell: /bin/bash
         ssh_redirect_user: false
         ssh_authorized_keys:
             - { instance.metadata.root_user.ssh_public_key }
             - { instance.metadata.root_user.mgmt_ssh_public_key }
-chpasswd:
-    list: |
-        root:{ instance.metadata.root_user.password_hash }
-    expire: false
 """
 
                     if vps_rerun_cloudinit == True:
                         # This will wipe previous cloud-init state from previous boots
                         # will re run all cloudinit_initial_modules, i.e reapplying user info and networking
                         # this typically only happens when a password reset has been requested
-                        userdata_config += """
+                        userdata_config += f"""
 bootcmd: 
+    - rm /root/.ssh/authorized_keys
     - rm -f /etc/netplan/50-cloud-init.yml
+    - rm -rf /var/lib/cloud/
     - cloud-init clean --logs
 """         
 
@@ -957,7 +961,7 @@ version: 2
                     net0=f"virtio={ instance.metadata.network.nic_allocation.macaddress },bridge={config.proxmox.vps.bridge},tag={config.proxmox.vps.vlan}"
                 )
 
-                self.prox.nodes(instance.node).qemu(f"{vm.id}/status/start").post()
+                self.prox.nodes(instance.node).qemu(f"{instance.id}/status/start").post()
 
 
     def stop_instance(
@@ -1028,7 +1032,7 @@ version: 2
 
     def get_port_forward_map(
         self
-    ) -> Dict[int,Tuple[ipaddress.IPv4Interface, int]]:
+    ) -> Dict[int,Tuple[str, ipaddress.IPv4Interface, int]]:
         instances = self.read_instances()
 
         port_map = {}
@@ -1045,7 +1049,7 @@ version: 2
                     logger.warning(f"warning, port out of range: {instance.fqdn} tried to map {external_port} but it's out of range!")
                     continue
                 
-                port_map[external_port] = (ip, internal_port)
+                port_map[external_port] = (instance.fqdn, ip, internal_port)
         
         return port_map
 
@@ -1165,8 +1169,10 @@ version: 2
     ) -> dict:
         services = {}
         routers = {}
+        entrypoints = {}
 
         for fqdn, instance in self.read_instances().items():
+            # first do vhosts
             for vhost, options in instance.metadata.network.vhosts.items():
                 valid, remarks = self.validate_domain(instance.metadata.owner, vhost)
 
@@ -1192,12 +1198,65 @@ version: 2
                             }]
                         }
                     }
-    
 
+        tcp_routers = {}
+        udp_routers = {}
+        tcp_services = {}
+        udp_services = {}
+
+        # then do tcp/udp port mappings
+        for external_port, internal_tuple in self.get_port_forward_map():
+            fqdn, ip, internal_port = internal_tuple
+
+            entrypoints[f"{fqdn}[{external_port}/tcp]"] = {
+                "address": ":{external_port}/tcp"
+            }
+
+            tcp_routers[f"{fqdn}[{external_port}/tcp]"] = {
+                "entryPoints": [f"{fqdn}[{external_port}/tcp]"],
+                "rule": "HostSNI(`*`)",
+                "service": f"{fqdn}[{external_port}/tcp]"
+            }
+
+            tcp_services[f"{fqdn}[{external_port}/tcp]"] = {
+                "loadBalancer": {
+                    "servers": [{
+                        "address": "{ip}:{internal_port}"
+                    }]
+                }
+            }
+
+            entrypoints[f"{fqdn}[{external_port}/udp]"] = {
+                "address": ":{external_port}/udp"
+            }
+
+            udp_routers[f"{fqdn}[{external_port}/udp]"] = {
+                "entryPoints": [f"{fqdn}[{external_port}/udp]"],
+                "service": f"{fqdn}[{external_port}/udp]"
+            }
+
+            udp_services[f"{fqdn}[{external_port}/udp]"] = {
+                "loadBalancer": {
+                    "servers": [{
+                        "address": "{ip}:{internal_port}"
+                    }]
+                }
+            }
+ 
+ 
         config = {
+            "entryPoints": entrypoints,
             "http": {
                 "routers": routers,
                 "services": services
+            },
+            "tcp": {
+                "routers": tcp_routers,
+                "services": tcp_services
+            },
+            "udp": {
+                "routers": udp_routers,
+                "services": udp_services
             }
         }
 
