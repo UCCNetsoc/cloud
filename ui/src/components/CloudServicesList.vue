@@ -95,7 +95,7 @@
             mdi-plus
           </v-icon>
         </v-btn>
-        <v-btn @click="uiReloadLxc()" icon>
+        <v-btn @click="uiReload()" icon>
           <v-icon>
             mdi-refresh
           </v-icon>
@@ -423,7 +423,7 @@ export default Vue.extend({
       } finally {
         this.confirmCancel.loading = false
         this.confirmCancel.mode = ConfirmCancelMode.Hidden
-        this.uiReloadLxc()
+        this.uiReload()
       }
     },
 
@@ -432,7 +432,7 @@ export default Vue.extend({
       this.confirmCancel.mode = ConfirmCancelMode.Hidden
     },
 
-    async uiReloadLxc () {
+    async uiReload () {
       this.lxcLoading = true
       this.lxcs = []
 
@@ -464,8 +464,8 @@ export default Vue.extend({
       this.confirmCancel.mode = mode
     },
 
-    async uiReloadLxcTemplates () {
-      this.lxcTemplates = []
+    async uiReloadTemplates () {
+      this.templates = []
 
       try {
         const res = await fetchRest(
@@ -476,19 +476,23 @@ export default Vue.extend({
           })
         const templates: {[name: string]: Template} = await res.json()
         for (const k of Object.keys(templates)) {
-          this.lxcTemplates.push(Object.assign(templates[k], { id: k }))
+          this.templates.push(Object.assign(templates[k], { id: k }))
         }
-        this.lxcTemplates = Object.values(templates)
+        this.templates = Object.values(templates)
       } catch (e) {
         console.error(e)
       }
     }
   },
 
+  props: {
+    type: String
+  },
+
   data () {
     const lxcs: LXC[] = []
     const action: ConfirmCancelAction = {}
-    const lxcTemplates: Template[] = []
+    const templates: Template[] = []
 
     return {
       ConfirmCancelMode, // Needed to use the enum in the rendered template
@@ -496,7 +500,7 @@ export default Vue.extend({
       msg: '',
       lxcs,
       lxcLoading: true,
-      lxcTemplates,
+      templates,
 
       confirmCancel: {
         mode: ConfirmCancelMode.Hidden,
@@ -517,8 +521,8 @@ export default Vue.extend({
   },
 
   mounted () {
-    this.uiReloadLxc()
-    this.uiReloadLxcTemplates()
+    this.uiReload()
+    this.uiReloadTemplates()
   }
 })
 </script>
