@@ -412,12 +412,12 @@ class Proxmox():
         self,
         instance_type: models.proxmox.Type,
         node: str,
-        id: int
+        vmid: int
     ) -> models.proxmox.Instance:
 
         if instance_type == models.proxmox.Type.LXC:
             try:
-                lxc_config = self.prox.nodes(node).lxc.get(f"{id}/config")
+                lxc_config = self.prox.nodes(node).lxc.get(f"{vmid}/config")
             except Exception as e:
                 raise exceptions.resource.NotFound("The LXC does not exist")
 
@@ -464,7 +464,7 @@ class Proxmox():
                 disk_space=disk_space
             )
 
-            current_status = self.prox.nodes(node).lxc.get(f"{id}/status/current")
+            current_status = self.prox.nodes(node).lxc.get(f"{vmid}/status/current")
             if current_status['status'] == 'running':
                 status = models.proxmox.Status.Running
             elif current_status['status'] == 'stopped':
@@ -472,7 +472,7 @@ class Proxmox():
 
             instance = models.proxmox.Instance(
                 type=instance_type,
-                id=id,
+                id=vmid,
                 fqdn=fqdn,
                 hostname=hostname,
                 node=node,
@@ -492,7 +492,81 @@ class Proxmox():
 
             return instance
         elif instance_type == models.proxmox.Type.VPS:
-            pass
+            try:
+                vm_config = self.prox.nodes(node).qemu.get(f"{vmid}/config")
+            except Exception as e:
+                raise exceptions.resource.NotFound("The instance does not exist")
+
+            fqdn = vm_config['name']
+            
+            # decode description
+            try:
+                metadata = models.proxmox.Metadata.parse_obj(
+                    yaml.safe_load(vm_config['description'])
+                )
+            except Exception as e:
+                raise exceptions.resource.Unavailable(
+                    f"Instance is unavailable, malformed metadata description: {e}"
+                )
+
+            # for user ocanty, returns .ocanty.uservm.netsoc.co
+            suffix = self._get_instance_fqdn_for_username(instance_type, metadata.owner, "")
+
+            # trim suffix
+            if not fqdn.endswith(suffix):
+                raise exceptions.resource.Unavailable(
+                    f"Found Instance but Owner / FQDN do not align, FQDN is {fqdn} but owner is {metadata.owner}"
+                )
+
+            hostname = fqdn[:-len(suffix)]
+
+            if (datetime.date.today() - metadata.inactivity.marked_active_at).days > config.proxmox.uservm.inactivity_shutdown_num_days:
+                active = False
+            else:
+                active = True 
+
+            # config str looks like this: whatever,size=30G
+            # extract the size str
+            size_str = dict(map(lambda x: (x.split('=') + [""])[:2], vm_config['virtio0'].split(',')))['size']
+
+            disk_space = int(size_str[:-1])
+
+            specs = models.proxmox.Specs(
+                cores=vm_config['cores'],
+                memory=vm_config['memory'],
+                swap=vm_config['swap'],
+                disk_space=disk_space
+            )
+
+            current_status = self.prox.nodes(node).qemu.get(f"{vmid}/status/current")
+            if current_status['status'] == 'running':
+                status = models.proxmox.Status.Running
+            elif current_status['status'] == 'stopped':
+                status = models.proxmox.Status.Stopped
+
+            instance = models.proxmox.Instance(
+                type=instance_type,
+                id=vmid,
+                fqdn=fqdn,
+                hostname=hostname,
+                node=node,
+                metadata=metadata,
+                specs=specs,
+                remarks=[],
+                status=status,
+                active=active
+            )
+
+            # Build remarks about the thing, problems, etc...
+            for vhost in instance.metadata.network.vhosts:
+                valid, remarks = self.validate_domain(instance.metadata.owner, vhost)
+
+                if valid is not True:
+                    instance.remarks += remarks
+
+            return instance
+
+        raise exceptions.resource.NotFound("The instance does not exist")
 
     def _read_instance_by_fqdn(
         self,
@@ -869,94 +943,6 @@ class Proxmox():
     ) -> models.proxmox.VPS:  
         """Find a VPS on a node or throw an exception"""
 
-        try:
-            vm_config = self.prox.nodes(node).qemu.get(f"{vm_dict['vmid']}/config")
-        except Exception as e:
-            raise exceptions.resource.NotFound("The VPS does not exist")
-
-        fqdn = vm_config['name']
-        
-        # decode description
-        try:
-            metadata = models.proxmox.Metadata.parse_obj(
-                yaml.safe_load(vm_config['description'])
-            )
-        except Exception as e:
-            raise exceptions.resource.Unavailable(
-                f"VPS is unavailable, malformed metadata description: {e}"
-            )
-
-        # for user ocanty, returns .ocanty.uservm.netsoc.co
-        suffix = self._get_vps_fqdn_for_username(metadata.owner, "")
-
-        # trim suffix
-        if not vm_dict['name'].endswith(suffix):
-            raise exceptions.resource.Unavailable(
-                f"Found VM but Owner / FQDN do not align, FQDN is {vm_dict['name']} but owner is {metadata.owner}"
-            )
-
-        hostname = vm_dict['name'][:-len(suffix)]
-
-
-        if (datetime.date.today() - metadata.inactivity.marked_active_at).days > config.proxmox.uservm.inactivity_shutdown_num_days:
-            active = False
-        else:
-            active = True 
-
-        vm = models.proxmox.UserVM(
-            id=vm_dict['vmid'],
-            fqdn=fqdn,
-            hostname=hostname,
-            node=node,
-            metadata=metadata,
-            specs=metadata.provision.image.specs,
-            remarks=[],
-            status=models.proxmox.Status.NotApplicable,
-            active=active
-        )
-
-        # if it's a vm request
-        if metadata.provision.stage == models.proxmox.Provision.Stage.AwaitingApproval:
-            vm.remarks.append(
-                "Your VM is currently awaiting approval from the SysAdmins, you will receive an email once it has been approved"
-            )
-        elif metadata.provision.stage == models.proxmox.Provision.Stage.Approved:
-            vm.remarks.append(
-                "Your VM has been approved, you can now flash it's image"
-            )
-        elif metadata.provision.stage == models.proxmox.Provision.Stage.Installed:
-            disk_space = 0
-
-            if 'virtio0' not in vm_config:
-                vm.remarks.append("VM is missing its disk. Contact SysAdmins")
-            else:
-                # config str looks like this: local-lvm:vm-1867516-disk-0,backup=0,size=30G
-
-                # extract the size str
-                size_str = dict(map(lambda x: (x.split('=') + [""])[:2], vm_config['virtio0'].split(',')))['size']
-
-                disk_space = int(size_str[:-1])
-
-            vm.specs=models.proxmox.Specs(
-                cores=vm_config['cores'],
-                memory=vm_config['memory'],
-                disk_space=0
-            )
-        else:
-            vm.remarks.append(
-                "Installation may take awhile, check back later"
-            )
-
-        vm_current_status = self.prox.nodes(node).qemu.get(f"{vm_dict['vmid']}/status/current")
-        logger.info(vm_current_status)
-        if vm_current_status['status'] == 'running':
-            vm.status = models.proxmox.Status.Running
-        elif vm_current_status['status'] == 'stopped':
-            vm.status = models.proxmox.Status.Stopped
-
-        return vm
-
-        raise exceptions.resource.NotFound("The VM does not exist")
 
 
 #     def _read_uservm_by_fqdn(
