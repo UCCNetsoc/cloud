@@ -47,6 +47,10 @@ TemplateID = {
     "max_length": 32
 }
 
+class Type(str, Enum):
+    LXC: str = "lxc"
+    VPS: str = "vps"
+
 def generate_ranged_port_field_args(gte, lte):
     return {
         "default": None,
@@ -92,22 +96,6 @@ class Template(BaseModel):
 
 from .account import Username
 from .jwt import Payload, Serialized
-
-class RequestDetail(BaseModel):
-    template_id: str = Field(**TemplateID)
-    reason: str = Field(**Reason)
-
-class VPSRequest(Payload):
-    sub: constr(regex=r'^admin vps request$') = "admin vps request"
-    username: str = Field(**Username)
-    hostname: str = Field(**Hostname)
-    detail: RequestDetail
-
-class LXCRequest(Payload):
-    sub: constr(regex=r'^admin lxc request$') = "admin lxc request"
-    username: str = Field(**Username)
-    hostname: str = Field(**Hostname)
-    detail: RequestDetail
     
 class ToS(BaseModel):
     suspended: bool = False
@@ -154,8 +142,20 @@ class Network(BaseModel):
     ports: Dict[int, int] = {}
     nic_allocation: NICAllocation 
 
-class LXCMetadata(BaseModel):
-    groups: List[str] = ["lxc", "cloudlxc"]
+class RequestDetail(BaseModel):
+    template_id: str = Field(**TemplateID)
+    reason: str = Field(**Reason)
+
+    
+class Request(Payload):
+    sub: constr(regex=r'^admin instance request$') = "admin instance request"
+    username: str = Field(**Username)
+    hostname: str = Field(**Hostname)
+    type: Type
+    detail: RequestDetail
+
+class Metadata(BaseModel):
+    groups: List[str] = []
     host_vars: dict = {}
 
     owner: str = Field(**Username)
@@ -180,7 +180,9 @@ class Status(str, Enum):
     Stopped = 'stopped'
     Running = 'running'
 
-class LXC(BaseModel):
+class Instance(BaseModel):
+    type: Type
+
     # Proxmox node
     node: str 
 
@@ -200,12 +202,13 @@ class LXC(BaseModel):
     active: bool
 
     # Metadata
-    metadata: LXCMetadata
+    metadata: Metadata
 
     # Remarks about the VM and it's configuration we return to the user
     remarks: List[str] = []
 
     status: Status
+
 
 class Provision(BaseModel):
     class Stage(str, Enum):
@@ -222,19 +225,14 @@ class Provision(BaseModel):
     template_id: str = Field(**TemplateID)
 
 
+
 class VPSMetadata(BaseModel):
-    groups: List[str] = ["vm", "uservm"]
+    groups: List[str] = ["vm", "cloudvm"]
     host_vars: dict = {}
 
-    # VM owner
     owner: str = Field(**Username)
 
-    # Why the VM exists
-    reason: str 
-
-    # Info about the VM provisioning
-    provision: Provision
-
+    # Tracks ToS suspension status
     tos: ToS = ToS()
 
     # Inactivity data
@@ -246,57 +244,33 @@ class VPSMetadata(BaseModel):
     # Root user info
     root_user: RootUser
 
-    # Repply cloud-init settings on next boot
-    # Used to set passwords, network settings, will also rotate host keys
+    # Details about the original request
+    request_detail: RequestDetail
+
     reapply_cloudinit_on_next_boot: str = False
 
-# class UserVM(BaseModel):
-#     # Proxmox node
-#     node: str 
+class VPS(BaseModel):
+    node: int
+    
+    id: int
 
-#     # VM id
-#     id: int
+    # VM hostname
+    hostname: str = Field(**Hostname)
 
-#     # VM hostname
-#     hostname: str = Field(**Hostname)
+    # VM fqdn
+    fqdn: str = Field(**FQDN)
 
-#     # VM fqdn
-#     fqdn: str = Field(**FQDN)
+    # Specs
+    specs: Specs
 
-#     # Specs
-#     specs: Specs
+    # Metadata
+    metadata: VPSMetadata
 
-#     # Metadata
-#     metadata: Metadata
+    # Remarks about the VM and it's configuration we return to the user
+    remarks: List[str] = []
 
-#     # Remarks about the VM and it's configuration we return to the user
-#     remarks: List[str] = []
+    status: Status
 
-#     status: Status
+    # Returns true if the VM is considered active i.e not in danger of being shut off or deletion
+    active: bool
 
-#     # Returns true if the VM is considered active i.e not in danger of being shut off or deletion
-#     active: bool
-
-# class UserLXC(BaseModel):
-#     # Proxmox node
-#     node: str 
-
-#     # VM id
-#     id: int
-
-#     # VM hostname
-#     hostname: str = Field(**Hostname)
-
-#     # VM fqdn
-#     fqdn: str = Field(**FQDN)
-
-#     # Specs
-#     specs: Specs
-
-#     # Metadata
-#     metadata: Metadata
-
-#     # Remarks about the VM and it's configuration we return to the user
-#     remarks: List[str] = []
-
-#     status: Status

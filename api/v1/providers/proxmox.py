@@ -85,6 +85,31 @@ class Proxmox():
             verify_ssl=False
         )
 
+    def get_templates(
+        self,
+        instance_type: models.proxmox.Type
+    ) -> Dict[str, models.proxmox.Template]:
+        if instance_type == models.proxmox.Type.LXC:
+            return config.proxmox.lxc.templates
+        elif instance_type == models.proxmox.Type.VPS:
+            return config.proxmox.vps.templates
+
+    def get_template(
+        self,
+        instance_type: models.proxmox.Type,
+        template_id: str
+    ) -> models.proxmox.Template:
+        templates = self.get_templates(instance_type)
+        if template_id not in templates:
+            raise exceptions.rest.Error(
+                400,
+                models.rest.Detail(
+                    msg=f"Template {template_id} does not exist!"
+                )
+            )
+        else:
+            return templates[template_id]
+
     def _select_best_node(
         self,
         specs: models.proxmox.Specs
@@ -116,43 +141,63 @@ class Proxmox():
         # return the node with the highest score
         return sorted(scoreboard, key=scoreboard.get, reverse=True)[0]
 
-    def _get_lxc_fqdn_for_username(
+    def _get_instance_fqdn_for_username(
         self,
+        instance_type: models.proxmox.Type,
         username: str,
         hostname: str
     ) -> str:
-        return f"{hostname}.{username}.{config.proxmox.lxc.base_fqdn}"
+        if instance_type == models.proxmox.Type.LXC:
+            return f"{hostname}.{username}.{config.proxmox.lxc.base_fqdn}"
+        elif instance_type == models.proxmox.Type.VPS:
+            return f"{hostname}.{username}.{config.proxmox.vps.base_fqdn}"
 
-    def _get_lxc_fqdn_for_account(
+    def _get_instance_fqdn_for_account(
         self,
+        instance_type: models.proxmox.Type,
         account: models.account.Account,
         hostname: str
     ) -> str:
-        return self._get_lxc_fqdn_for_username(account.username, hostname)
+        return self._get_instance_fqdn_for_username(instance_type, account.username, hostname)
 
-    def _allocate_ip_lxc(
-        self
-    ) -> ipaddress.IPv4Interface:
+    def _allocate_nic(
+        self,
+        instance_type: models.proxmox.Type
+    ) -> models.proxmox.NICAllocation:
         # world's most ghetto ip allocation algorithm
+        if instance_type == models.proxmox.Type.LXC:
+            network = config.proxmox.lxc.network.network
+            base_ip = config.proxmox.lxc.network.ip
+            gateway = base_ip + 1
+        elif instance_type == models.proxmox.Type.VPS:
+            network = config.proxmox.vps.network.network
+            base_ip = config.proxmox.vps.network.ip
+            gateway = base_ip + 1
 
         # returns set with network and broadcast address removed
-        ips = set(config.proxmox.lxc.network.network.hosts())
+        ips = set(network.hosts())
 
-        # remove router address
-        ips.remove(config.proxmox.lxc.network.ip + 1)
+        # remove router/gateway address
+        ips.remove(gateway)
 
         # remove any addresses assigned to any of the lxcs
-        for fqdn, lxc in self.read_lxcs().items():
-            for address in lxc.metadata.network.nic_allocation.addresses:
+        for fqdn, instance in self.read_instances(instance_type).items():
+            for address in instance.metadata.network.nic_allocation.addresses:
                 if address.ip in ips:
                     ips.remove(address.ip)
 
         if len(ips) > 0:
-            ip = next(iter(ips))
+            ip_addr = next(iter(ips))
 
-            return ipaddress.IPv4Interface(f"{ip}/{config.proxmox.lxc.network.network.prefixlen}")
+            return models.proxmox.NICAllocation(
+                addresses=[
+                    ipaddress.IPv4Interface(f"{ip_addr}/{network.prefixlen}")
+                ],
+                gateway4=gateway,
+                macaddress="02:00:00:%02x:%02x:%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+            )
         else:
-            raise exception.resource.Unavailable("Could not allocate an IP for the LXC. No IPs available")
+            raise exception.resource.Unavailable("Could not allocate an IP for the instance. No IPs available")
 
     def _random_password(
         self,
@@ -168,7 +213,7 @@ class Proxmox():
 
     def _serialize_metadata(
         self,
-        metadata: Union[models.proxmox.LXCMetadata, models.proxmox.VPSMetadata]
+        metadata: models.proxmox.Metadata
     ):
         # https://github.com/samuelcolvin/pydantic/issues/1043
         return yaml.safe_dump(
@@ -178,156 +223,167 @@ class Proxmox():
             default_style='', width=8192
         )
 
-    def write_out_lxc_metadata(
+    def write_out_instance_metadata(
         self,
-        lxc: models.proxmox.LXC
+        instance: models.proxmox.Instance
     ):
-        yaml_description = self._serialize_metadata(lxc.metadata)
+        yaml_description = self._serialize_metadata(instance.metadata)
         
-        self.prox.nodes(lxc.node).lxc(f"{lxc.id}/config").put(description=yaml_description)
+        if instance.type == models.proxmox.Type.LXC:
+            self.prox.nodes(instance.node).lxc(f"{instance.id}/config").put(description=yaml_description)
+        elif instance.type == models.proxmox.Type.VPS:
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(description=yaml_description)
 
-    def create_lxc(
+    def create_instance(
         self,
+        instance_type: models.proxmox.Type,
         account: models.account.Account,
         hostname: str,
         request_detail: models.proxmox.RequestDetail
     ) -> Tuple[str,str]:
-        if request_detail.template_id not in config.proxmox.lxc.templates:
-            raise exceptions.resource.Unavailable(f"LXC template {detail.template_id} does not exist!")
 
-        template = config.proxmox.lxc.templates[request_detail.template_id]
+        if instance_type == models.proxmox.Type.LXC:
+            template = self.get_template(instance_type, request_detail.template_id)
 
-        if template.disk_format != models.proxmox.Template.DiskFormat.TarGZ:
-            raise exceptions.resource.Unavailable(f"LXC template {detail.template_id} must use TarGZ of RootFS format!")
+            if template.disk_format != models.proxmox.Template.DiskFormat.TarGZ:
+                raise exceptions.resource.Unavailable(f"Template (on LXC) {detail.template_id} must use TarGZ of RootFS format!")
 
-        try:
-            existing_vm = self.read_lxc_by_account(account, hostname)
-            raise exceptions.resource.AlreadyExists(f"LXC {hostname} already exists")
-        except exceptions.resource.NotFound:
+            try:
+                existing_vm = self.read_instance_by_account(instance_type, account, hostname)
+                raise exceptions.resource.AlreadyExists(f"Instance {hostname} already exists")
+            except exceptions.resource.NotFound:
+                pass
+
+            node_name = self._select_best_node(template.specs)
+            fqdn = self._get_instance_fqdn_for_account(instance_type, account, hostname)
+            
+            lxc_images_path = self.prox.storage(config.proxmox.lxc.dir_pool).get()['path'] + "/template/cache"
+            image_path = f"{lxc_images_path}/{template.disk_sha256sum}.{template.disk_format}"
+            download_path = f"{lxc_images_path}/{socket.gethostname()}-{os.getpid()}-{template.disk_sha256sum}"
+
+            with ProxmoxNodeSSH(node_name) as con:
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"mkdir -p {lxc_images_path}"
+                )
+                status = stdout.channel.recv_exit_status()
+
+                if status != 0:
+                    raise exceptions.resource.Unavailable(f"Could not download template: could not reserve download dir")
+
+                # See if the image exists
+                try:
+                    con.sftp.stat(image_path)
+
+                    # Checksum image    
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"sha256sum {image_path} | cut -f 1 -d' '"
+                    )
+
+                    if template.disk_sha256sum not in str(stdout.read()):
+                        raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
+                except FileNotFoundError as e:
+                    # Original image does not exist, we gotta download it
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"wget {template.disk_url} -O {download_path}"
+                    )
+                    status = stdout.channel.recv_exit_status()
+
+                    if status != 0:
+                        raise exceptions.resource.Unavailable(f"Could not download template: error {status}: {stderr.read()} {stdout.read()}")
+
+                    # Checksum image    
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"sha256sum {download_path} | cut -f 1 -d' '"
+                    )
+
+                    if template.disk_sha256sum not in str(stdout.read()):
+                        raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
+
+                    # Move image
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"rm -f {image_path} && mv {download_path} {image_path}"
+                    )
+
+                    status = stdout.channel.recv_exit_status()
+                    if status != 0:
+                        provision_failed(f"Couldn't rename template {status}: {stderr.read()} {stdout.read()}")
+
+            user_ssh_public_key, user_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
+            mgmt_ssh_public_key, mgmt_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
+            password = self._random_password()
+
+            metadata = models.proxmox.Metadata(
+                owner=account.username,
+                request_detail=request_detail,
+                inactivity=models.proxmox.Inactivity(
+                    marked_active_at=datetime.date.today()
+                ),
+                network=models.proxmox.Network(
+                    nic_allocation=self._allocate_nic(instance_type)
+                ),
+                root_user=models.proxmox.RootUser(
+                    password_hash=self._hash_password(password),
+                    ssh_public_key=user_ssh_public_key,
+                    mgmt_ssh_public_key=mgmt_ssh_public_key,
+                    mgmt_ssh_private_key=mgmt_ssh_private_key
+                )
+            )
+
+            # reserve a VM, but don't set any of the specs yet
+            # just setup the metadata we'll need later
+            random.seed(f"{fqdn}-{node_name}")
+            hash_id = random.randint(1000, 5000000)
+            random.seed()
+
+            # Store VM metadata in the description field
+            # https://github.com/samuelcolvin/pydantic/issues/1043
+            yaml_description = self._serialize_metadata(metadata)
+            
+            result = self.prox.nodes(f"{node_name}/lxc").post(**{
+                "hostname": fqdn,
+                "vmid": hash_id,
+                "description": yaml_description,
+                "ostemplate": f"{config.proxmox.lxc.dir_pool}:vztmpl/{template.disk_sha256sum}.{template.disk_format}",
+                "cores": template.specs.cores,
+                "memory": template.specs.memory,
+                "swap": template.specs.swap,
+                "storage": config.proxmox.lxc.dir_pool,
+                "unprivileged": 1,
+                "ssh-public-keys": f"{user_ssh_public_key}\n{mgmt_ssh_public_key}"
+            })
+
+            self._wait_vmid_lock(instance_type, node_name, hash_id)
+            
+            # if there is an id collision, proxmox will do id+1, so we need to search for the lxc again
+            lxc = self._read_instance_by_fqdn(instance_type, fqdn)
+
+            self.prox.nodes(lxc.node).lxc(f"{lxc.id}/resize").put(
+                disk='rootfs',
+                size=f'{template.specs.disk_space}G'
+            )
+
+            self._wait_vmid_lock(instance_type, node_name, lxc.id)
+
+            return password, user_ssh_private_key
+        elif instance_type == models.proxmox.Type.VPS:
             pass
 
-        node_name = self._select_best_node(template.specs)
-        fqdn = self._get_lxc_fqdn_for_account(account, hostname)
-        
-        lxc_images_path = self.prox.storage(config.proxmox.lxc.dir_pool).get()['path'] + "/template/cache"
-        image_path = f"{lxc_images_path}/{template.disk_sha256sum}.{template.disk_format}"
-        download_path = f"{lxc_images_path}/{socket.gethostname()}-{os.getpid()}-{template.disk_sha256sum}"
+    def delete_instance(
+        self,
+        instance: models.proxmox.Instance
+    ):
+        if instance.status != models.proxmox.Status.Stopped:
+            raise exceptions.resource.Unavailable("Cannot delete instance, instance is running")
 
-        with ProxmoxNodeSSH(node_name) as con:
-            stdin, stdout, stderr = con.ssh.exec_command(
-                f"mkdir -p {lxc_images_path}"
-            )
-            status = stdout.channel.recv_exit_status()
+        if instance.type == models.proxmox.Type.LXC:
+            self.prox.nodes(instance.node).lxc(f"{instance.id}").delete()
+        elif instance_type == models.proxmox.Type.VPS:
+            self.prox.nodes(instance.node).qemu(f"{instance.id}").delete()
 
-            if status != 0:
-                raise exceptions.resource.Unavailable(f"Could not download template: could not reserve download dir")
-
-            # See if the image exists
-            try:
-                con.sftp.stat(image_path)
-
-                # Checksum image    
-                stdin, stdout, stderr = con.ssh.exec_command(
-                    f"sha256sum {image_path} | cut -f 1 -d' '"
-                )
-
-                if template.disk_sha256sum not in str(stdout.read()):
-                    raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
-            except FileNotFoundError as e:
-                # Original image does not exist, we gotta download it
-                stdin, stdout, stderr = con.ssh.exec_command(
-                    f"wget {template.disk_url} -O {download_path}"
-                )
-                status = stdout.channel.recv_exit_status()
-
-                if status != 0:
-                   raise exceptions.resource.Unavailable(f"Could not download template: error {status}: {stderr.read()} {stdout.read()}")
-
-                # Checksum image    
-                stdin, stdout, stderr = con.ssh.exec_command(
-                    f"sha256sum {download_path} | cut -f 1 -d' '"
-                )
-
-                if template.disk_sha256sum not in str(stdout.read()):
-                    raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
-
-                # Move image
-                stdin, stdout, stderr = con.ssh.exec_command(
-                    f"rm -f {image_path} && mv {download_path} {image_path}"
-                )
-
-                status = stdout.channel.recv_exit_status()
-                if status != 0:
-                    provision_failed(f"Couldn't rename template {status}: {stderr.read()} {stdout.read()}")
-
-        nic_allocation=models.proxmox.NICAllocation(
-            addresses=[
-                self._allocate_ip_lxc()
-            ],
-            gateway4=config.proxmox.lxc.network.ip + 1, # router address is assumed to be .1 of the subnet
-            macaddress="02:00:00:%02x:%02x:%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-        )
-
-        user_ssh_public_key, user_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
-        mgmt_ssh_public_key, mgmt_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
-        password = self._random_password()
-
-        metadata = models.proxmox.LXCMetadata(
-            owner=account.username,
-            request_detail=request_detail,
-            inactivity=models.proxmox.Inactivity(
-                marked_active_at=datetime.date.today()
-            ),
-            network=models.proxmox.Network(
-                nic_allocation=nic_allocation
-            ),
-            root_user=models.proxmox.RootUser(
-                password_hash=self._hash_password(password),
-                ssh_public_key=user_ssh_public_key,
-                mgmt_ssh_public_key=mgmt_ssh_public_key,
-                mgmt_ssh_private_key=mgmt_ssh_private_key
-            )
-        )
-
-        # reserve a VM, but don't set any of the specs yet
-        # just setup the metadata we'll need later
-        random.seed(f"{fqdn}-{node_name}")
-        hash_id = random.randint(1000, 5000000)
-        random.seed()
-
-        # Store VM metadata in the description field
-        # https://github.com/samuelcolvin/pydantic/issues/1043
-        yaml_description = self._serialize_metadata(metadata)
-        
-        result = self.prox.nodes(f"{node_name}/lxc").post(**{
-            "hostname": fqdn,
-            "vmid": hash_id,
-            "description": yaml_description,
-            "ostemplate": f"{config.proxmox.lxc.dir_pool}:vztmpl/{template.disk_sha256sum}.{template.disk_format}",
-            "cores": template.specs.cores,
-            "memory": template.specs.memory,
-            "swap": template.specs.swap,
-            "storage": config.proxmox.lxc.dir_pool,
-            "unprivileged": 1,
-            "ssh-public-keys": f"{user_ssh_public_key}\n{mgmt_ssh_public_key}"
-        })
-
-        self._wait_vmid_lock(node_name, hash_id)
-        
-        # if there is an id collision, proxmox will do id+1, so we need to search for the lxc again
-        lxc = self._read_lxc_by_fqdn(fqdn)
-
-        self.prox.nodes(lxc.node).lxc(f"{lxc.id}/resize").put(
-            disk='rootfs',
-            size=f'{template.specs.disk_space}G'
-        )
-
-        self._wait_vmid_lock(node_name, lxc.id)
-
-        return password, user_ssh_private_key
 
     def _wait_vmid_lock(
         self,
+        instance_type: models.proxmox.Type,
         node_name: str,
         vm_id: int,
         timeout: int = 25,
@@ -336,7 +392,11 @@ class Proxmox():
         """Waits for Proxmox to unlock the VM, it typically locks it when it's resizing a disk/creating a vm/etc..."""
         start = time.time()
         while True:
-            res = self.prox.nodes(node_name).lxc(f"{vm_id}/config").get()
+            if instance_type == models.proxmox.Type.LXC:
+                res = self.prox.nodes(node_name).lxc(f"{vm_id}/config").get()
+            elif instance_type == models.proxmox.Type.VPS:
+                res = self.prox.nodes(node_name).lxc(f"{vm_id}/config").get()
+
             now = time.time()
 
             if 'lock' not in res: 
@@ -348,261 +408,299 @@ class Proxmox():
             time.sleep(poll_interval)
 
 
-    def _read_lxc_on_node(
+    def _read_instance_on_node(
         self,
+        instance_type: models.proxmox.Type,
         node: str,
         id: int
-    ) -> models.proxmox.LXC:
+    ) -> models.proxmox.Instance:
 
-        try:
-            lxc_config = self.prox.nodes(node).lxc.get(f"{id}/config")
-        except Exception as e:
-            raise exceptions.resource.NotFound("The VM does not exist")
+        if instance_type == models.proxmox.Type.LXC:
+            try:
+                lxc_config = self.prox.nodes(node).lxc.get(f"{id}/config")
+            except Exception as e:
+                raise exceptions.resource.NotFound("The LXC does not exist")
 
-        # proxmox uses hostname as the lxc name
-        # but name for vm name, god help me
-        fqdn = lxc_config['hostname']
+            # proxmox uses hostname as the lxc name
+            # but name for vm name, god help me
+            fqdn = lxc_config['hostname']
 
-        # decode description
-        try:
-            metadata = models.proxmox.LXCMetadata.parse_obj(
-                yaml.safe_load(lxc_config['description'])
+            # decode description
+            try:
+                metadata = models.proxmox.Metadata.parse_obj(
+                    yaml.safe_load(lxc_config['description'])
+                )
+            except Exception as e:
+                raise exceptions.resource.Unavailable(
+                    f"LXC is unavailable, malformed metadata description: {e}"
+                )
+
+            # for user ocanty, returns .ocanty.lxc.cloud.netsoc.co
+            suffix = self._get_instance_fqdn_for_username(instance_type, metadata.owner, "")
+
+            # trim suffix
+            if not fqdn.endswith(suffix):
+                raise exceptions.resource.Unavailable(
+                    f"Found but Owner / FQDN do not align, FQDN is {lxc_fqdn} but owner is {metadata.owner}"
+                )
+
+            hostname = fqdn[:-len(suffix)]
+
+            if (datetime.date.today() - metadata.inactivity.marked_active_at).days > config.proxmox.lxc.inactivity_shutdown_num_days:
+                active = False
+            else:
+                active = True 
+
+            # config str looks like this: whatever,size=30G
+            # extract the size str
+            size_str = dict(map(lambda x: (x.split('=') + [""])[:2], lxc_config['rootfs'].split(',')))['size']
+
+            disk_space = int(size_str[:-1])
+
+            specs = models.proxmox.Specs(
+                cores=lxc_config['cores'],
+                memory=lxc_config['memory'],
+                swap=lxc_config['swap'],
+                disk_space=disk_space
             )
-        except Exception as e:
-            raise exceptions.resource.Unavailable(
-                f"LXC is unavailable, malformed metadata description: {e}"
+
+            current_status = self.prox.nodes(node).lxc.get(f"{id}/status/current")
+            if current_status['status'] == 'running':
+                status = models.proxmox.Status.Running
+            elif current_status['status'] == 'stopped':
+                status = models.proxmox.Status.Stopped
+
+            instance = models.proxmox.Instance(
+                type=instance_type,
+                id=id,
+                fqdn=fqdn,
+                hostname=hostname,
+                node=node,
+                metadata=metadata,
+                specs=specs,
+                remarks=[],
+                status=status,
+                active=active
             )
 
-        # for user ocanty, returns .ocanty.lxc.cloud.netsoc.co
-        suffix = self._get_lxc_fqdn_for_username(metadata.owner, "")
+            # Build remarks about the thing, problems, etc...
+            for vhost in instance.metadata.network.vhosts:
+                valid, remarks = self.validate_domain(instance.metadata.owner, vhost)
 
-        # trim suffix
-        if not fqdn.endswith(suffix):
-            raise exceptions.resource.Unavailable(
-                f"Found but Owner / FQDN do not align, FQDN is {lxc_fqdn} but owner is {metadata.owner}"
-            )
+                if valid is not True:
+                    instance.remarks += remarks
 
-        hostname = fqdn[:-len(suffix)]
+            return instance
+        elif instance_type == models.proxmox.Type.VPS:
+            pass
 
-        if (datetime.date.today() - metadata.inactivity.marked_active_at).days > config.proxmox.lxc.inactivity_shutdown_num_days:
-            active = False
-        else:
-            active = True 
-
-        # config str looks like this: whatever,size=30G
-        # extract the size str
-        size_str = dict(map(lambda x: (x.split('=') + [""])[:2], lxc_config['rootfs'].split(',')))['size']
-
-        disk_space = int(size_str[:-1])
-
-        specs = models.proxmox.Specs(
-            cores=lxc_config['cores'],
-            memory=lxc_config['memory'],
-            swap=lxc_config['swap'],
-            disk_space=disk_space
-        )
-
-        current_status = self.prox.nodes(node).lxc.get(f"{id}/status/current")
-        if current_status['status'] == 'running':
-            status = models.proxmox.Status.Running
-        elif current_status['status'] == 'stopped':
-            status = models.proxmox.Status.Stopped
-
-        lxc = models.proxmox.LXC(
-            id=id,
-            fqdn=fqdn,
-            hostname=hostname,
-            node=node,
-            metadata=metadata,
-            specs=specs,
-            remarks=[],
-            status=status,
-            active=active
-        )
-
-        # Build remarks about the thing, problems, etc...
-        for vhost in lxc.metadata.network.vhosts:
-            valid, remarks = self.validate_domain(lxc.metadata.owner, vhost)
-
-            if valid is not True:
-                lxc.remarks += remarks
-
-        return lxc
-
-    def _read_lxc_by_fqdn(
+    def _read_instance_by_fqdn(
         self,
+        instance_type: models.proxmox.Type,
         fqdn: str
-    ) -> models.proxmox.LXC:
-        # Look on each node for the VM
-        for node in self.prox.nodes().get():
-            for potential_lxc in self.prox.nodes(node['node']).lxc.get():
-                # is it an one of our lxc fqdns?
-                if potential_lxc['name'] == fqdn:
-                    lxc = self._read_lxc_on_node(node['node'], potential_lxc['vmid'])
-                    return lxc
-        
-        raise exceptions.resource.NotFound("The VM does not exist")
+    ) -> models.proxmox.Instance:
+        if instance_type == models.proxmox.Type.LXC:
+            for node in self.prox.nodes().get():
+                for potential_lxc in self.prox.nodes(node['node']).lxc.get():
+                    # is it an one of our lxc fqdns?
+                    if potential_lxc['name'] == fqdn:
+                        instance = self._read_instance_on_node(instance_type, node['node'], potential_lxc['vmid'])
+                        return instance
 
-    def read_lxc_by_account(
+        elif instance_type == models.proxmox.Type.VPS:
+            pass
+
+        raise exceptions.resource.NotFound("The instance does not exist")
+
+    def read_instance_by_account(
         self,
+        instance_type: models.proxmox.Type,
         account: models.account.Account,
         hostname: str
-    ) -> models.proxmox.LXC:
-        return self._read_lxc_by_fqdn(self._get_lxc_fqdn_for_account(account, hostname))
+    ) -> models.proxmox.Instance:
+        return self._read_instance_by_fqdn(
+            instance_type,
+            self._get_instance_fqdn_for_account(instance_type, account, hostname)
+        )
 
-    def read_lxcs_by_account(
+    def read_instances_by_account(
         self,
+        instance_type: models.proxmox.Type,
         account: models.account.Account
-    ) -> Dict[str, models.proxmox.LXC]:
+    ) -> Dict[str, models.proxmox.Instance]:
         """Returns a dict indexed by hostname of uservms owned by user account"""
+        if instance_type == models.proxmox.Type.LXC:
+            ret = { }
+            
+            for node in self.prox.nodes().get():
+                for lxc_dict in self.prox.nodes(node['node']).lxc.get():
+                    if lxc_dict['name'].endswith(self._get_instance_fqdn_for_account(instance_type, account, "")):
+                        lxc = self._read_instance_on_node(instance_type, node['node'], lxc_dict['vmid'])
+                        ret[lxc.hostname] = lxc
+                        
+            
+            return ret
+        elif instance_type == models.proxmox.Type.VPS:
+            return {}
 
-        ret = { }
-        
-        for node in self.prox.nodes().get():
-            for lxc_dict in self.prox.nodes(node['node']).lxc.get():
-                if lxc_dict['name'].endswith(self._get_lxc_fqdn_for_account(account, "")):
-                    lxc = self._read_lxc_on_node(node['node'], lxc_dict['vmid'])
-                    ret[lxc.hostname] = lxc
-                    
-        
-        return ret
-
-    def read_lxcs(
-        self
-    ) -> Dict[str, models.proxmox.LXC]:
-        ret = {}
-
-        for node in self.prox.nodes().get():
-            for lxc_dict in self.prox.nodes(node['node']).lxc.get():
-                if lxc_dict['name'].endswith(config.proxmox.lxc.base_fqdn):
-                    lxc = self._read_lxc_on_node(node['node'], lxc_dict['vmid'])
-                    ret[lxc.fqdn] = lxc
-
-        return ret  
-
-    def reset_root_user_lxc(
+    def read_instances(
         self,
-        lxc: models.proxmox.LXC
+        instance_type: Optional[models.proxmox.Type] = None
+    ) -> Dict[str, models.proxmox.Instance]:
+        if instance_type == models.proxmox.Type.LXC:
+            ret = {}
+
+            for node in self.prox.nodes().get():
+                for lxc_dict in self.prox.nodes(node['node']).lxc.get():
+                    if lxc_dict['name'].endswith(config.proxmox.lxc.base_fqdn):
+                        lxc = self._read_instance_on_node(instance_type, node['node'], lxc_dict['vmid'])
+                        ret[lxc.fqdn] = lxc
+
+            return ret  
+        elif instance_type == models.proxmox.Type.VPS:
+            return {}
+        elif instance_type == None:
+            lxcs = self.read_instances(models.proxmox.Type.LXC)
+            vpses = self.read_instances(models.proxmox.Type.VPS)
+            
+            return {**lxcs, **vpses}
+
+
+    def reset_instance_root_user(
+        self,
+        instance: models.proxmox.Instance
     ) -> Tuple[str, str]:
         """Returns a tuple of password, private_key"""
-
-        if lxc.status == models.proxmox.Status.Stopped:
-            raise exceptions.resource.Unavailable("The LXC must be running to reset the root password")
-
         user_ssh_public_key, user_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
         mgmt_ssh_public_key, mgmt_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
 
         password = self._random_password()
 
-        lxc.metadata.root_user = models.proxmox.RootUser(
+        root_user = models.proxmox.RootUser(
             password_hash=self._hash_password(password),
             ssh_public_key=user_ssh_public_key,
             mgmt_ssh_public_key=mgmt_ssh_public_key,
             mgmt_ssh_private_key=mgmt_ssh_private_key
         )
-        self.write_out_lxc_metadata(lxc)
 
-        with ProxmoxNodeSSH(lxc.node) as con:
-            escaped_hash = lxc.metadata.root_user.password_hash.replace('$','$')
-            stdin, stdout, stderr = con.ssh.exec_command(
-                f"echo -e 'root:{escaped_hash}' | pct exec {lxc.id} -- chpasswd -e"
-            )
-            status = stdout.channel.recv_exit_status()
+        if instance.type == models.proxmox.Type.LXC:
+            if instance.status == models.proxmox.Status.Stopped:
+                raise exceptions.resource.Unavailable("The instance must be running to reset the root password")
 
-            logger.info(stdout.read()) 
-            logger.info(stderr.read())
-
-            if status != 0:
-                raise exceptions.resource.Unavailable(
-                    f"Could not start LXC: unable to set root password: {status}: {stdout.read()} {stderr.read()}"
+            with ProxmoxNodeSSH(instance.node) as con:
+                escaped_hash = root_user.password_hash.replace('$','$')
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"echo -e 'root:{escaped_hash}' | pct exec {instance.id} -- chpasswd -e"
                 )
+                status = stdout.channel.recv_exit_status()
 
-            stdin, stdout, stderr = con.ssh.exec_command(
-                f"echo -e '# --- BEGIN PVE ---\\n{lxc.metadata.root_user.ssh_public_key}\\n{lxc.metadata.root_user.mgmt_ssh_public_key}\\n# --- END PVE ---' | pct push { lxc.id } /dev/stdin '/root/.ssh/authorized_keys' --perms 0600 --user 0 --group 0"
-            )
-            status = stdout.channel.recv_exit_status()
+                if status != 0:
+                    raise exceptions.resource.Unavailable(
+                        f"Could not start instance: unable to set root password: {status}: {stdout.read()} {stderr.read()}"
+                    )
 
-            if status != 0:
-                raise exceptions.resource.Unavailable(
-                    f"Could not start LXC: unable to inject ssh keys {status}: {stdout.read()} {stderr.read()}"
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"echo -e '# --- BEGIN PVE ---\\n{root_user.ssh_public_key}\\n{root_user.mgmt_ssh_public_key}\\n# --- END PVE ---' | pct push { instance.id } /dev/stdin '/root/.ssh/authorized_keys' --perms 0600 --user 0 --group 0"
                 )
+                status = stdout.channel.recv_exit_status()
+
+                if status != 0:
+                    raise exceptions.resource.Unavailable(
+                        f"Could not start LXC: unable to inject ssh keys {status}: {stdout.read()} {stderr.read()}"
+                    )
+
+        elif instance.type == models.proxmox.Type.VPS:
+            if instance.status == models.proxmox.Status.Started:
+                # VPS needs to be stopped because we set the root pw using cloudinit on boot
+                raise exceptions.resource.Unavailable("The instance must be stopped to reset the root password")
+
+        instance.metadata.root_user = root_user
+        self.write_out_instance_metadata(instance)
 
         return password, user_ssh_private_key
 
-    def start_lxc(
+    def start_instance(
         self,
-        lxc: models.proxmox.LXC
+        instance: models.proxmox.Instance
     ):
-        if lxc.status != models.proxmox.Status.Running:
-            self.prox.nodes(lxc.node).lxc(f"{lxc.id}/config").put(**{
-                "nameserver": "1.1.1.1",
-                "net0": f"rate=100,name=eth0,bridge={config.proxmox.lxc.bridge},tag={config.proxmox.lxc.vlan},hwaddr={lxc.metadata.network.nic_allocation.macaddress},ip={lxc.metadata.network.nic_allocation.addresses[0]},mtu=1450",
-            })
+        if instance.status != models.proxmox.Status.Running:
+            if instance.type == models.proxmox.Type.LXC:
+                self.prox.nodes(instance.node).lxc(f"{instance.id}/config").put(**{
+                    "nameserver": "1.1.1.1",
+                    "net0": f"rate=100,name=eth0,bridge={config.proxmox.lxc.bridge},tag={config.proxmox.lxc.vlan},hwaddr={instance.metadata.network.nic_allocation.macaddress},ip={instance.metadata.network.nic_allocation.addresses[0]},mtu=1450",
+                })
 
-            self.prox.nodes(lxc.node).lxc(f"{lxc.id}/status/start").post()
-
-    def stop_lxc(
+                self.prox.nodes(instance.node).lxc(f"{instance.id}/status/start").post()
+            elif instance.type == models.proxmox.Type.VPS:
+                pass
+    def stop_instance(
         self,
-        lxc: models.proxmox.LXC
+        instance: models.proxmox.Instance
     ):
-        if lxc.status == models.proxmox.Status.Running:
-            self.prox.nodes(lxc.node).lxc(f"{lxc.id}/status/stop").post()
+        if instance.status == models.proxmox.Status.Running:
+            if instance.type == models.proxmox.Type.LXC:
+                self.prox.nodes(instance.node).lxc(f"{instance.id}/status/stop").post()
+            elif instance.type == models.proxmox.Type.VPS:
+                self.prox.nodes(instance.node).qemu(f"{instance.id}/status/stop").post()
 
-    def shutdown_lxc(
+    def shutdown_instance(
         self,
-        lxc: models.proxmox.LXC
+        instance: models.proxmox.Instance
     ):
-        if lxc.status == models.proxmox.Status.Running:
-            self.prox.nodes(lxc.node).lxc(f"{lxc.id}/status/shutdown").post()
+        if instance.status == models.proxmox.Status.Running:
+            if instance.type == models.proxmox.Type.LXC:
+                self.prox.nodes(instance.node).lxc(f"{instance.id}/status/shutdown").post()
+            elif instance.type == models.proxmox.Type.VPS:
+                self.prox.nodes(instance.node).qemu(f"{instance.id}/status/shutdown").post()
 
-    def mark_active_lxc(
+    def mark_instance_active(
         self,
-        lxc: models.proxmox.LXC
+        instance: models.proxmox.Instance
     ): 
         # reset inactivity status, this resets tracking of the emails too
-        lxc.metadata.inactivity = models.proxmox.Inactivity(
+        instance.metadata.inactivity = models.proxmox.Inactivity(
             marked_active_at = datetime.date.today()
         )
-        self.write_out_lxc_metadata(lxc)
+        self.write_out_instance_metadata(instance)
 
-    def add_vhost_lxc(
+    def add_instance_vhost(
         self,
-        lxc: models.proxmox.LXC,
+        instance: models.proxmox.Instance,
         vhost: str,
         options: models.proxmox.VHostOptions
     ):
-        lxc.metadata.network.vhosts[vhost] = options
-        self.write_out_lxc_metadata(lxc)
+        instance.metadata.network.vhosts[vhost] = options
+        self.write_out_instance_metadata(instance)
 
-    def remove_vhost_lxc(
+    def remove_instance_vhost(
         self,
-        lxc: models.proxmox.LXC,
+        instance: models.proxmox.Instance,
         vhost: str
     ):
-        if vhost in lxc.metadata.network.vhosts:
-            del lxc.metadata.network.vhosts[vhost]
+        if vhost in instance.metadata.network.vhosts:
+            del instance.metadata.network.vhosts[vhost]
 
-            self.write_out_lxc_metadata(lxc)
+            self.write_out_instance_metadata(instance)
         else:
-            raise exceptions.resource.NotFound(f"Could not find {vhost} vhost on resource")
+            raise exceptions.resource.NotFound(f"Could not find {vhost} vhost on instance")
 
     def get_port_forward_map(
         self
     ) -> Dict[int,Tuple[ipaddress.IPv4Interface, int]]:
-        lxcs = self.read_lxcs()
+        instances = self.read_instances()
 
         port_map = {}
 
-        for fqdn, lxc in lxcs.items():
-            ip = lxc.metadata.network.nic_allocation.addresses[0]
+        for fqdn, instance in instances.items():
+            ip = instance.metadata.network.nic_allocation.addresses[0]
 
-            for external_port, internal_port in lxc.metadata.network.ports.items():
+            for external_port, internal_port in instance.metadata.network.ports.items():
                 if external_port in port_map:
-                    logger.warning(f"warning, conflicting port map: {lxc.fqdn} tried to map {external_port} but it's already taken!")
+                    logger.warning(f"warning, conflicting port map: {instance.fqdn} tried to map {external_port} but it's already taken!")
                     continue
 
                 if config.proxmox.port_forward.range[0] > external_port or external_port > config.proxmox.port_forward.range[1]:
-                    logger.warning(f"warning, port out of range: {lxc.fqdn} tried to map {external_port} but it's out of range!")
+                    logger.warning(f"warning, port out of range: {instance.fqdn} tried to map {external_port} but it's out of range!")
                     continue
                 
                 port_map[external_port] = (ip, internal_port)
@@ -682,7 +780,8 @@ class Proxmox():
         return (False, remarks)
 
     def get_vhost_forward_map(
-        self
+        self,
+
     ) -> Dict[str, ipaddress.IPv4Address]:
         vhost_map = {}
 
@@ -694,9 +793,9 @@ class Proxmox():
 
         return port_map
 
-    def add_port_lxc(
+    def add_instance_port(
         self,
-        lxc: models.proxmox.LXC,
+        instance: models.proxmox.Instance,
         external: int,
         internal: int
     ):
@@ -705,17 +804,18 @@ class Proxmox():
         if external in port_map:
             raise exceptions.resource.Unavailable(f"Cannot map port {external} to {internal}, this port is currently taken by another user/another one of your VMs/LXCs")
             
-        lxc.metadata.network.ports[external] = internal
-        self.write_out_lxc_metadata(lxc)
+        instance.metadata.network.ports[external] = internal
+        self.write_out_instance_metadata(instance)
 
-    def remove_port_lxc(
+    def remove_instance_port(
         self, 
-        lxc: models.proxmox.LXC,
+        instance: models.proxmox.Instance,
         external: int
     ):
-        if external in lxc.metadata.network.ports:
-            del lxc.metadata.network.ports[external]
-        self.write_out_lxc_metadata(lxc)
+        if external in instance.metadata.network.ports:
+            del instance.metadata.network.ports[external]
+
+        self.write_out_instance_metadata(instance)
 
     def build_traefik_config(
         self,
@@ -724,9 +824,9 @@ class Proxmox():
         services = {}
         routers = {}
 
-        for fqdn, lxc in self.read_lxcs().items():
-            for vhost, options in lxc.metadata.network.vhosts.items():
-                valid, remarks = self.validate_domain(lxc.metadata.owner, vhost)
+        for fqdn, instance in self.read_instances().items():
+            for vhost, options in instance.metadata.network.vhosts.items():
+                valid, remarks = self.validate_domain(instance.metadata.owner, vhost)
 
                 if valid is True:
                     routers[f"{fqdn}[{vhost}]"] = {
@@ -746,7 +846,7 @@ class Proxmox():
                     services[f"{fqdn}[{vhost}]"] = {
                         "loadBalancer": {
                             "servers": [{ 
-                                "url": f"{ proto }://{lxc.metadata.network.nic_allocation.addresses[0].ip}:{ options.port }"
+                                "url": f"{ proto }://{instance.metadata.network.nic_allocation.addresses[0].ip}:{ options.port }"
                             }]
                         }
                     }
@@ -761,118 +861,102 @@ class Proxmox():
 
         return config
 
-    def _get_vps_fqdn_for_username(
+
+    def _read_vps_on_node(
         self,
-        username: str,
-        hostname: str
-    ) -> str:
-        return f"{hostname}.{username}.{config.proxmox.vps.base_fqdn}"
+        node: str,
+        id: int
+    ) -> models.proxmox.VPS:  
+        """Find a VPS on a node or throw an exception"""
 
-    def _get_vps_fqdn_for_account(
-        self,
-        account: models.account.Account,
-        hostname: str
-    ) -> str:
-        """
-        Returns a FQDN for a VM hostname for an account
+        try:
+            vm_config = self.prox.nodes(node).qemu.get(f"{vm_dict['vmid']}/config")
+        except Exception as e:
+            raise exceptions.resource.NotFound("The VPS does not exist")
 
-        i.e cake => cake.ocanty.uservm.netsoc.co
-        """
-        return self._get_vps_fqdn_for_username(account.username, hostname)
+        fqdn = vm_config['name']
+        
+        # decode description
+        try:
+            metadata = models.proxmox.Metadata.parse_obj(
+                yaml.safe_load(vm_config['description'])
+            )
+        except Exception as e:
+            raise exceptions.resource.Unavailable(
+                f"VPS is unavailable, malformed metadata description: {e}"
+            )
 
-#     def _read_uservm_on_node(
-#         self,
-#         node: str,
-#         fqdn: str
-#     ) -> models.proxmox.UserVM:  
-#         """Find a VM on a node or throw an exception"""
+        # for user ocanty, returns .ocanty.uservm.netsoc.co
+        suffix = self._get_vps_fqdn_for_username(metadata.owner, "")
 
-#         # get each vm on the node
-#         for vm_dict in self.prox.nodes(node).qemu.get():
-#             if vm_dict['name'] == fqdn:
-#                 vm_config = self.prox.nodes(node).qemu.get(f"{vm_dict['vmid']}/config")
+        # trim suffix
+        if not vm_dict['name'].endswith(suffix):
+            raise exceptions.resource.Unavailable(
+                f"Found VM but Owner / FQDN do not align, FQDN is {vm_dict['name']} but owner is {metadata.owner}"
+            )
 
-#                 # decode description
-#                 try:
-#                     metadata = models.proxmox.Metadata.parse_obj(
-#                         yaml.safe_load(vm_config['description'])
-#                     )
-#                 except Exception as e:
-#                     raise exceptions.resource.Unavailable(
-#                         f"User VM is unavailable, malformed metadata description: {e}"
-#                     )
-
-#                 # for user ocanty, returns .ocanty.uservm.netsoc.co
-#                 suffix = self._get_uservm_fqdn_for_username(metadata.owner, "")
-
-#                 # trim suffix
-#                 if not vm_dict['name'].endswith(suffix):
-#                     raise exceptions.resource.Unavailable(
-#                         f"Found VM but Owner / FQDN do not align, FQDN is {vm_dict['name']} but owner is {metadata.owner}"
-#                     )
-
-#                 hostname = vm_dict['name'][:-len(suffix)]
+        hostname = vm_dict['name'][:-len(suffix)]
 
 
-#                 if (datetime.date.today() - metadata.inactivity.marked_active_at).days > config.proxmox.uservm.inactivity_shutdown_num_days:
-#                     active = False
-#                 else:
-#                     active = True 
+        if (datetime.date.today() - metadata.inactivity.marked_active_at).days > config.proxmox.uservm.inactivity_shutdown_num_days:
+            active = False
+        else:
+            active = True 
 
-#                 vm = models.proxmox.UserVM(
-#                     id=vm_dict['vmid'],
-#                     fqdn=fqdn,
-#                     hostname=hostname,
-#                     node=node,
-#                     metadata=metadata,
-#                     specs=metadata.provision.image.specs,
-#                     remarks=[],
-#                     status=models.proxmox.Status.NotApplicable,
-#                     active=active
-#                 )
+        vm = models.proxmox.UserVM(
+            id=vm_dict['vmid'],
+            fqdn=fqdn,
+            hostname=hostname,
+            node=node,
+            metadata=metadata,
+            specs=metadata.provision.image.specs,
+            remarks=[],
+            status=models.proxmox.Status.NotApplicable,
+            active=active
+        )
 
-#                 # if it's a vm request
-#                 if metadata.provision.stage == models.proxmox.Provision.Stage.AwaitingApproval:
-#                     vm.remarks.append(
-#                         "Your VM is currently awaiting approval from the SysAdmins, you will receive an email once it has been approved"
-#                     )
-#                 elif metadata.provision.stage == models.proxmox.Provision.Stage.Approved:
-#                     vm.remarks.append(
-#                         "Your VM has been approved, you can now flash it's image"
-#                     )
-#                 elif metadata.provision.stage == models.proxmox.Provision.Stage.Installed:
-#                     disk_space = 0
+        # if it's a vm request
+        if metadata.provision.stage == models.proxmox.Provision.Stage.AwaitingApproval:
+            vm.remarks.append(
+                "Your VM is currently awaiting approval from the SysAdmins, you will receive an email once it has been approved"
+            )
+        elif metadata.provision.stage == models.proxmox.Provision.Stage.Approved:
+            vm.remarks.append(
+                "Your VM has been approved, you can now flash it's image"
+            )
+        elif metadata.provision.stage == models.proxmox.Provision.Stage.Installed:
+            disk_space = 0
 
-#                     if 'virtio0' not in vm_config:
-#                         vm.remarks.append("VM is missing its disk. Contact SysAdmins")
-#                     else:
-#                         # config str looks like this: local-lvm:vm-1867516-disk-0,backup=0,size=30G
+            if 'virtio0' not in vm_config:
+                vm.remarks.append("VM is missing its disk. Contact SysAdmins")
+            else:
+                # config str looks like this: local-lvm:vm-1867516-disk-0,backup=0,size=30G
 
-#                         # extract the size str
-#                         size_str = dict(map(lambda x: (x.split('=') + [""])[:2], vm_config['virtio0'].split(',')))['size']
+                # extract the size str
+                size_str = dict(map(lambda x: (x.split('=') + [""])[:2], vm_config['virtio0'].split(',')))['size']
 
-#                         disk_space = int(size_str[:-1])
+                disk_space = int(size_str[:-1])
 
-#                     vm.specs=models.proxmox.Specs(
-#                         cores=vm_config['cores'],
-#                         memory=vm_config['memory'],
-#                         disk_space=0
-#                     )
-#                 else:
-#                     vm.remarks.append(
-#                         "Installation may take awhile, check back later"
-#                     )
+            vm.specs=models.proxmox.Specs(
+                cores=vm_config['cores'],
+                memory=vm_config['memory'],
+                disk_space=0
+            )
+        else:
+            vm.remarks.append(
+                "Installation may take awhile, check back later"
+            )
 
-#                 vm_current_status = self.prox.nodes(node).qemu.get(f"{vm_dict['vmid']}/status/current")
-#                 logger.info(vm_current_status)
-#                 if vm_current_status['status'] == 'running':
-#                     vm.status = models.proxmox.Status.Running
-#                 elif vm_current_status['status'] == 'stopped':
-#                     vm.status = models.proxmox.Status.Stopped
+        vm_current_status = self.prox.nodes(node).qemu.get(f"{vm_dict['vmid']}/status/current")
+        logger.info(vm_current_status)
+        if vm_current_status['status'] == 'running':
+            vm.status = models.proxmox.Status.Running
+        elif vm_current_status['status'] == 'stopped':
+            vm.status = models.proxmox.Status.Stopped
 
-#                 return vm
+        return vm
 
-#         raise exceptions.resource.NotFound("The VM does not exist")
+        raise exceptions.resource.NotFound("The VM does not exist")
 
 
 #     def _read_uservm_by_fqdn(
@@ -1376,54 +1460,3 @@ class Proxmox():
 #         )
 
 #         self.prox.nodes(vm.node).qemu(f"{vm.id}/status/shutdown").post()
-
-#     def suspend_uservm(
-#         self,
-#         vm: models.proxmox.UserVM,
-#         suspension: models.proxmox.Suspension
-#     ):
-#         """Update suspension status"""
-#         if vm.status == models.proxmox.Status.Running:
-#             self.shutdown_uservm(vm)
-
-#         vm.metadata.suspension = suspension
-#         self.write_out_uservm_metadata(vm)
-
-
-#     def add_domain_uservm(
-#         self,
-#         vm: models.proxmox.UserVM,
-#         domain: str
-#     ):
-#         vm.metadata.network.domains.add(domain)
-#         self.write_out_uservm_metadata(vm)
-
-#     def remove_domain_uservm(
-#         self,
-#         vm: models.proxmox.UserVM,
-#         domain: str
-#     ):
-#         if domain in vm.metadata.network.domains:
-#             vm.metadata.network.domains.remove(domain)
-
-#             self.write_out_uservm_metadata(vm)
-
-#     # def build_exposed_ports_map(
-#     #     self
-#     # ) -> Dict[int, Tuple[ipaddress.IPv4Address, int]]:
-#     #     for self.read_uservms()
-
-#     # def add_port_mapping_uservm(
-#     #     self,
-#     #     vm: models.proxmox.UserVM,
-#     #     mapping: models.proxmox.ExposedPort
-#     # ):
-#     #     pass
-
-#     # def remove_port_mapping_uservm(
-#     #     self, 
-#     #     vm: models.proxmox.UserVM,
-#     #     mapping: models.proxmox.PortMapping
-#     # ):
-#     #     pass
-        
