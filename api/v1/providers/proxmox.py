@@ -242,21 +242,21 @@ class Proxmox():
         request_detail: models.proxmox.RequestDetail
     ) -> Tuple[str,str]:
 
-        if instance_type == models.proxmox.Type.LXC:
-            template = self.get_template(instance_type, request_detail.template_id)
+        template = self.get_template(instance_type, request_detail.template_id)
 
+        try:
+            existing_vm = self.read_instance_by_account(instance_type, account, hostname)
+            raise exceptions.resource.AlreadyExists(f"Instance {hostname} already exists")
+        except exceptions.resource.NotFound:
+            pass
+
+        node_name = self._select_best_node(template.specs)
+        fqdn = self._get_instance_fqdn_for_account(instance_type, account, hostname)
+
+        if instance_type == models.proxmox.Type.LXC:
             if template.disk_format != models.proxmox.Template.DiskFormat.TarGZ:
                 raise exceptions.resource.Unavailable(f"Template (on LXC) {detail.template_id} must use TarGZ of RootFS format!")
 
-            try:
-                existing_vm = self.read_instance_by_account(instance_type, account, hostname)
-                raise exceptions.resource.AlreadyExists(f"Instance {hostname} already exists")
-            except exceptions.resource.NotFound:
-                pass
-
-            node_name = self._select_best_node(template.specs)
-            fqdn = self._get_instance_fqdn_for_account(instance_type, account, hostname)
-            
             lxc_images_path = self.prox.storage(config.proxmox.lxc.dir_pool).get()['path'] + "/template/cache"
             image_path = f"{lxc_images_path}/{template.disk_sha256sum}.{template.disk_format}"
             download_path = f"{lxc_images_path}/{socket.gethostname()}-{os.getpid()}-{template.disk_sha256sum}"
@@ -349,7 +349,9 @@ class Proxmox():
                 "swap": template.specs.swap,
                 "storage": config.proxmox.lxc.dir_pool,
                 "unprivileged": 1,
-                "ssh-public-keys": f"{user_ssh_public_key}\n{mgmt_ssh_public_key}"
+                "ssh-public-keys": f"{user_ssh_public_key}\n{mgmt_ssh_public_key}",
+                "nameserver": "1.1.1.1",
+                "net0": f"rate=100,name=eth0,bridge={config.proxmox.lxc.bridge},tag={config.proxmox.lxc.vlan},hwaddr={metadata.network.nic_allocation.macaddress},ip={metadata.network.nic_allocation.addresses[0]},mtu=1450"
             })
 
             self._wait_vmid_lock(instance_type, node_name, hash_id)
@@ -366,7 +368,99 @@ class Proxmox():
 
             return password, user_ssh_private_key
         elif instance_type == models.proxmox.Type.VPS:
-            pass
+            download_images_path = self.prox.storage(config.proxmox.lxc.dir_pool).get()['path'] + "/template/qcow2"
+            vms_image_path = f"/tmp/admin-api/{vm.metadata.provision.image.disk_sha256sum}"
+            download_path = f"{images_path}/{socket.gethostname()}-{os.getpid()}-{vm.metadata.provision.image.disk_sha256sum}"
+
+            with ProxmoxNodeSSH(vm.node) as con:
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"mkdir -p {images_path}"
+                )
+                status = stdout.channel.recv_exit_status()
+
+                if status != 0:
+                    provision_failed(f"Could not download image: could not reserve download dir")
+
+                # See if the image exists
+                try:
+                    con.sftp.stat(image_path)
+
+                    # Checksum image    
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"sha256sum {image_path} | cut -f 1 -d' '"
+                    )
+
+                    if vm.metadata.provision.image.disk_sha256sum not in str(stdout.read()):
+                        provision_failed(f"Downloaded image does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
+
+                except FileNotFoundError as e:
+                    provision_stage(models.proxmox.Provision.Stage.DownloadImage)
+
+                    # Original image does not exist, we gotta download it
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"wget {vm.metadata.provision.image.disk_url} -O {download_path}"
+                    )
+                    status = stdout.channel.recv_exit_status()
+
+                    if status != 0:
+                        provision_failed(f"Could not download image: error {status}: {stderr.read()} {stdout.read()}")
+
+                    # Checksum image    
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"sha256sum {download_path} | cut -f 1 -d' '"
+                    )
+
+                    if vm.metadata.provision.image.disk_sha256sum not in str(stdout.read()):
+                        provision_failed(f"Downloaded image does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
+
+                    # Move image
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"rm -rf {image_path} && mv {download_path} {image_path}"
+                    )
+
+                    status = stdout.channel.recv_exit_status()
+                    if status != 0:
+                        provision_failed(f"Couldn't rename VM image {status}: {stderr.read()} {stdout.read()}")
+                
+                provision_stage(models.proxmox.Provision.Stage.FlashImage)
+
+                # Images path for installed VMs
+                vms_images_path = self.prox.storage(config.proxmox.uservm.dir_pool).get()['path'] + "/images"
+
+                # Move disk image
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"cd {vms_images_path} && rm -rf {vm.id} && mkdir {vm.id} && cd {vm.id} && cp {image_path} ./primary.{ vm.metadata.provision.image.disk_format }"
+                )
+                status = stdout.channel.recv_exit_status()
+                
+                if status != 0:
+                    provision_failed(f"Couldn't copy VM image {status}: {stderr.read()} {stdout.read()}")
+
+                # Create disk for EFI
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"cd {vms_images_path}/{vm.id} && qemu-img create -f qcow2 efi.qcow2 128K"
+                )
+                status = stdout.channel.recv_exit_status()
+                
+                if status != 0:
+                    provision_failed(f"Couldn't create EFI image {status}: {stderr.read()} {stdout.read()}")
+
+                self.prox.nodes(vm.node).qemu(f"{vm.id}/config").put(
+                    virtio0=f"{config.proxmox.uservm.dir_pool}:{vm.id}/primary.{ vm.metadata.provision.image.disk_format }",
+                    cores=vm.metadata.provision.image.specs.cores,
+                    memory=vm.metadata.provision.image.specs.memory,
+                    bios='ovmf',
+                    efidisk0=f"{config.proxmox.uservm.dir_pool}:{vm.id}/efi.qcow2",
+                    scsihw='virtio-scsi-pci',
+                    machine='q35',
+                    serial0='socket',
+                    bootdisk='virtio0'
+                )
+
+                self.prox.nodes(vm.node).qemu(f"{vm.id}/resize").put(
+                    disk='virtio0',
+                    size=f'{vm.metadata.provision.image.specs.disk_space}G'
+                )
 
     def delete_instance(
         self,
@@ -378,7 +472,16 @@ class Proxmox():
         if instance.type == models.proxmox.Type.LXC:
             self.prox.nodes(instance.node).lxc(f"{instance.id}").delete()
         elif instance_type == models.proxmox.Type.VPS:
+            # delete cloud-init data
+            with ProxmoxNodeSSH(instance.node) as con:
+                snippets_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/snippets"
+
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"rm -f '{ snippets_path }/{instance.fqdn}.networkconfig.yml' '{ snippets_path }/{instance.fqdn}.userdata.yml' '{ snippets_path }/{instance.fqdn}.metadata.yml'"
+                )
+
             self.prox.nodes(instance.node).qemu(f"{instance.id}").delete()
+
 
 
     def _wait_vmid_lock(
@@ -575,14 +678,19 @@ class Proxmox():
     ) -> models.proxmox.Instance:
         if instance_type == models.proxmox.Type.LXC:
             for node in self.prox.nodes().get():
-                for potential_lxc in self.prox.nodes(node['node']).lxc.get():
+                for potential in self.prox.nodes(node['node']).lxc.get():
                     # is it an one of our lxc fqdns?
-                    if potential_lxc['name'] == fqdn:
-                        instance = self._read_instance_on_node(instance_type, node['node'], potential_lxc['vmid'])
+                    if potential['name'] == fqdn:
+                        instance = self._read_instance_on_node(instance_type, node['node'], potential['vmid'])
                         return instance
 
         elif instance_type == models.proxmox.Type.VPS:
-            pass
+            for node in self.prox.nodes().get():
+                for potential in self.prox.nodes(node['node']).qemu.get():
+                    if potential['name'] == fqdn:
+                        instance = self._read_instance_on_node(instance_type, node['node'], potential['vmid'])
+                        return instance
+
 
         raise exceptions.resource.NotFound("The instance does not exist")
 
@@ -615,7 +723,16 @@ class Proxmox():
             
             return ret
         elif instance_type == models.proxmox.Type.VPS:
-            return {}
+            ret = { }
+            
+            for node in self.prox.nodes().get():
+                for vps_dict in self.prox.nodes(node['node']).qemu.get():
+                    if vps_dict['name'].endswith(self._get_instance_fqdn_for_account(instance_type, account, "")):
+                        vps = self._read_instance_on_node(instance_type, node['node'], vps_dict['vmid'])
+                        ret[vps.hostname] = vps
+                        
+            
+            return ret
 
     def read_instances(
         self,
@@ -632,7 +749,15 @@ class Proxmox():
 
             return ret  
         elif instance_type == models.proxmox.Type.VPS:
-            return {}
+            ret = {}
+
+            for node in self.prox.nodes().get():
+                for vps_dict in self.prox.nodes(node['node']).vps.get():
+                    if vps_dict['name'].endswith(config.proxmox.vps.base_fqdn):
+                        vps = self._read_instance_on_node(instance_type, node['node'], vps_dict['vmid'])
+                        ret[vps.fqdn] = vps
+
+            return ret  
         elif instance_type == None:
             lxcs = self.read_instances(models.proxmox.Type.LXC)
             vpses = self.read_instances(models.proxmox.Type.VPS)
@@ -683,19 +808,26 @@ class Proxmox():
                         f"Could not start LXC: unable to inject ssh keys {status}: {stdout.read()} {stderr.read()}"
                     )
 
+            instance.metadata.root_user = root_user
+            self.write_out_instance_metadata(instance)
+
         elif instance.type == models.proxmox.Type.VPS:
             if instance.status == models.proxmox.Status.Started:
                 # VPS needs to be stopped because we set the root pw using cloudinit on boot
                 raise exceptions.resource.Unavailable("The instance must be stopped to reset the root password")
 
-        instance.metadata.root_user = root_user
-        self.write_out_instance_metadata(instance)
+            instance.metadata.root_user = root_user
+            self.write_out_instance_metadata(instance)    
+
+            # rerun cloudinit - will write ssh keys and root pass
+            self.start_instance(instance, vps_rerun_cloudinit=True)
 
         return password, user_ssh_private_key
 
     def start_instance(
         self,
-        instance: models.proxmox.Instance
+        instance: models.proxmox.Instance,
+        vps_rerun_cloudinit: Optional[bool] = False
     ):
         if instance.status != models.proxmox.Status.Running:
             if instance.type == models.proxmox.Type.LXC:
@@ -706,7 +838,96 @@ class Proxmox():
 
                 self.prox.nodes(instance.node).lxc(f"{instance.id}/status/start").post()
             elif instance.type == models.proxmox.Type.VPS:
-                pass
+
+                # Detach existing cloud-init drive (if any)
+                self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
+                    ide2="none,media=cdrom",
+                    cicustom=""
+                )
+
+                # install cloud-init data
+                with ProxmoxNodeSSH(vm.node) as con:
+                    snippets_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/snippets"
+
+                    con.sftp.putfo(
+                        io.StringIO(""),
+                        f'{ snippets_path }/{instance.fqdn}.metadata.yml'
+                    )
+
+                    userdata_config = f"""#cloud-config
+preserve_hostname: false
+manage_etc_hosts: true
+fqdn: { instance.fqdn }
+ssh_pwauth: 1
+disable_root: 0
+packages:
+    - qemu-guest-agent
+runcmd:
+    - [ systemctl, enable, qemu-guest-agent ]
+    - [ systemctl, start, qemu-guest-agent, --no-block ]  
+users:
+    -   name: root
+        lock_passwd: false
+        shell: /bin/bash
+        ssh_redirect_user: false
+        ssh_authorized_keys:
+            - { instance.metadata.root_user.ssh_public_key }
+            - { instance.metadata.root_user.mgmt_ssh_public_key }
+chpasswd:
+    list: |
+        root:{ instance.metadata.root_user.password_hash }
+    expire: false
+"""
+
+                    if vps_rerun_cloudinit == True:
+                        # This will wipe previous cloud-init state from previous boots
+                        # will re run all cloudinit_initial_modules, i.e reapplying user info and networking
+                        # this typically only happens when a password reset has been requested
+                        userdata_config += """
+bootcmd: 
+    - rm -f /etc/netplan/50-cloud-init.yml
+    - cloud-init clean --logs
+"""         
+
+                    con.sftp.putfo(
+                        io.StringIO(userdata_config),
+                        f'{ snippets_path }/{instance.fqdn}.userdata.yml'
+                    )
+
+                    con.sftp.putfo(
+                        io.StringIO(f"""
+ethernets:
+    net0:
+        match:
+            macaddress: { instance.metadata.network.nic_allocation.macaddress }
+        nameservers:
+            addresses:
+                - 1.1.1.1
+                - 8.8.8.8
+        gateway4: { config.proxmox.uservm.network.ip + 1 }
+        optional: true
+        addresses:
+            - { instance.metadata.network.nic_allocation.addresses[0] }
+        mtu: 1450 
+version: 2
+                        """),
+                        f'{ snippets_path }/{instance.fqdn}.networkconfig.yml'
+                    )
+
+                # Insert cloud-init stuff
+                self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
+                    cicustom=f"user={ config.proxmox.vps.dir_pool }:snippets/{instance.fqdn}.userdata.yml,network={ config.proxmox.vps.dir_pool }:snippets/{instance.fqdn}.networkconfig.yml,meta={ config.proxmox.vps.dir_pool }:snippets/{instance.fqdn}.metadata.yml",
+                    ide2=f"{ config.proxmox.vps.dir_pool }:cloudinit,format=qcow2"
+                )
+
+                # Set network card
+                self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
+                    net0=f"virtio={ instance.metadata.network.nic_allocation.macaddress },bridge={config.proxmox.vps.bridge},tag={config.proxmox.vps.vlan}"
+                )
+
+                self.prox.nodes(instance.node).qemu(f"{vm.id}/status/start").post()
+
+
     def stop_instance(
         self,
         instance: models.proxmox.Instance
@@ -716,6 +937,21 @@ class Proxmox():
                 self.prox.nodes(instance.node).lxc(f"{instance.id}/status/stop").post()
             elif instance.type == models.proxmox.Type.VPS:
                 self.prox.nodes(instance.node).qemu(f"{instance.id}/status/stop").post()
+
+                # delete cloud-init data
+                with ProxmoxNodeSSH(instance.node) as con:
+                    snippets_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/snippets"
+
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"rm -f '{ snippets_path }/{instance.fqdn}.networkconfig.yml' '{ snippets_path }/{instance.fqdn}.userdata.yml' '{ snippets_path }/{instance.fqdn}.metadata.yml'"
+                    )
+
+                # Detach existing cloud-init drive (if any)
+                self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
+                    ide2="none,media=cdrom",
+                    cicustom=""
+                )
+
 
     def shutdown_instance(
         self,
@@ -876,7 +1112,7 @@ class Proxmox():
         port_map = self.get_port_forward_map()
 
         if external in port_map:
-            raise exceptions.resource.Unavailable(f"Cannot map port {external} to {internal}, this port is currently taken by another user/another one of your VMs/LXCs")
+            raise exceptions.resource.Unavailable(f"Cannot map port {external} to {internal}, this port is currently taken by another user/another one of your instances")
             
         instance.metadata.network.ports[external] = internal
         self.write_out_instance_metadata(instance)
@@ -936,116 +1172,8 @@ class Proxmox():
         return config
 
 
-    def _read_vps_on_node(
-        self,
-        node: str,
-        id: int
-    ) -> models.proxmox.VPS:  
-        """Find a VPS on a node or throw an exception"""
 
 
-
-#     def _read_uservm_by_fqdn(
-#         self,
-#         fqdn: str
-#     ) -> models.proxmox.UserVM:
-#         """Find a VM in the cluster or throw an exception"""
-
-#         # Look on each node for the VM
-#         for node in self.prox.nodes().get():
-#             try:
-#                 vm = self._read_uservm_on_node(node['node'], fqdn)
-#                 return vm
-#             except exceptions.resource.NotFound:
-#                 pass
-        
-#         raise exceptions.resource.NotFound("The VM does not exist")
-
-#     def read_uservm_by_account(
-#         self,
-#         account: models.account.Account,
-#         hostname: str
-#     ) -> models.proxmox.UserVM:
-#         """Read a VM owned by an account"""
-#         return self._read_uservm_by_fqdn(self._get_uservm_fqdn_for_account(account, hostname))
-
-#     def read_uservms_by_account(
-#         self,
-#         account: models.account.Account
-#     ) -> Dict[str, models.proxmox.UserVM]:
-#         """Returns a dict indexed by hostname of uservms owned by user account"""
-
-#         ret = { }
-        
-#         for node in self.prox.nodes().get():
-#             for vm in self.prox.nodes(node['node']).qemu.get():
-#                 if vm['name'].endswith(config.proxmox.uservm.base_fqdn):
-#                     try:
-#                         vm = self._read_uservm_on_node(node['node'], fqdn)
-                        
-#                         if vm.owner == account.username:
-#                             ret[vm.hostname] = vm
-
-#                     except Exception as e:
-#                         pass
-        
-#         return ret
-
-#     def read_uservms(
-#         self
-#     ) -> Dict[str, models.proxmox.UserVM]:
-#         """Returns a dict of all user vms indexed by fqdn"""
-#         ret = { }
-        
-#         for node in self.prox.nodes().get():
-#             for vm in self.prox.nodes(node['node']).qemu.get():
-#                 if vm['name'].endswith(config.proxmox.uservm.base_fqdn):
-#                     try:
-#                         vm = self._read_uservm_on_node(node['node'], fqdn)
-                        
-#                         ret[vm.fqdn] = vm
-
-#                     except Exception as e:
-#                         pass
-
-#         return ret
-
-#     def reset_root_password_ssh_key_uservm(
-#         self,
-#         vm: models.proxmox.UserVM
-#     ) -> Tuple[str, str]:
-#         """
-#         Reset the root password, ssh key on a VM
-#         Returns a tuple with password and private key
-#         """
-#         was_running = False
-
-#         if vm.status == models.proxmox.Status.Running:
-#             self.stop_uservm(vm)
-#             was_running = True
-        
-#         password = self._random_password()
-        
-#         public_key, private_key = utilities.auth.generate_rsa_public_private_key_pair()
-
-#         vm.metadata.root_user.password_hash = self._hash_password(password)
-#         vm.metadata.root_user.ssh_public_key = public_key
-#         vm.metadata.reapply_cloudinit_on_next_boot = True
-
-#         self.write_out_uservm_metadata(vm)
-
-#         if was_running:
-#             self.start_uservm(vm)
-
-#         return password, private_key
-
-#     def request_userlxc(
-#         self,
-#         account: models.account.Account,
-#         hostname: str,
-#         image: models.proxmox.Im
-#     ):
-#         pass
 
 #     def request_uservm(
 #         self,
@@ -1117,49 +1245,8 @@ class Proxmox():
 #             description=yaml_description
 #         )
 
-#     def _serialize_uservm_metadata(
-#         self,
-#         metadata: models.proxmox.Metadata
-#     ) -> str:
-#         return yaml.safe_dump(
-#             yaml.safe_load(metadata.json()),
-#             default_flow_style=False,
-#             explicit_start=None,
-#             default_style='', width=8192
-#         )
 
-#     def write_out_uservm_metadata(
-#         self,
-#         vm: models.proxmox.UserVM
-#     ):
-#         yaml_description = self._serialize_uservm_metadata(vm.metadata)
-        
-#         # https://github.com/samuelcolvin/pydantic/issues/1043
-#         self.prox.nodes(vm.node).qemu(f"{vm.id}/config").post(description=yaml_description)
-
-#     def approve_uservm(
-#         self,
-#         vm: models.proxmox.UserVM
-#     ):  
-#         if vm.metadata.suspension.status is True:
-#             raise exceptions.resource.Unavailable("Cannot perform this action on a suspended VM")
-
-#         if vm.metadata.provision.stage == models.proxmox.Provision.Stage.AwaitingApproval:
-#             vm.metadata.provision.stage = models.proxmox.Provision.Stage.Approved
-#             self.write_out_uservm_metadata(vm)
-
-#             self.mark_active_uservm(vm)
     
-#     def mark_active_uservm(
-#         self,
-#         vm: models.proxmox.UserVM
-#     ): 
-#         # reset inactivity status
-#         vm.metadata.inactivity = models.proxmox.Inactivity(
-#             marked_active_at = datetime.date.today()
-#         )
-#         self.write_out_uservm_metadata(vm)
-
 #     def flash_uservm_image(
 #         self,
 #         vm: models.proxmox.UserVM
@@ -1297,152 +1384,6 @@ class Proxmox():
 
 #             provision_stage(models.proxmox.Provision.Stage.Installed)
 
-#     def start_uservm(
-#         self,
-#         vm : models.proxmox.UserVM
-#     ):
-#         if vm.metadata.suspension.status is True:
-#             raise exceptions.resource.Unavailable("Cannot perform this action on a suspended VM")
-
-#         if vm.metadata.provision.stage != models.proxmox.Provision.Stage.Installed:
-#             raise exceptions.resource.Unavailable("Cannot start a VM that is not marked as installed!")
-
-#         # Detach existing cloud-init drive (if any)
-#         self.prox.nodes(vm.node).qemu(f"{vm.id}/config").put(
-#             ide2="none,media=cdrom",
-#             cicustom=""
-#         )
-
-#         # install cloud-init data
-#         with ProxmoxNodeSSH(vm.node) as con:
-#             snippets_path = self.prox.storage(config.proxmox.uservm.dir_pool).get()['path'] + "/snippets"
-
-#             con.sftp.putfo(
-#                 io.StringIO(""),
-#                 f'{ snippets_path }/{vm.fqdn}.metadata.yml'
-#             )
-
-#             userdata_config = f"""#cloud-config
-# preserve_hostname: false
-# manage_etc_hosts: true
-# fqdn: { vm.fqdn }
-# ssh_pwauth: 1
-# disable_root: 0
-# packages:
-#     - qemu-guest-agent
-# runcmd:
-#     - [ systemctl, enable, qemu-guest-agent ]
-#     - [ systemctl, start, qemu-guest-agent, --no-block ]  
-# users:
-#     -   name: root
-#         lock_passwd: false
-#         shell: /bin/bash
-#         ssh_redirect_user: false
-#         ssh_authorized_keys:
-#             - { vm.metadata.root_user.ssh_public_key }
-#             - { vm.metadata.root_user.mgmt_ssh_public_key }
-# chpasswd:
-#     list: |
-#         root:{ vm.metadata.root_user.password_hash }
-#     expire: false
-# """
-
-#             if vm.metadata.reapply_cloudinit_on_next_boot == True:
-#                 # This will wipe previous cloud-init state from previous boots
-#                 userdata_config += """
-# bootcmd: 
-#     - rm -f /etc/netplan/50-cloud-init.yml
-#     - cloud-init clean --logs
-# """         
-
-#             con.sftp.putfo(
-#                 io.StringIO(userdata_config),
-#                 f'{ snippets_path }/{vm.fqdn}.userdata.yml'
-#             )
-
-#             con.sftp.putfo(
-#                 io.StringIO(f"""
-# ethernets:
-#     net0:
-#         match:
-#             macaddress: { vm.metadata.network.nic_allocation.macaddress }
-#         nameservers:
-#             search:
-#                 - { config.proxmox.uservm.base_fqdn }
-#             addresses:
-#                 - 1.1.1.1
-#                 - 8.8.8.8
-#         gateway4: { config.proxmox.uservm.network.ip + 1 }
-#         optional: true
-#         addresses:
-#             - { vm.metadata.network.nic_allocation.addresses[0] }
-#         mtu: 1450 
-# version: 2
-#                 """),
-#                 f'{ snippets_path }/{vm.fqdn}.networkconfig.yml'
-#             )
-
-#             # Insert cloud-init stuff
-#             self.prox.nodes(vm.node).qemu(f"{vm.id}/config").put(
-#                 cicustom=f"user={ config.proxmox.uservm.dir_pool }:snippets/{vm.fqdn}.userdata.yml,network={ config.proxmox.uservm.dir_pool }:snippets/{vm.fqdn}.networkconfig.yml,meta={ config.proxmox.uservm.dir_pool }:snippets/{vm.fqdn}.metadata.yml",
-#                 ide2=f"{ config.proxmox.uservm.dir_pool }:cloudinit,format=qcow2"
-#             )
-
-#             # Set network card
-#             self.prox.nodes(vm.node).qemu(f"{vm.id}/config").put(
-#                 net0=f"virtio={ vm.metadata.network.nic_allocation.macaddress },bridge=vmbr0,tag=69"
-#             )
-
-#             self.prox.nodes(vm.node).qemu(f"{vm.id}/status/start").post()
-
-#             # Reset cloudinit status
-#             vm.metadata.reapply_cloudinit_on_next_boot = False
-#             self.write_out_uservm_metadata(vm)
-
-#     def delete_uservm(
-#         self,
-#         vm: models.proxmox.UserVM
-#     ):
-#         # delete cloudinit
-#         with ProxmoxNodeSSH(vm.node) as con:
-#             snippets_path = self.prox.storage(config.proxmox.uservm.dir_pool).get()['path'] + "/snippets"
-
-#             stdin, stdout, stderr = con.ssh.exec_command(
-#                 f"rm -f '{ snippets_path }/{vm.fqdn}.networkconfig.yml' '{ snippets_path }/{vm.fqdn}.userdata.yml' '{ snippets_path }/{vm.fqdn}.metadata.yml'"
-#             )
-
-#         # delete node on proxmox
-#         self.prox.nodes(vm.node).qemu(vm.id).delete()
 
 
-#     def stop_uservm(
-#         self,
-#         vm : models.proxmox.UserVM
-#     ):
-#         if vm.metadata.suspension.status is True:
-#             raise exceptions.resource.Unavailable("Cannot perform this action on a suspended VM")
 
-#         if vm.metadata.provision.stage != models.proxmox.Provision.Stage.Installed:
-#             raise exceptions.resource.Unavailable("VM is not installed")
-        
-#         self.prox.nodes(vm.node).qemu(f"{vm.id}/config").put(
-#             cicustom=''
-#         )
-
-#         self.prox.nodes(vm.node).qemu(f"{vm.id}/status/stop").post()
-
-#     def shutdown_uservm(
-#         self,
-#         vm: models.proxmox.UserVM
-#     ):
-#         if vm.metadata.suspension.status is True:
-#             raise exceptions.resource.Unavailable("Cannot perform this action on a suspended VM")
-
-#         if vm.metadata.provision.stage != models.proxmox.Provision.Stage.Installed:
-#             raise exceptions.resource.Unavailable("Cannot shutdown a VM that is not marked as installed!")
-
-#         self.prox.nodes(vm.node).qemu(f"{vm.id}/config").put(
-#             cicustom=''
-#         )
-
-#         self.prox.nodes(vm.node).qemu(f"{vm.id}/status/shutdown").post()
