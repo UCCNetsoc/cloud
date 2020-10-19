@@ -20,18 +20,18 @@ proxmox:
     password: "lolno"
   vps:
     dir_pool: local
-    templates: {}
-      # ubuntu-20.04:
-      #   title: "Ubuntu 20.04"
-      #   description: "Ubuntu 20.04"
-      #   logo_url: "https://assets.ubuntu.com/v1/29985a98-ubuntu-logo32.png"
-      #   disk_url: "https://cloud-images.ubuntu.com/releases/focal/release-20200921.1/ubuntu-20.04-server-cloudimg-amd64.img"
-      #   disk_sha256sum: "d18a9d2b890d3c1401e70a281cae44b61816aa669c4936f7a99c168e572ec8cb"
-      #   disk_format: "qcow"
-      #   specs:
-      #     cores: 1
-      #     disk_space: 10
-      #     memory: 512
+    templates:
+      ubuntu-20.04:
+        title: "Ubuntu 20.04"
+        description: "Ubuntu 20.04"
+        logo_url: "https://assets.ubuntu.com/v1/29985a98-ubuntu-logo32.png"
+        disk_url: "https://cloud-images.ubuntu.com/releases/focal/release-20200921.1/ubuntu-20.04-server-cloudimg-amd64.img"
+        disk_sha256sum: "d18a9d2b890d3c1401e70a281cae44b61816aa669c4936f7a99c168e572ec8cb"
+        disk_format: "qcow2"
+        specs:
+          cores: 1
+          disk_space: 10
+          memory: 512
   lxc:
     dir_pool: local
     templates:
