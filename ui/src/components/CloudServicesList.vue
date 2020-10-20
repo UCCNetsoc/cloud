@@ -106,7 +106,7 @@
       {{ msg }}
     </message-dialog>
     <confirm-cancel-dialog
-      :title="confirmCancel.mode"
+      :title="confirmCancel.mode+' '+typeName"
       :visible="confirmCancel.mode !== ConfirmCancelMode.Hidden"
       :loading="confirmCancel.loading"
       @confirmed="confirm()"
@@ -128,7 +128,7 @@
           :rules="requiredRules"
         ></v-text-field>
         <v-select
-          :items='lxcTemplates'
+          :items='templates'
           label='Template'
           outlined
           :rules="requiredRules"
@@ -142,7 +142,7 @@
             <span>{{ item.title }}</span>
           </template>
         </v-select>
-        <v-card-text style="margin-top: -2.5em; margin-bottom: -0.5em">
+        <v-card-text style="margin-top: -1.5em; margin-bottom: -0.5em">
           <v-card flat>
             <v-container>
               <v-row no-gutters justify="start" align="center">
@@ -344,7 +344,7 @@ interface LXC {
 
 enum ConfirmCancelMode {
   Hidden = '-',
-  RequestService = 'request a service'
+  RequestService = 'request a'
 }
 
 interface ConfirmCancelAction {
@@ -408,13 +408,13 @@ export default Vue.extend({
           case ConfirmCancelMode.RequestService: {
             // console.log(username)
             await fetchRest(
-              `${config.apiBaseUrl}/v1/proxmox/lxc-request/${username}/${host}`, {
+              `${config.apiBaseUrl}/v1/proxmox/${username}/${this.type}-request/${host}`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ template_id, reason })
               })
 
-            this.msg = 'Service request successfully sent! We will review your request and get back to you soon.'
+            this.msg = `${this.typeName} request successfully sent! we will review your request and get back to you soon.`
             break
           }
         }
@@ -433,28 +433,28 @@ export default Vue.extend({
     },
 
     async uiReload () {
-      this.lxcLoading = true
-      this.lxcs = []
+      this.loading = true
+      this.instances = []
 
       try {
         // console.log(config)
         const res = await fetchRest(
-          `${config.apiBaseUrl}/v1/proxmox/lxc/${this.$store.state.auth.user.profile.preferred_username}`, {
+          `${config.apiBaseUrl}/v1/proxmox/${this.$store.state.auth.user.profile.preferred_username}/${this.type}`, {
             headers: {
               Authorization: `Bearer ${this.$store.state.auth.user.access_token}`
             }
           })
 
-        this.lxcLoading = false
-        const lxcs: { [name: string]: LXC } = await res.json()
-        this.lxcs = Object.values(lxcs)
+        this.loading = false
+        const instances: { [name: string]: LXC } = await res.json()
+        this.instances = Object.values(instances)
 
-        if (this.lxcs.length === 0) {
-          this.empty = 'You have no services, try requesting one!'
+        if (this.instances.length === 0) {
+          this.empty = `You have no ${this.typeName}${this.typeName[this.typeName.length - 1] === 's' ? '\'s' : 's'}, try requesting one!`
         }
       } catch (e) {
-        this.lxcLoading = false
-        this.lxcs = []
+        this.loading = false
+        this.instances = []
         this.empty = e.message
       }
     },
@@ -469,7 +469,7 @@ export default Vue.extend({
 
       try {
         const res = await fetchRest(
-          `${config.apiBaseUrl}/v1/proxmox/lxc-templates`, {
+          `${config.apiBaseUrl}/v1/proxmox/${this.$store.state.auth.user.profile.preferred_username}/${this.type}-templates`, {
             headers: {
               Authorization: `Bearer ${this.$store.state.auth.user.access_token}`
             }
@@ -478,7 +478,6 @@ export default Vue.extend({
         for (const k of Object.keys(templates)) {
           this.templates.push(Object.assign(templates[k], { id: k }))
         }
-        this.templates = Object.values(templates)
       } catch (e) {
         console.error(e)
       }
@@ -486,11 +485,12 @@ export default Vue.extend({
   },
 
   props: {
-    type: String
+    type: String,
+    typeName: String
   },
 
   data () {
-    const lxcs: LXC[] = []
+    const instances: LXC[] = []
     const action: ConfirmCancelAction = {}
     const templates: Template[] = []
 
@@ -498,8 +498,8 @@ export default Vue.extend({
       ConfirmCancelMode, // Needed to use the enum in the rendered template
       empty: '',
       msg: '',
-      lxcs,
-      lxcLoading: true,
+      instances,
+      loading: true,
       templates,
 
       confirmCancel: {
