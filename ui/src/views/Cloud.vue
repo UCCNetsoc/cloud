@@ -101,7 +101,7 @@
           <v-card-subtitle>
             A service is a lightweight container that can run most software and web services
           </v-card-subtitle>
-          <cloud-services-list/>
+          <cloud-services-list type="lxc" typeName="service" />
         </v-card>
       </v-col>
     </v-row>
@@ -114,7 +114,7 @@
           <v-card-subtitle>
             A virtual private server is a complete emulation of a server. This is required if you need to use Docker / LXD or Linux kernel tools
           </v-card-subtitle>
-          <cloud-services-list/>
+          <cloud-services-list type="vps" typeName="vps" />
         </v-card>
       </v-col>
     </v-row>
