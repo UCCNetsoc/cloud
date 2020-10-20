@@ -21,7 +21,7 @@ import structlog as logging
 
 from urllib.parse import urlparse, unquote
 
-from typing import Optional, Tuple, List, Dict, Union
+from typing import Optional, Tuple, List, Dict, Union, Generator
 from proxmoxer import ProxmoxAPI
 
 from v1 import models, exceptions, utilities
@@ -203,7 +203,7 @@ class Proxmox():
         self,
         length=8
     ) -> str:
-        return 'ayylmao2' #''.join(random.choice(string.ascii_letters) for i in range(length))
+        return ''.join(random.choice(string.ascii_letters) for i in range(length))
 
     def _hash_password(
         self,
@@ -505,7 +505,7 @@ class Proxmox():
 
         if instance.type == models.proxmox.Type.LXC:
             self.prox.nodes(instance.node).lxc(f"{instance.id}").delete()
-        elif instance_type == models.proxmox.Type.VPS:
+        elif instance.type == models.proxmox.Type.VPS:
             # delete cloud-init data
             with ProxmoxNodeSSH(instance.node) as con:
                 snippets_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/snippets"
@@ -515,8 +515,6 @@ class Proxmox():
                 )
 
             self.prox.nodes(instance.node).qemu(f"{instance.id}").delete()
-
-
 
     def _wait_vmid_lock(
         self,
@@ -540,7 +538,7 @@ class Proxmox():
                 break
 
             if (now-start) > timeout:
-                raise exceptions.resource.Unavailable("Timeout occured waiting for VPS/LXC to unlock.")
+                raise exceptions.resource.Unavailable("Timeout occured waiting for instance to unlock.")
 
             time.sleep(poll_interval)
 
@@ -869,6 +867,13 @@ class Proxmox():
 
                 self.prox.nodes(instance.node).lxc(f"{instance.id}/status/start").post()
             elif instance.type == models.proxmox.Type.VPS:
+                # delete cloud-init data
+                with ProxmoxNodeSSH(instance.node) as con:
+                    snippets_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/snippets"
+
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"rm -f '{ snippets_path }/{instance.fqdn}.networkconfig.yml' '{ snippets_path }/{instance.fqdn}.userdata.yml' '{ snippets_path }/{instance.fqdn}.metadata.yml'"
+                    )
 
                 # Detach existing cloud-init drive (if any)
                 self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
@@ -885,44 +890,43 @@ class Proxmox():
                         f'{ snippets_path }/{instance.fqdn}.metadata.yml'
                     )
 
-                    escaped_hash = instance.metadata.root_user.password_hash.replace('$','\\$')
+                    # cloud-init has a complete allergy to modifying the root user so we need to do a lot of this
+                    # the non-traditional way
                     userdata_config = f"""#cloud-config
 preserve_hostname: false
 manage_etc_hosts: true
 fqdn: { instance.fqdn }
-ssh_pwauth: 1
-disable_root: 0
-lock_passwd: false
 packages:
     - qemu-guest-agent
+chpasswd:
+    expire: false
+disable_root: false
+ssh_pwauth: true
 runcmd:
-    - sed -i'.orig' -e's/without-password/yes/' /etc/ssh/sshd_config
-    - service sshd restart
-    - bash -c "passwd -u root && echo -e 'root:{ escaped_hash }' | chpasswd -e"
+    - echo 'root:{instance.metadata.root_user.password_hash}' | chpasswd -e
+    - sed -i -e '/^PermitRootLogin/s/^.*$/PermitRootLogin yes/' /etc/ssh/sshd_config
+    - echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config
+    - [ systemctl, restart, sshd ]
     - [ systemctl, enable, qemu-guest-agent ]
     - [ systemctl, start, qemu-guest-agent, --no-block ]  
+write_files:
+    - owner: root:root
+      permissions: '0600'
+      path: /root/.ssh/authorized_keys
+      content: |
+        {instance.metadata.root_user.ssh_public_key}
+        {instance.metadata.root_user.mgmt_ssh_public_key}
 users:
-    -   name: ubuntu
-        lock_passwd: false
-        sudo: ALL=(ALL) NOPASSWD:ALL
-        passwd: { instance.metadata.root_user.password_hash }
-        shell: /bin/bash
-        ssh_redirect_user: false
-        ssh_authorized_keys:
-            - { instance.metadata.root_user.ssh_public_key }
-            - { instance.metadata.root_user.mgmt_ssh_public_key }
 """
 
                     if vps_rerun_cloudinit == True:
-                        # This will wipe previous cloud-init state from previous boots
-                        # will re run all cloudinit_initial_modules, i.e reapplying user info and networking
-                        # this typically only happens when a password reset has been requested
+                        # This will wipe previous cloud-init state from previous boot then shutdown
+                        # on the next boot, cloudinit will reapply
                         userdata_config += f"""
 bootcmd: 
-    - rm /root/.ssh/authorized_keys
-    - rm -f /etc/netplan/50-cloud-init.yml
-    - rm -rf /var/lib/cloud/
-    - cloud-init clean --logs
+    - rm -f /etc/netplan/50-cloud-init.yaml
+    - rm -rf /var/lib/cloud
+    - shutdown now
 """         
 
                     con.sftp.putfo(
@@ -973,21 +977,6 @@ version: 2
                 self.prox.nodes(instance.node).lxc(f"{instance.id}/status/stop").post()
             elif instance.type == models.proxmox.Type.VPS:
                 self.prox.nodes(instance.node).qemu(f"{instance.id}/status/stop").post()
-
-                # delete cloud-init data
-                with ProxmoxNodeSSH(instance.node) as con:
-                    snippets_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/snippets"
-
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"rm -f '{ snippets_path }/{instance.fqdn}.networkconfig.yml' '{ snippets_path }/{instance.fqdn}.userdata.yml' '{ snippets_path }/{instance.fqdn}.metadata.yml'"
-                    )
-
-                # Detach existing cloud-init drive (if any)
-                self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
-                    ide2="none,media=cdrom",
-                    cicustom=""
-                )
-
 
     def shutdown_instance(
         self,
