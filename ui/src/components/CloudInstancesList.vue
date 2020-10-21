@@ -90,10 +90,11 @@
     </v-row>
     <v-row class="center ml-1" style="margin-top: -1em">
       <v-col class="d-flex  justify-end" cols="12" sm="12">
-        <v-btn @click="popConfirmCancel(ConfirmCancelMode.RequestService, { })" icon>
+        <v-btn @click="popConfirmCancel(ConfirmCancelMode.RequestInstance, { })" flat>
           <v-icon>
             mdi-plus
           </v-icon>
+          Request
         </v-btn>
         <v-btn @click="uiReload()" icon>
           <v-icon>
@@ -106,97 +107,216 @@
       {{ msg }}
     </message-dialog>
     <confirm-cancel-dialog
-      :title="confirmCancel.mode+' '+typeName"
+      :title="confirmCancel.mode"
       :visible="confirmCancel.mode !== ConfirmCancelMode.Hidden"
       :loading="confirmCancel.loading"
       @confirmed="confirm()"
       @cancelled="cancel()"
-      class="confirmCancel"
+      width="1280"
     >
-      <v-form
-        v-if="confirmCancel.mode == ConfirmCancelMode.RequestService"
-        lazy-validation
-        ref="form"
-        @submit="confirm()"
+      <v-container
+        v-if="confirmCancel.mode == ConfirmCancelMode.RequestInstance"
+        style="margin-bottom: -1em"
       >
-        <!-- :suffix="'.'+$store.state.auth.user.profile.preferred_username+'.lxc.cloud.netsoc.co'" -->
-        <v-text-field
-          label='Hostname'
-          outlined
-          style="margin-bottom: -1em"
-          v-model='confirmCancel.action.host'
-          :rules="requiredRules"
-        ></v-text-field>
-        <v-select
-          :items='templates'
-          label='Template'
-          outlined
-          :rules="requiredRules"
-          v-model='confirmCancel.action.template_id'
-          class="mt-4"
-          item-text="title"
-          item-value="id"
-        >
-          <template v-slot:item="{ item }">
-            <img style="width: 2em; margin-right: 1em;" :src="item.logo_url" />
-            <span>{{ item.title }}</span>
-          </template>
-        </v-select>
-        <v-card-text style="margin-top: -1.5em; margin-bottom: -0.5em">
-          <v-card flat>
-            <v-container>
-              <v-row no-gutters justify="start" align="center">
-                <v-col>
-                  <v-avatar
-                    size="32"
-                    tile
+        <v-row>
+          <v-col cols="12" md="6" style="max-height: 300px; overflow-y: scroll">
+            <v-list
+              three-line
+            >
+              <v-list-item-group v-model="templateIdx">
+                <template v-for="(item) in templates">
+                  <!-- <v-subheader
+                    v-if="item.header"
+                    :key="item.header"
+                    v-text="item.header"
+                  ></v-subheader> -->
+                  <v-list-item
+                    :key="item.title"
                   >
-                    <v-icon large>mdi-web</v-icon>
-                  </v-avatar>
-                </v-col>
-                <v-col sm="10">
-                  <h3>
-                    No commerical use
-                  </h3>
-                  <span>
-                    Don't host facebook or listen.moe, etc
-                  </span>
-                </v-col>
-              </v-row>
-            </v-container>
-          </v-card>
-          <v-card flat>
-            <v-container>
-              <v-row no-gutters justify="start" align="center">
-                <v-col>
-                  <v-avatar
-                    size="32"
-                    tile
-                  >
-                    <v-icon large>mdi-briefcase-account-outline</v-icon>
-                  </v-avatar>
-                </v-col>
-                <v-col sm="10">
-                  <h3>
-                    No adult material
-                  </h3>
-                  <span>
-                    Find somewhere else
-                  </span>
-                </v-col>
-              </v-row>
-            </v-container>
-          </v-card>
-        </v-card-text>
-        <span style="margin: auto;">Check the Terms of service for an exhaustive list of acceptable usages.</span>
-        <v-textarea
-          label='Reason'
-          outlined
-          style="margin-top: 1em"
-          :rules="requiredRules"
-          v-model='confirmCancel.action.reason'
-        ></v-textarea>
-      </v-form>
+                    <v-list-item-avatar>
+                      <v-img :src="item.logo_url"></v-img>
+                    </v-list-item-avatar>
+
+                    <v-list-item-content>
+                      <v-list-item-title v-html="item.title"></v-list-item-title>
+                      <v-list-item-subtitle v-html="'<span class=\'text--primary\'>' + item.subtitle + '</span><br/>' + item.specs.cores + ' CPU, ' + item.specs.memory + 'MB RAM, ' + item.specs.disk_space +'GB disk space, ' + item.specs.swap +'MB swap '"></v-list-item-subtitle>
+                    </v-list-item-content>
+                  </v-list-item>
+                </template>
+              </v-list-item-group>
+            </v-list>
+          </v-col>
+          <v-col cols="12" md="6" style="max-height: 600px; overflow-y: scroll">
+            <v-card flat v-if="templateIdx === undefined">
+              <v-card-text>
+                <v-row no-gutters justify="start" align="center">
+                  <v-col>
+                    <v-avatar
+                      size="64"
+                      tile
+                    >
+                      <v-icon large>mdi-server</v-icon>
+                    </v-avatar>
+                  </v-col>
+                  <v-col sm="10">
+                    <h3>
+                      Select a template to continue
+                    </h3>
+                    <span>
+                      A template represents the base installation your instance will have
+                    </span>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+            </v-card>
+            <v-form
+              v-else
+              lazy-validation
+              ref="form"
+              @submit="confirm()"
+            >
+              <v-card flat>
+                <v-card-text>
+                  <v-row no-gutters justify="start" align="center">
+                    <v-col>
+                      <v-avatar
+                        size="64"
+                        tile
+                      >
+                        <img
+                          :src="Object.values(templates)[templateIdx].logo_url"
+                          alt="John"
+                        >
+                      </v-avatar>
+                    </v-col>
+                    <v-col sm="10">
+                      <h3>
+                        {{ Object.values(templates)[templateIdx].title }}
+                      </h3>
+                      <span>
+                        {{ Object.values(templates)[templateIdx].subtitle }}
+                      </span>
+                      <span>
+                        {{ Object.values(templates)[templateIdx].description }}
+                      </span>
+                    </v-col>
+                  </v-row>
+                </v-card-text>
+              </v-card>
+              <v-divider/>
+              <v-card-text>
+                <v-card flat>
+                  <v-container>
+                    <v-row no-gutters justify="start" align="center">
+                      <v-col>
+                        <v-avatar
+                          size="48"
+                          tile
+                        >
+                          <v-icon large>mdi-briefcase-remove</v-icon>
+                        </v-avatar>
+                      </v-col>
+                      <v-col sm="10">
+                        <h3>
+                          No commercial use
+                        </h3>
+                        <span>
+                          Netsoc Cloud is only for educational and learning purposes
+                        </span>
+                      </v-col>
+                    </v-row>
+                  </v-container>
+                </v-card>
+                <v-card flat>
+                  <v-card-text>
+                    <v-row no-gutters justify="start" align="center">
+                      <v-col>
+                        <v-avatar
+                          size="48"
+                          tile
+                        >
+                          <v-icon large>mdi-server-off</v-icon>
+                        </v-avatar>
+                      </v-col>
+                      <v-col sm="10">
+                        <h3>
+                          No 'spammy'/resource-intensive services
+                        </h3>
+                        <span>
+                          No cryptocurrency mining, DNS resolvers, email servers, file-sharing software, IRC servers or VPN usage
+                        </span>
+                      </v-col>
+                    </v-row>
+                  </v-card-text>
+                </v-card>
+                <v-card flat>
+                  <v-card-text>
+                    <v-row no-gutters justify="start" align="center">
+                      <v-col>
+                        <v-avatar
+                          size="48"
+                          tile
+                        >
+                          <v-icon large>mdi-voice-off</v-icon>
+                        </v-avatar>
+                      </v-col>
+                      <v-col sm="10">
+                        <h3>
+                          No inappropiate / adult content
+                        </h3>
+                        <span>
+                          Don't host anything your lecturers wouldn't be comfortable seeing
+                        </span>
+                      </v-col>
+                    </v-row>
+                  </v-card-text>
+                </v-card>
+                <v-card flat>
+                  <v-container>
+                    <v-row no-gutters justify="start" align="center">
+                      <v-col>
+                        <v-avatar
+                          size="48"
+                          tile
+                        >
+                          <v-icon large>mdi-chart-line</v-icon>
+                        </v-avatar>
+                      </v-col>
+                      <v-col sm="10">
+                        <h3>
+                          No support, uptime, or data integrity guarantees
+                        </h3>
+                        <span>
+                          You are responsible for arranging alternative hosting, security and backup procedures for your own instances
+                        </span>
+                      </v-col>
+                    </v-row>
+                  </v-container>
+                  <v-card-actions>
+                    <span class="grey--text">
+                      Not an exhaustive list. Consult the <a class="grey--text" target="_blank" href="https://wiki.netsoc.co/services/terms-of-service">Terms of Service</a> for more information
+                    </span>
+                  </v-card-actions>
+                </v-card>
+              </v-card-text>
+              <v-divider/>
+              <v-text-field
+                label='Hostname'
+                outlined
+                style="margin-bottom: -1em"
+                v-model='confirmCancel.action.host'
+                :rules="requiredRules"
+              ></v-text-field>
+              <v-textarea
+                label='Why do you need this instance?'
+                outlined
+                :rules="requiredRules"
+                v-model='confirmCancel.action.reason'
+              ></v-textarea>
+            </v-form>
+          </v-col>
+        </v-row>
+      </v-container>
       <v-form
         v-else-if="confirmCancel.mode == ConfirmCancelMode.AddWebsite"
         lazy-validation
@@ -252,12 +372,6 @@
   </v-container>
 </template>
 
-<style scoped>
-.confirmCancel p {
-  text-align: center !important;
-}
-</style>
-
 <script lang='ts'>
 import ConfirmCancelDialog from '@/components/ConfirmCancelDialog.vue'
 import MessageDialog from '@/components/MessageDialog.vue'
@@ -268,21 +382,23 @@ import { fetchRest } from '@/api/rest'
 
 import Vue from 'vue'
 
-interface Template {
-  id?: string;
-  title: string;
-  description: string;
-  logo_url: string;
-  disk_url: string;
-  disk_sha256sum: string;
-  disk_format: string;
-}
-
 interface Specs {
   cores: number;
   disk_space: number;
   memory: number;
   swap: number;
+}
+
+interface Template {
+  id?: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  logo_url: string;
+  disk_url: string;
+  disk_sha256sum: string;
+  disk_format: string;
+  specs: Specs;
 }
 
 interface ToS {
@@ -296,9 +412,14 @@ interface NICAllocation {
   macaddress: string;
 }
 
+interface VHostOptions {
+  port: number;
+  https: boolean;
+}
+
 interface Network {
   ports: { [external: number]: number };
-  vhosts: string[];
+  vhosts: { [vhost: string]: VHostOptions};
   nic_allocation: NICAllocation;
 }
 
@@ -314,7 +435,7 @@ interface RequestDetail {
   reason: string;
 }
 
-interface LXCMetadata {
+interface Metadata {
   groups: string[];
   host_vars: { [key: string]: string };
   owner: string;
@@ -330,33 +451,38 @@ enum Status {
   Running = 'running'
 }
 
-interface LXC {
+enum Type {
+  VPS = 'vps',
+  LXC = 'lxc'
+}
+
+interface Instance {
   node: string;
+  type: Type;
   id: number;
   hostname: string;
   fqdn: string;
   specs: Specs;
   active: boolean;
-  metadata: LXCMetadata;
+  metadata: Metadata;
   remarks: string[];
   status: Status;
 }
 
 enum ConfirmCancelMode {
   Hidden = '-',
-  RequestService = 'request a'
+  RequestInstance = 'request instance'
 }
 
 interface ConfirmCancelAction {
   host?: string;
-  template_id?: string;
+  template_idx?: number;
   reason?: string;
 }
 
 // const HostValidation = new RegExp('^((?!-))(xn--)?[a-z0-9][a-z0-9-_]{0,61}[a-z0-9]{0,1}\\.(xn--)?([a-z0-9\\-]{1,61}|[a-z0-9-]{1,30}\\.[a-z]{2,})$')
 
 export default Vue.extend({
-  name: 'WebsitesList',
   components: {
     ConfirmCancelDialog,
     MessageDialog
@@ -405,7 +531,7 @@ export default Vue.extend({
       this.confirmCancel.loading = true
       try {
         switch (this.confirmCancel.mode) {
-          case ConfirmCancelMode.RequestService: {
+          case ConfirmCancelMode.RequestInstance: {
             // console.log(username)
             await fetchRest(
               `${config.apiBaseUrl}/v1/proxmox/${username}/${this.type}-request/${host}`, {
@@ -445,12 +571,11 @@ export default Vue.extend({
             }
           })
 
+        this.instances = await res.json()
         this.loading = false
-        const instances: { [name: string]: LXC } = await res.json()
-        this.instances = Object.values(instances)
 
-        if (this.instances.length === 0) {
-          this.empty = `You have no ${this.typeName}${this.typeName[this.typeName.length - 1] === 's' ? '\'s' : 's'}, try requesting one!`
+        if (Object.keys(this.instances).length === 0) {
+          this.empty = 'You have no instances of this type, try requesting one!'
         }
       } catch (e) {
         this.loading = false
@@ -474,10 +599,8 @@ export default Vue.extend({
               Authorization: `Bearer ${this.$store.state.auth.user.access_token}`
             }
           })
-        const templates: {[name: string]: Template} = await res.json()
-        for (const k of Object.keys(templates)) {
-          this.templates.push(Object.assign(templates[k], { id: k }))
-        }
+
+        this.templates = await res.json()
       } catch (e) {
         console.error(e)
       }
@@ -490,9 +613,10 @@ export default Vue.extend({
   },
 
   data () {
-    const instances: LXC[] = []
+    const instances: { [hostname: string]: Instance} = {}
     const action: ConfirmCancelAction = {}
-    const templates: Template[] = []
+    const templates: { [template_id: string]: Template} = {}
+    const templateIdx: number | undefined = undefined
 
     return {
       ConfirmCancelMode, // Needed to use the enum in the rendered template
@@ -501,6 +625,8 @@ export default Vue.extend({
       instances,
       loading: true,
       templates,
+
+      templateIdx,
 
       confirmCancel: {
         mode: ConfirmCancelMode.Hidden,

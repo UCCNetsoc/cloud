@@ -9,41 +9,35 @@
                 Cloud
               </v-card-title>
               <v-card-subtitle>
-                Provision services and servers on demand
+                Provision instances on demand
               </v-card-subtitle>
               <v-card-text>
                 <p>
-                  You can host either a service or Virtual Private Server that's been spawned from a template such as
-                  WordPress, Ghost CMS, static hosting and more.
+                  An instance is a <b>Container</b> or <b>Virtual Private Server (VPS)</b> which is the running form of one of our pre-configured templates<br/><br/>
                 </p>
                 <p>
                   <a>Need help?</a><br>
-                  Follow the <a v-on:click="$router.push('/tutorial')">Tutorial</a> page to setup your first website
+                  Follow the <a v-on:click="$router.push('/tutorial')">Tutorial</a> page to setup your first website using Netsoc Cloud
                 </p>
               </v-card-text>
             </v-card>
             <v-divider vertical class="hidden-sm-and-down"/>
             <v-card flat>
               <v-card-title>
-                <b>Keeping your service/VPS running</b>
+                <b>Keeping your instance running</b>
               </v-card-title>
               <v-card-text>
-                <h3>Services</h3>
+                <h3>Containers</h3>
                 <p>
-                  Your service will expire if you don't mark it active at least every 90 days.
-                  We will warn you by email if you have forgotten to do this<br/>
-                  <br/>
-                  If your service is not marked active after 90 days, we will shut it down
-                  If your service is not marked active after 150 days we will remove it from our servers and your data will be lost<br/>
+                  <b class="warning--text">Shutdown if you don't mark them active at least every 90 days.</b><br/>
+                  <b class="red--text">Removed if you don't mark them active at least every 150 days</b><br/>
                 </p>
+
                 <br/><br/>
                 <h3>Virtual Private Servers</h3>
                 <p>
-                  Your VPS will expire if you don't mark it active at least every 60 days
-                  We will warn you by email if you have forgotten to do this<br/>
-                  <br/>
-                  If your VPS is not marked active after 60 days, we will shut it down
-                  If your VPS is not marked active after 120 days, we will remove it from our servers and your data will be lost<br/>
+                  <b class="warning--text">Shutdown if you don't mark them active at least every 30 days.</b><br/>
+                  <b class="red--text">Removed if you don't mark them active at least every 120 days</b><br/>
                 </p>
               </v-card-text>
             </v-card>
@@ -96,12 +90,12 @@
       <v-col cols="12" sm="12" align="stretch">
         <v-card>
           <v-card-title>
-            Services
+            Containers
           </v-card-title>
           <v-card-subtitle>
-            A service is a lightweight container that can run most software and web services
+            A container is a lightweight instance that can run almost all software and web services
           </v-card-subtitle>
-          <cloud-services-list type="lxc" typeName="service" />
+          <cloud-instances-list type="lxc" typeName="container" />
         </v-card>
       </v-col>
     </v-row>
@@ -109,12 +103,12 @@
       <v-col cols="12" sm="12" align="stretch">
        <v-card>
           <v-card-title>
-            Virtual Private Server
+            Virtual Private Server (VPS)
           </v-card-title>
           <v-card-subtitle>
-            A virtual private server is a complete emulation of a server. This is required if you need to use Docker / LXD or Linux kernel tools
+            A virtual private server instance is a complete emulation of a server. A VPS is required if you need to use Docker / LXD or Linux kernel tools
           </v-card-subtitle>
-          <cloud-services-list type="vps" typeName="vps" />
+          <cloud-instances-list type="vps" typeName="vps" />
         </v-card>
       </v-col>
     </v-row>
@@ -123,12 +117,12 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import CloudServicesList from '@/components/CloudServicesList.vue'
+import CloudInstancesList from '@/components/CloudInstancesList.vue'
 
 export default Vue.extend({
   name: 'Websites',
   components: {
-    CloudServicesList
+    CloudInstancesList
   },
 
   data: () => ({

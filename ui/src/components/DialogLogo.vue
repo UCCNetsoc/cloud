@@ -29,10 +29,10 @@
 
 .binary-background {
   background: url("../assets/binary-repeat.png") rgba(22,22,22,1);
-  background-size: 45%;
+  background-size: 30%;
 
   animation: swipe 45s ease infinite;
-  background-repeat: round no-repeat;
+  background-repeat: round repeat;
 }
 
 </style>

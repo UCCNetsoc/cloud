@@ -87,6 +87,7 @@ class Template(BaseModel):
         TarGZ: str = "tar.gz"
     
     title: str
+    subtitle: str
     description: str
     logo_url: str
     disk_url: str
