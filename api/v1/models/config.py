@@ -114,7 +114,7 @@ class Proxmox(BaseModel):
             allowed_a_aaaa: Set[str] = set(["84.39.234.52"])
 
         class NetsocSupplied(BaseModel):
-            base_domain: str = "netsoc.dev"
+            base_domain: str = "netsoc.co"
 
         netsoc_supplied: NetsocSupplied = NetsocSupplied()
         user_supplied: UserSupplied = UserSupplied()

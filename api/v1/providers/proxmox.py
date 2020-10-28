@@ -239,7 +239,7 @@ class Proxmox():
         instance_type: models.proxmox.Type,
         account: models.account.Account,
         hostname: str,
-        request_detail: models.proxmox.RequestDetail
+        request_detail: models.proxmox.InstanceRequestDetail
     ) -> Tuple[str,str]:
 
         template = self.get_template(instance_type, request_detail.template_id)
@@ -271,7 +271,8 @@ class Proxmox():
                 ssh_public_key=user_ssh_public_key,
                 mgmt_ssh_public_key=mgmt_ssh_public_key,
                 mgmt_ssh_private_key=mgmt_ssh_private_key
-            )
+            ),
+            wake_on_request=template.wake_on_request
         )
 
         random.seed(f"{fqdn}-{node_name}")
@@ -554,7 +555,7 @@ class Proxmox():
             try:
                 lxc_config = self.prox.nodes(node).lxc.get(f"{vmid}/config")
             except Exception as e:
-                raise exceptions.resource.NotFound("The LXC does not exist")
+                raise exceptions.resource.NotFound("The instance does not exist")
 
             # proxmox uses hostname as the lxc name
             # but name for vm name, god help me
@@ -567,7 +568,7 @@ class Proxmox():
                 )
             except Exception as e:
                 raise exceptions.resource.Unavailable(
-                    f"LXC is unavailable, malformed metadata description: {e}"
+                    f"Instance is unavailable, malformed metadata description: {e}"
                 )
 
             # for user ocanty, returns .ocanty.lxc.cloud.netsoc.co
@@ -581,10 +582,22 @@ class Proxmox():
 
             hostname = fqdn[:-len(suffix)]
 
-            if (datetime.date.today() - metadata.inactivity.marked_active_at).days > config.proxmox.lxc.inactivity_shutdown_num_days:
-                active = False
+            # An instance is considered active if the time it was last marked active is within the allowed active before shutdown period
+            if config.proxmox.lxc.inactivity_shutdown_num_days > (datetime.date.today() - metadata.inactivity.marked_active_at).days:
+                active = True
             else:
-                active = True 
+                active = False
+
+            # If the instance is marked permanent, this overrides the activity period
+            if metadata.permanent == True:
+                active = True
+
+            # If the instance is suspended for ToS violations, we mark the instance as always inactive
+            if metadata.tos.suspended == True:
+                active = False
+
+            shutdown_date = metadata.inactivity.marked_active_at + datetime.timedelta(config.proxmox.lxc.inactivity_shutdown_num_days)
+            deletion_date = metadata.inactivity.marked_active_at + datetime.timedelta(config.proxmox.lxc.inactivity_deletion_num_days)
 
             # config str looks like this: whatever,size=30G
             # extract the size str
@@ -612,6 +625,8 @@ class Proxmox():
                 hostname=hostname,
                 node=node,
                 metadata=metadata,
+                inactivity_shutdown_date=shutdown_date,
+                inactivity_deletion_date=deletion_date,
                 specs=specs,
                 remarks=[],
                 status=status,
@@ -654,10 +669,19 @@ class Proxmox():
 
             hostname = fqdn[:-len(suffix)]
 
-            if (datetime.date.today() - metadata.inactivity.marked_active_at).days > config.proxmox.vps.inactivity_shutdown_num_days:
-                active = False
+            # An instance is considered active if the time it was last marked active is within the allowed active before shutdown period
+            if config.proxmox.vps.inactivity_shutdown_num_days > (datetime.date.today() - metadata.inactivity.marked_active_at).days:
+                active = True
             else:
-                active = True 
+                active = False
+
+            # If the instance is marked permanent, this overrides the activity period
+            if metadata.permanent == True:
+                active = True
+
+            # If the instance is suspended for ToS violations, we mark the instance as always inactive
+            if metadata.tos.suspended == True:
+                active = False
 
             # config str looks like this: whatever,size=30G
             # extract the size str
@@ -678,6 +702,9 @@ class Proxmox():
             elif current_status['status'] == 'stopped':
                 status = models.proxmox.Status.Stopped
 
+            shutdown_date = metadata.inactivity.marked_active_at + datetime.timedelta(config.proxmox.vps.inactivity_shutdown_num_days)
+            deletion_date = metadata.inactivity.marked_active_at + datetime.timedelta(config.proxmox.vps.inactivity_deletion_num_days)
+
             instance = models.proxmox.Instance(
                 type=instance_type,
                 id=vmid,
@@ -685,6 +712,8 @@ class Proxmox():
                 hostname=hostname,
                 node=node,
                 metadata=metadata,
+                inactivity_shutdown_date=shutdown_date,
+                inactivity_deletion_date=deletion_date,
                 specs=specs,
                 remarks=[],
                 status=status,
@@ -1042,6 +1071,22 @@ version: 2
         
         return port_map
 
+    def get_random_available_external_port(
+        self
+    ) -> Optional[int]:
+        port_map = self.get_port_forward_map()
+
+        occupied_set = set(port_map.keys())
+        full_range_set = set(range(config.proxmox.port_forward.range[0],config.proxmox.port_forward.range[1]+1))
+
+        remaining = full_range_set-occupied_set
+
+        if len(remaining) > 0:
+            return random.choice(tuple(remaining))
+        
+        raise exceptions.resource.Unavailable("out of suitable external ports")
+
+
     def validate_domain(
         self,
         username: models.account.Username,
@@ -1073,7 +1118,7 @@ version: 2
                 # Valid domain
                 return (True, None)
             else:
-                remarks.append(f"Domain {domain} - subdomain {split_prefix[:len(split_prefix)-1]} must end with one of {username}.{base_domain}")
+                remarks.append(f"Domain {domain}: subdomain {split_prefix[-1]} is invalid, must be the same as username {username}")
         else: # custom domain
             try:
                 info_list = socket.getaddrinfo(domain, 80)
@@ -1083,11 +1128,11 @@ version: 2
             a_aaaa = set(map(lambda info: info[4][0], filter(lambda x: x[0] in [socket.AddressFamily.AF_INET, socket.AddressFamily.AF_INET6], info_list)))
             
             if len(a_aaaa) == 0:
-                remarks.append(f"Domain {domain} - no A or AAAA records present")
+                remarks.append(f"Domain {domain}: no A or AAAA records present")
 
             for record in a_aaaa:
                 if record not in allowed_a_aaaa:
-                    remarks.append(f"Domain {domain} - unknown A/AAAA record on domain ({record}), must be one of {allowed_a_aaaa}")
+                    remarks.append(f"Domain {domain}: unknown A/AAAA record on domain ({record}), must be one of {allowed_a_aaaa}")
 
             # we need to check if they have the appropiate TXT record with the correct value
             custom_base = f"{split[len(split)-2]}.{split[len(split)-1]}"
@@ -1101,13 +1146,13 @@ version: 2
                 txt_res = set(map(lambda x: str(x).strip('"'),q))
 
                 if txt_content not in txt_res:
-                    remarks.append(f"Domain {domain} - could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}, instead found {txt_res}!")
+                    remarks.append(f"Domain {domain}: could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}, instead found {txt_res}!")
             except dns.resolver.NXDOMAIN:
-                remarks.append(f"Domain {domain} - could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}")
+                remarks.append(f"Domain {domain}: could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}")
             except dns.exception.DNSException as e:
-                remarks.append(f"Domain {domain} - unable to lookup record ({txt_name}.{custom_base}): ({e})")
+                remarks.append(f"Domain {domain}: unable to lookup record ({txt_name}.{custom_base}): ({e})")
             except Exception as e:
-                remarks.append(f"Domain {domain} - error {e} (contact SysAdmins)")
+                remarks.append(f"Domain {domain}: error {e} (contact SysAdmins)")
 
         if len(remarks) == 0:
             return (True, None)

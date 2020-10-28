@@ -41,7 +41,7 @@ VHost = {
 TemplateID = {
     "default": None,
     "title": "Template ID",
-    "description": "",
+    "description": "Template ID",
     "regex": r"^[a-z0-9-.]+$",
     "min_length": 1,
     "max_length": 32
@@ -93,6 +93,7 @@ class Template(BaseModel):
     disk_url: str
     disk_sha256sum: str
     disk_format: str
+    wake_on_request: bool
     specs: Specs
 
 from .account import Username
@@ -135,7 +136,7 @@ class NICAllocation(BaseModel):
     macaddress: str
 
 class VHostOptions(BaseModel):
-    port: int = Field(**{**{"default": 80},**Port})
+    port: int = Field(**Port)
     https: bool = False
 
 class Network(BaseModel):
@@ -143,17 +144,22 @@ class Network(BaseModel):
     ports: Dict[int, int] = {}
     nic_allocation: NICAllocation 
 
-class RequestDetail(BaseModel):
+class InstanceRequestDetail(BaseModel):
     template_id: str = Field(**TemplateID)
     reason: str = Field(**Reason)
 
-    
-class Request(Payload):
+class InstanceRequest(Payload):
     sub: constr(regex=r'^admin instance request$') = "admin instance request"
     username: str = Field(**Username)
     hostname: str = Field(**Hostname)
     type: Type
-    detail: RequestDetail
+    detail: InstanceRequestDetail
+
+class InstanceRequestDenial(BaseModel):
+    reason: Optional[str] = "-"
+
+class RespecRequest(BaseModel):
+    details: str
 
 class Metadata(BaseModel):
     groups: List[str] = []
@@ -164,8 +170,14 @@ class Metadata(BaseModel):
     # Tracks ToS suspension status
     tos: ToS = ToS()
 
+    # Is this a permanent instance? i.e dedicated towards sysadmins and the like
+    permanent: bool = False 
+
     # Inactivity data
     inactivity: Inactivity
+
+    # Wake-On-Request
+    wake_on_request: bool
 
     # Network
     network: Network
@@ -174,12 +186,12 @@ class Metadata(BaseModel):
     root_user: RootUser
 
     # Details about the original request
-    request_detail: RequestDetail
+    request_detail: InstanceRequestDetail
 
 class Status(str, Enum):
-    NotApplicable = 'n/a'
-    Stopped = 'stopped'
-    Running = 'running'
+    NotApplicable = 'N/A'
+    Stopped = 'Stopped'
+    Running = 'Running'
 
 class Instance(BaseModel):
     type: Type
@@ -199,8 +211,12 @@ class Instance(BaseModel):
     # Specs
     specs: Specs
 
-    # If the VM is currently active
+    # If the VM is currently marked as active
     active: bool
+    
+    # Future dates for shutdown and deletion
+    inactivity_shutdown_date: datetime.date
+    inactivity_deletion_date: datetime.date
 
     # Metadata
     metadata: Metadata

@@ -9,15 +9,10 @@ import PasswordSet from '@/views/PasswordSet.vue'
 
 import Account from '@/views/Account.vue'
 import About from '@/views/About.vue'
-import Backups from '@/views/Backups.vue'
 import Cloud from '@/views/Cloud.vue'
-import Databases from '@/views/Databases.vue'
-import Help from '@/views/Help.vue'
-import Mentorships from '@/views/Mentorships.vue'
-import Terminal from '@/views/Terminal.vue'
-import Status from '@/views/Status.vue'
-import Websites from '@/views/Websites.vue'
+import CloudInstanceRequest from '@/views/CloudInstanceRequest.vue'
 
+import Terminal from '@/views/Terminal.vue'
 import { useAuthRoutes, requireAuth } from './auth'
 
 Vue.use(VueRouter)
@@ -74,6 +69,16 @@ const routes = [
     component: requireAuth(Account)
   },
   {
+    path: '/cloud',
+    name: 'Cloud',
+    component: requireAuth(Cloud)
+  },
+  {
+    path: '/cloud/:emailOrUsername/:instanceRequestType/:hostname/:token',
+    name: 'Instance Request',
+    component: requireAuth(CloudInstanceRequest)
+  },
+  {
     path: '/tutorial',
     name: 'Tutorial',
     beforeEnter (_to: Route, _from: Route, next: Function) {
@@ -110,11 +115,6 @@ const routes = [
       window.open('https://wiki.netsoc.co')
       next(false)
     }
-  },
-  {
-    path: '/cloud',
-    name: 'Cloud',
-    component: requireAuth(Cloud)
   },
   {
     path: '/file-manager',

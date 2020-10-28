@@ -6,9 +6,9 @@
     :fullscreen="$vuetify.breakpoint.mdAndDown"
     class="ma-4"
     scrollable
-    :overlay-opacity="0.4"
+    :overlay-opacity="0.6"
   >
-    <v-card :loading="loading">
+    <v-card style="height: 100%" :loading="loading">
       <dialog-logo/>
       <section class="mx-12">
         <slot></slot>

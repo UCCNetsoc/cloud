@@ -13,8 +13,9 @@
     <v-row v-if="!visible" class="justify-center text-center">
       <v-col cols="12" sm="12">
         <h2 class="font-weight-light display-5" style="position: relative; z-index: 2">
-          New to UCC Netsoc or Linux? Try out our <router-link to='/tutorial'>Tutorial</router-link> to get started<br>
-          Need help? Check out <code>#servers</code> on our <a target="_blank" href="https://discord.netsoc.co">Discord</a>
+          New to UCC Netsoc or Linux? Try out our <router-link to='/tutorial'>Tutorial</router-link> to get started<br/>
+          Need help? Check out <code>#servers</code> on our <a target="_blank" href="https://discord.netsoc.co">Discord</a><br/>
+          Already experienced? View our <a target="_blank" href="https://github.com/UCCNetsoc">GitHub</a>!
         </h2>
       </v-col>
     </v-row>
@@ -71,13 +72,9 @@ export default Vue.extend({
   data: () => ({
     selectedMenu: 0,
     menu: [
-      { icon: 'mdi-account-circle', name: 'Account & User Server', route: '/account' },
+      { icon: 'mdi-information', name: 'About', route: '/about' },
+      { icon: 'mdi-account-circle', name: 'Account', route: '/account' },
       { icon: 'mdi-cloud', name: 'Cloud', route: '/cloud' },
-      // { icon: 'mdi-web', name: 'Blogs & Websites', route: '/websites' },
-      // { icon: 'mdi-cloud', name: 'Cloud', route: '/cloud' },
-      // { icon: 'mdi-database', name: 'Databases', route: '/databases' },
-      // { icon: 'mdi-gamepad-square', name: 'Games', route: '/games' },
-      // { icon: 'mdi-teach', name: 'Mentorships', route: '/mentorships' },
       { icon: 'mdi-console-line', name: 'Terminal', route: '/terminal' },
       { icon: 'mdi-lifebuoy', name: 'Tutorial', route: '/tutorial' },
       { icon: 'mdi-book', name: 'Wiki', route: '/wiki' }

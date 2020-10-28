@@ -55,7 +55,12 @@
       </v-toolbar-title>
 
       <v-spacer></v-spacer>
-      <span style="cursor: pointer" v-on:click="$router.push('/account')" class="font-weight-bold">{{ this.$store.state.auth.user.profile.preferred_username }}</span>
+      <span style="cursor: pointer; margin-right: 0.125em" v-on:click="$router.push('/account')" class="font-weight-bold">
+        <v-icon class="align-center" size="24">
+          mdi-account-circle
+        </v-icon>
+        {{ this.$store.state.auth.user.profile.preferred_username }}
+      </span>
       <v-btn text v-on:click="$router.push('/accounts/logout', () => {})">
         <v-icon>mdi-logout</v-icon>
       </v-btn>

@@ -36,8 +36,8 @@ export default Vue.extend({
     },
 
     width: {
-      type: Number,
-      default: 460
+      type: String,
+      default: '460'
     },
 
     title: {
