@@ -1050,13 +1050,13 @@ version: 2
 
     def get_port_forward_map(
         self
-    ) -> Dict[int,Tuple[str, ipaddress.IPv4Interface, int]]:
+    ) -> Dict[int,Tuple[str, ipaddress.IPv4Address, int]]:
         instances = self.read_instances()
 
         port_map = {}
 
         for fqdn, instance in instances.items():
-            ip = instance.metadata.network.nic_allocation.addresses[0]
+            interface = instance.metadata.network.nic_allocation.addresses[0]
 
             for external_port, internal_port in instance.metadata.network.ports.items():
                 if external_port in port_map:
@@ -1067,7 +1067,7 @@ version: 2
                     logger.warning(f"warning, port out of range: {instance.fqdn} tried to map {external_port} but it's out of range!")
                     continue
                 
-                port_map[external_port] = (instance.fqdn, ip, internal_port)
+                port_map[external_port] = (instance.fqdn, interface.ip, internal_port)
         
         return port_map
 
@@ -1239,11 +1239,11 @@ version: 2
         udp_services = {}
 
         # then do tcp/udp port mappings
-        for external_port, internal_tuple in self.get_port_forward_map():
+        for external_port, internal_tuple in self.get_port_forward_map().items():
             fqdn, ip, internal_port = internal_tuple
 
             entrypoints[f"{fqdn}[{external_port}/tcp]"] = {
-                "address": ":{external_port}/tcp"
+                "address": f":{external_port}/tcp"
             }
 
             tcp_routers[f"{fqdn}[{external_port}/tcp]"] = {
@@ -1255,13 +1255,13 @@ version: 2
             tcp_services[f"{fqdn}[{external_port}/tcp]"] = {
                 "loadBalancer": {
                     "servers": [{
-                        "address": "{ip}:{internal_port}"
+                        "address": f"{ip}:{internal_port}"
                     }]
                 }
             }
 
             entrypoints[f"{fqdn}[{external_port}/udp]"] = {
-                "address": ":{external_port}/udp"
+                "address": f":{external_port}/udp"
             }
 
             udp_routers[f"{fqdn}[{external_port}/udp]"] = {
@@ -1272,7 +1272,7 @@ version: 2
             udp_services[f"{fqdn}[{external_port}/udp]"] = {
                 "loadBalancer": {
                     "servers": [{
-                        "address": "{ip}:{internal_port}"
+                        "address": f"{ip}:{internal_port}"
                     }]
                 }
             }
