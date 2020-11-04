@@ -391,7 +391,7 @@ async def shutdown_instance(
     '/{email_or_username}/{instance_type}/{hostname}/respec-request',
     status_code=201,
 )
-async def request_instance_respect(
+async def request_instance_respec(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     respec: models.proxmox.RespecRequest,

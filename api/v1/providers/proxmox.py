@@ -75,6 +75,10 @@ class ProxmoxNodeSSH:
         self.ssh.close()
         self.jump.close()
 
+def build_proxmox_config_string(options: dict):
+    """Turns a dict into string of e.g.'key1=value1,key2=value2'"""
+    return ",".join(map(lambda d: f"{d[0]}={d[1]}", options.items()))
+
 class Proxmox():
     def __init__(self):
         self.prox = ProxmoxAPI(
@@ -165,14 +169,9 @@ class Proxmox():
         instance_type: models.proxmox.Type
     ) -> models.proxmox.NICAllocation:
         # world's most ghetto ip allocation algorithm
-        if instance_type == models.proxmox.Type.LXC:
-            network = config.proxmox.lxc.network.network
-            base_ip = config.proxmox.lxc.network.ip
-            gateway = base_ip + 1
-        elif instance_type == models.proxmox.Type.VPS:
-            network = config.proxmox.vps.network.network
-            base_ip = config.proxmox.vps.network.ip
-            gateway = base_ip + 1
+        network = config.proxmox.network.network
+        base_ip = config.proxmox.network.ip
+        gateway = base_ip + 1
 
         # returns set with network and broadcast address removed
         ips = set(network.hosts())
@@ -180,8 +179,8 @@ class Proxmox():
         # remove router/gateway address
         ips.remove(gateway)
 
-        # remove any addresses assigned to any of the lxcs
-        for fqdn, instance in self.read_instances(instance_type).items():
+        # remove any addresses assigned to any of the other instances
+        for fqdn, instance in self.read_instances().items():
             for address in instance.metadata.network.nic_allocation.addresses:
                 if address.ip in ips:
                     ips.remove(address.ip)
@@ -283,11 +282,14 @@ class Proxmox():
         yaml_description = self._serialize_metadata(metadata)
 
         if instance_type == models.proxmox.Type.LXC:
+            metadata.groups = ["lxc", "cloudlxc", "cloud"]
+
             if template.disk_format != models.proxmox.Template.DiskFormat.TarGZ:
                 raise exceptions.resource.Unavailable(f"Templates (on LXC instances) {detail.template_id} must use TarGZ of RootFS format!")
 
-            lxc_images_path = self.prox.storage(config.proxmox.lxc.dir_pool).get()['path'] + "/template/cache"
-            image_path = f"{lxc_images_path}/{template.disk_sha256sum}.{template.disk_format}"
+            # Download the disk image/template
+            lxc_images_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/template/cache"
+            image_path = f"{lxc_images_path}/{template.disk_file}"
             download_path = f"{lxc_images_path}/{socket.gethostname()}-{os.getpid()}-{template.disk_sha256sum}"
 
             with ProxmoxNodeSSH(node_name) as con:
@@ -309,47 +311,60 @@ class Proxmox():
                     )
 
                     if template.disk_sha256sum not in str(stdout.read()):
-                        raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
-                except FileNotFoundError as e:
-                    # Original image does not exist, we gotta download it
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"wget {template.disk_url} -O {download_path}"
-                    )
-                    status = stdout.channel.recv_exit_status()
+                        raise exceptions.resource.Unavailable(f"Template does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
+                except (exceptions.resource.Unavailable, FileNotFoundError) as e:
+                    # If a fallback URL exists to download the image
+                    if template.disk_file_fallback_url is not None:
+                        # Original image does not exist, we gotta download it
+                        stdin, stdout, stderr = con.ssh.exec_command(
+                            f"wget {template.disk_file_fallback_url} -O {download_path}"
+                        )
+                        status = stdout.channel.recv_exit_status()
 
-                    if status != 0:
-                        raise exceptions.resource.Unavailable(f"Could not download template: error {status}: {stderr.read()} {stdout.read()}")
+                        if status != 0:
+                            raise exceptions.resource.Unavailable(f"Could not download template: error {status}: {stderr.read()} {stdout.read()}")
 
-                    # Checksum image    
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"sha256sum {download_path} | cut -f 1 -d' '"
-                    )
+                        # Checksum image    
+                        stdin, stdout, stderr = con.ssh.exec_command(
+                            f"sha256sum {download_path} | cut -f 1 -d' '"
+                        )
 
-                    if template.disk_sha256sum not in str(stdout.read()):
-                        raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
+                        if template.disk_sha256sum not in str(stdout.read()):
+                            raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
 
-                    # Move image
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"rm -f {image_path} && mv {download_path} {image_path}"
-                    )
+                        # Move image
+                        stdin, stdout, stderr = con.ssh.exec_command(
+                            f"rm -f {image_path} && mv {download_path} {image_path}"
+                        )
 
-                    status = stdout.channel.recv_exit_status()
-                    if status != 0:
-                        provision_failed(f"Couldn't rename template {status}: {stderr.read()} {stdout.read()}")
+                        status = stdout.channel.recv_exit_status()
+                        if status != 0:
+                            raise exceptions.resource.Unavailable(f"Couldn't rename template {status}: {stderr.read()} {stdout.read()}")
+                    else:
+                        raise exceptions.resource.Unavailable(f"This template is currently unavailable: no fallback URL for template")
             
             self.prox.nodes(f"{node_name}/lxc").post(**{
                 "hostname": fqdn,
                 "vmid": hash_id,
                 "description": yaml_description,
-                "ostemplate": f"{config.proxmox.lxc.dir_pool}:vztmpl/{template.disk_sha256sum}.{template.disk_format}",
+                "ostemplate": f"{config.proxmox.dir_pool}:vztmpl/{template.disk_file}",
                 "cores": template.specs.cores,
                 "memory": template.specs.memory,
                 "swap": template.specs.swap,
-                "storage": config.proxmox.lxc.dir_pool,
+                "storage": config.proxmox.dir_pool,
                 "unprivileged": 1,
                 "ssh-public-keys": f"{user_ssh_public_key}\n{mgmt_ssh_public_key}",
                 "nameserver": "1.1.1.1",
-                "net0": f"rate=100,name=eth0,bridge={config.proxmox.lxc.bridge},tag={config.proxmox.lxc.vlan},hwaddr={metadata.network.nic_allocation.macaddress},ip={metadata.network.nic_allocation.addresses[0]},mtu=1450"
+                "net0": build_proxmox_config_string({
+                    "rate": "100",
+                    "name": "eth0",
+                    "bridge": config.proxmox.bridge,
+                    "tag": config.proxmox.vlan,
+                    "hwaddr": metadata.network.nic_allocation.macaddress,
+                    "ip": metadata.network.nic_allocation.addresses[0],
+                    "gw": metadata.network.nic_allocation.gateway4,
+                    "mtu": 1450 # if we ever decide to move to vxlan
+                })
             })
 
             self._wait_vmid_lock(instance_type, node_name, hash_id)
@@ -366,6 +381,8 @@ class Proxmox():
 
             return password, user_ssh_private_key
         elif instance_type == models.proxmox.Type.VPS:
+            metadata.groups = ["vm", "cloudvm", "cloud"]
+
             if template.disk_format != models.proxmox.Template.DiskFormat.QCOW2:
                 raise exceptions.resource.Unavailable(f"Templates (on VPS instances) {detail.template_id} must use QCOW2 disk image format!")
 
@@ -393,8 +410,8 @@ class Proxmox():
             def cleanup_stub():
                 self.prox.nodes(instance.node).qemu(vm_id).delete()
 
-            vps_templates_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/template/vps"
-            template_path = f"{vps_templates_path}/{template.disk_sha256sum}"
+            vps_templates_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/template/vps"
+            template_path = f"{vps_templates_path}/{template.disk_file}"
             download_path = f"{vps_templates_path}/{socket.gethostname()}-{os.getpid()}-{template.disk_sha256sum}"
 
             with ProxmoxNodeSSH(node_name) as con:
@@ -411,47 +428,51 @@ class Proxmox():
                         cleanup_stub()
                         raise exceptions.resource.Unavailable(f"Downloaded image does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
 
-                except FileNotFoundError as e:
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"mkdir -p {vps_templates_path}"
-                    )
-                    status = stdout.channel.recv_exit_status()
+                except (exceptions.resource.Unavailable, FileNotFoundError) as e:
+                    # If a fallback URL exists to download the image
+                    if template.disk_file_fallback_url is not None:
+                        stdin, stdout, stderr = con.ssh.exec_command(
+                            f"mkdir -p {vps_templates_path}"
+                        )
+                        status = stdout.channel.recv_exit_status()
 
-                    if status != 0:
-                        cleanup_stub()
-                        raise exceptions.resource.Unavailable(f"Could not download template: could not reserve download dir")
+                        if status != 0:
+                            cleanup_stub()
+                            raise exceptions.resource.Unavailable(f"Could not download template: could not reserve download dir")
 
-                    # Original image does not exist, we gotta download it
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"wget {template.disk_url} -O {download_path}"
-                    )
-                    status = stdout.channel.recv_exit_status()
+                        # Original image does not exist, we gotta download it
+                        stdin, stdout, stderr = con.ssh.exec_command(
+                            f"wget {template.disk_url} -O {download_path}"
+                        )
+                        status = stdout.channel.recv_exit_status()
 
-                    if status != 0:
-                        cleanup_stub()
-                        raise exceptions.resource.Unavailable(f"Could not download template: error {status}: {stderr.read()} {stdout.read()}")
+                        if status != 0:
+                            cleanup_stub()
+                            raise exceptions.resource.Unavailable(f"Could not download template: error {status}: {stderr.read()} {stdout.read()}")
 
-                    # Checksum image    
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"sha256sum {download_path} | cut -f 1 -d' '"
-                    )
+                        # Checksum image    
+                        stdin, stdout, stderr = con.ssh.exec_command(
+                            f"sha256sum {download_path} | cut -f 1 -d' '"
+                        )
 
-                    if template.disk_sha256sum not in str(stdout.read()):
-                        cleanup_stub()
-                        raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
+                        if template.disk_sha256sum not in str(stdout.read()):
+                            cleanup_stub()
+                            raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
 
-                    # Move image
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"rm -f {template_path} && mv {download_path} {template_path}"
-                    )
+                        # Move image
+                        stdin, stdout, stderr = con.ssh.exec_command(
+                            f"rm -f {template_path} && mv {download_path} {template_path}"
+                        )
 
-                    status = stdout.channel.recv_exit_status()
-                    if status != 0:
-                        cleanup_stub()
-                        raise exceptions.resource.Unavailable(f"Couldn't rename instance template {status}: {stderr.read()} {stdout.read()}")
+                        status = stdout.channel.recv_exit_status()
+                        if status != 0:
+                            cleanup_stub()
+                            raise exceptions.resource.Unavailable(f"Couldn't rename instance template {status}: {stderr.read()} {stdout.read()}")
+                    else:
+                        raise exceptions.resource.Unavailable(f"This template is currently unavailable: no fallback URL for template")
 
                 # Images path for installed VMs
-                vms_images_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/images"
+                vms_images_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/images"
 
                 # Copy disk image
                 stdin, stdout, stderr = con.ssh.exec_command(
@@ -477,11 +498,11 @@ class Proxmox():
             self.prox.nodes(f"{node_name}/qemu/{vm_id}/config").put(
                 name=fqdn,
                 description=yaml_description,
-                virtio0=f"{config.proxmox.vps.dir_pool}:{vm_id}/primary.{ template.disk_format }",
+                virtio0=f"{config.proxmox.dir_pool}:{vm_id}/primary.{ template.disk_format }",
                 cores=template.specs.cores,
                 memory=template.specs.memory,
                 bios='ovmf',
-                efidisk0=f"{config.proxmox.vps.dir_pool}:{vm_id}/efi.qcow2",
+                efidisk0=f"{config.proxmox.dir_pool}:{vm_id}/efi.qcow2",
                 scsihw='virtio-scsi-pci',
                 machine='q35',
                 serial0='socket',
@@ -509,7 +530,7 @@ class Proxmox():
         elif instance.type == models.proxmox.Type.VPS:
             # delete cloud-init data
             with ProxmoxNodeSSH(instance.node) as con:
-                snippets_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/snippets"
+                snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
 
                 stdin, stdout, stderr = con.ssh.exec_command(
                     f"rm -f '{ snippets_path }/{instance.fqdn}.networkconfig.yml' '{ snippets_path }/{instance.fqdn}.userdata.yml' '{ snippets_path }/{instance.fqdn}.metadata.yml'"
@@ -863,7 +884,7 @@ class Proxmox():
 
                 if status != 0:
                     raise exceptions.resource.Unavailable(
-                        f"Could not start LXC: unable to inject ssh keys {status}: {stdout.read()} {stderr.read()}"
+                        f"Could not start instance: unable to inject ssh keys {status}: {stdout.read()} {stderr.read()}"
                     )
 
             instance.metadata.root_user = root_user
@@ -885,20 +906,29 @@ class Proxmox():
     def start_instance(
         self,
         instance: models.proxmox.Instance,
-        vps_rerun_cloudinit: Optional[bool] = False
+        vps_rerun_cloudinit: bool = False
     ):
         if instance.status != models.proxmox.Status.Running:
             if instance.type == models.proxmox.Type.LXC:
                 self.prox.nodes(instance.node).lxc(f"{instance.id}/config").put(**{
                     "nameserver": "1.1.1.1",
-                    "net0": f"rate=100,name=eth0,bridge={config.proxmox.lxc.bridge},tag={config.proxmox.lxc.vlan},hwaddr={instance.metadata.network.nic_allocation.macaddress},ip={instance.metadata.network.nic_allocation.addresses[0]},mtu=1450",
+                    "net0": build_proxmox_config_string({
+                        "rate": "100",
+                        "name": "eth0",
+                        "bridge": config.proxmox.bridge,
+                        "tag": config.proxmox.vlan,
+                        "hwaddr": instance.metadata.network.nic_allocation.macaddress,
+                        "ip": instance.metadata.network.nic_allocation.addresses[0],
+                        "gw": instance.metadata.network.nic_allocation.gateway4,
+                        "mtu": 1450 # if we ever decide to move to vxlan
+                    })
                 })
 
                 self.prox.nodes(instance.node).lxc(f"{instance.id}/status/start").post()
             elif instance.type == models.proxmox.Type.VPS:
                 # delete cloud-init data
                 with ProxmoxNodeSSH(instance.node) as con:
-                    snippets_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/snippets"
+                    snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
 
                     stdin, stdout, stderr = con.ssh.exec_command(
                         f"rm -f '{ snippets_path }/{instance.fqdn}.networkconfig.yml' '{ snippets_path }/{instance.fqdn}.userdata.yml' '{ snippets_path }/{instance.fqdn}.metadata.yml'"
@@ -912,7 +942,7 @@ class Proxmox():
 
                 # install cloud-init data
                 with ProxmoxNodeSSH(instance.node) as con:
-                    snippets_path = self.prox.storage(config.proxmox.vps.dir_pool).get()['path'] + "/snippets"
+                    snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
 
                     con.sftp.putfo(
                         io.StringIO(""),
@@ -973,7 +1003,7 @@ ethernets:
             addresses:
                 - 1.1.1.1
                 - 8.8.8.8
-        gateway4: { config.proxmox.vps.network.ip + 1 }
+        gateway4: { config.proxmox.network.ip + 1 }
         optional: true
         addresses:
             - { instance.metadata.network.nic_allocation.addresses[0] }
@@ -985,13 +1015,17 @@ version: 2
 
                 # Insert cloud-init stuff
                 self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
-                    cicustom=f"user={ config.proxmox.vps.dir_pool }:snippets/{instance.fqdn}.userdata.yml,network={ config.proxmox.vps.dir_pool }:snippets/{instance.fqdn}.networkconfig.yml,meta={ config.proxmox.vps.dir_pool }:snippets/{instance.fqdn}.metadata.yml",
-                    ide2=f"{ config.proxmox.vps.dir_pool }:cloudinit,format=qcow2"
+                    cicustom=f"user={ config.proxmox.dir_pool }:snippets/{instance.fqdn}.userdata.yml,network={ config.proxmox.dir_pool }:snippets/{instance.fqdn}.networkconfig.yml,meta={ config.proxmox.dir_pool }:snippets/{instance.fqdn}.metadata.yml",
+                    ide2=f"{ config.proxmox.dir_pool }:cloudinit,format=qcow2"
                 )
 
                 # Set network card
                 self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
-                    net0=f"virtio={ instance.metadata.network.nic_allocation.macaddress },bridge={config.proxmox.vps.bridge},tag={config.proxmox.vps.vlan}"
+                    net0=build_proxmox_config_string({
+                        "virtio": instance.metadata.network.nic_allocation.macaddress,
+                        "bridge": config.proxmox.bridge,
+                        "tag": config.proxmox.vlan
+                    })
                 )
 
                 self.prox.nodes(instance.node).qemu(f"{instance.id}/status/start").post()
@@ -1056,7 +1090,6 @@ version: 2
         port_map = {}
 
         for fqdn, instance in instances.items():
-            interface = instance.metadata.network.nic_allocation.addresses[0]
 
             for external_port, internal_port in instance.metadata.network.ports.items():
                 if external_port in port_map:
@@ -1067,7 +1100,7 @@ version: 2
                     logger.warning(f"warning, port out of range: {instance.fqdn} tried to map {external_port} but it's out of range!")
                     continue
                 
-                port_map[external_port] = (instance.fqdn, interface.ip, internal_port)
+                port_map[external_port] = (instance.fqdn, instance.metadata.network.nic_allocation.addresses[0].ip, internal_port)
         
         return port_map
 

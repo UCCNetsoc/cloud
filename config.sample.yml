@@ -12,36 +12,62 @@ proxmox:
     server: "feynman.netsoc.co"
     port: 2222
     username: "root"
-    password: "lolno"
+    password: "-"
   api:
     server: "feynman.netsoc.co"
     port: 8006
     username: "root@pam"
-    password: "lolno"
+    password: "-"
+  dir_pool: "local"
   vps:
-    dir_pool: local
     templates:
       ubuntu-20.04:
         title: "Ubuntu 20.04"
-        description: "Ubuntu 20.04"
+        subtitle: "Ubuntu's version 20.04 operating system"
+        description: | 
+          Ubuntu is a Linux distribution based on Debian mostly composed of free and open-source software.
+          Ubuntu is officially released in three editions: Desktop, Server, and Core for Internet of things devices and robots.
+          All the editions can run on the computer alone, or in a virtual machine
         logo_url: "https://assets.ubuntu.com/v1/29985a98-ubuntu-logo32.png"
-        disk_url: "https://cloud-images.ubuntu.com/releases/focal/release-20200921.1/ubuntu-20.04-server-cloudimg-amd64.img"
+        disk_file: "ubuntu-20.04-server-cloudimg-amd64.img"
+        disk_file_fallback_url: "https://cloud-images.ubuntu.com/releases/focal/release-20200921.1/ubuntu-20.04-server-cloudimg-amd64.img"
         disk_sha256sum: "d18a9d2b890d3c1401e70a281cae44b61816aa669c4936f7a99c168e572ec8cb"
         disk_format: "qcow2"
+        wake_on_request: no
+        specs:
+          cores: 1
+          disk_space: 10
+          memory: 2048
+  lxc:
+    templates:
+      netsoc-nginx-alpine:
+        title: "nginx 1.19 Alpine"
+        subtitle: "For static hosting or use as a reverse proxy"
+        description: |
+          nginx is a HTTP, HTTP reverse proxy and generic TCP/UDP reverse proxy server
+        logo_url: "https://img.icons8.com/color/452/nginx.png"
+        disk_file: "netsoc-nginx-alpine.tar.gz"
+        disk_sha256sum: "675fd362609cfe31c1e3b671663a5a4ee4d2bdaa091e3ad1f115663d0d0af4ae"
+        disk_format: "tar.gz"
+        wake_on_request: yes
         specs:
           cores: 1
           disk_space: 10
           memory: 512
-  lxc:
-    dir_pool: local
-    templates:
+          swap: 512
       ubuntu-19.10:
         title: "Ubuntu 19.10"
-        description: "Ubuntu 19.10"
+        subtitle: "Ubuntu's version 19.10 operating system"
+        description: | 
+          Ubuntu is a Linux distribution based on Debian mostly composed of free and open-source software.
+          Ubuntu is officially released in three editions: Desktop, Server, and Core for Internet of things devices and robots.
+          All the editions can run on the computer alone, or in a virtual machine
         logo_url: "https://assets.ubuntu.com/v1/29985a98-ubuntu-logo32.png"
-        disk_url: "http://download.proxmox.com/images/system/ubuntu-19.10-standard_19.10-1_amd64.tar.gz"
+        disk_file: "ubuntu-19.10-standard_19.10-1_amd64.tar.gz"
+        disk_file_fallback_url: "http://download.proxmox.com/images/system/ubuntu-19.10-standard_19.10-1_amd64.tar.gz"
         disk_sha256sum: "6df31f74b031fc831b774b1b0f8f7f43cbc0dd422a400671d4703dde3092b829"
         disk_format: "tar.gz"
+        wake_on_request: no
         specs:
           cores: 1
           disk_space: 10

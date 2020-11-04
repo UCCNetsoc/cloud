@@ -90,7 +90,8 @@ class Template(BaseModel):
     subtitle: str
     description: str
     logo_url: str
-    disk_url: str
+    disk_file: str
+    disk_file_fallback_url: Optional[str]
     disk_sha256sum: str
     disk_format: str
     wake_on_request: bool
