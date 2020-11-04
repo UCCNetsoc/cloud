@@ -80,9 +80,6 @@ class Proxmox(BaseModel):
         password: str
 
     class VPS(BaseModel):
-        network: ipaddress.IPv4Interface = ipaddress.IPv4Interface("10.69.0.0/16")
-        bridge: str = "vmbr0"
-        vlan: int = 69
         base_fqdn: str = "vps.cloud.netsoc.co"
         templates: Dict[str, Template] = {}
         dir_pool: str = "local"
@@ -93,12 +90,8 @@ class Proxmox(BaseModel):
         inactivity_deletion_num_days: int = 120
 
     class LXC(BaseModel):
-        network: ipaddress.IPv4Interface = ipaddress.IPv4Interface("10.68.0.0/16")
-        bridge: str = "vmbr0"
-        vlan: int = 68
-        base_fqdn: str = "lxc.cloud.netsoc.co"
+        base_fqdn: str = "container.cloud.netsoc.co"
         templates: Dict[str, Template] = {}
-        dir_pool: str = "local"
 
         inactivity_shutdown_warning_num_days: int = 60
         inactivity_shutdown_num_days: int = 90
@@ -123,6 +116,10 @@ class Proxmox(BaseModel):
     api: API
     vps: VPS
     lxc: LXC
+    bridge: str = "vmbr0"
+    network: ipaddress.IPv4Interface = ipaddress.IPv4Interface("10.50.0.0/16")
+    vlan: int = 69
+    dir_pool: str = "local"
     port_forward: PortForward = PortForward()
     vhosts: VHosts = VHosts()
 
