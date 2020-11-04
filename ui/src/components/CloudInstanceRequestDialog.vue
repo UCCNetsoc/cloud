@@ -1,6 +1,6 @@
 <template>
   <v-container>
-    <message-dialog :visible="msg.length > 0" @okay="msg = '', this.successful && $emit('successful')">
+    <message-dialog :visible="msg.length > 0" @okay="msg = ''; successful === true && $emit('successful')">
       {{ msg }}
     </message-dialog>
     <confirm-cancel-dialog

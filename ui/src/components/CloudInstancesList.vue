@@ -5,8 +5,8 @@
         <v-data-table
           :loading="loading"
           :headers="headers"
-          :items="Object.entries(instances)"
-          :items-per-page="20"
+          :items="Object.entries(instances).sort()"
+          :items-per-page="50"
           style="margin-top: -1rem"
         >
           <template slot="no-data">
@@ -130,12 +130,12 @@
                       </v-avatar>
                     </v-col>
                     <v-col sm="12" md="10">
-                      <span v-if="row.item[1].metadata.tos.suspended == true" class="red--text">
+                      <div v-if="row.item[1].metadata.tos.suspended == true" class="red--text">
                         Suspended ({{ row.item[1].metadata.tos.reason }})
-                      </span>
-                      <span v-else-if="row.item[1].metadata.permanent == true" class="green--text">
+                      </div>
+                      <div v-else-if="row.item[1].metadata.permanent == true" class="green--text">
                         Permanent
-                      </span>
+                      </div>
                       <div v-else-if="row.item[1].active == true" class="green--text">
                         Active until <b>{{ row.item[1].inactivity_shutdown_date }}</b>
                       </div>
@@ -286,7 +286,7 @@
                     </v-list-item-avatar>
 
                     <v-list-item-content>
-                      <v-list-item-title v-html="item.title + ' ' + typeName"></v-list-item-title>
+                      <v-list-item-title v-html="item.title"></v-list-item-title>
                       <v-list-item-subtitle v-html="'<span class=\'text--primary\'>' + item.subtitle + '</span><br/>' + getSpecString(item.specs)"></v-list-item-subtitle>
                     </v-list-item-content>
                   </v-list-item>
@@ -521,8 +521,12 @@
         @submit="confirm()"
       >
         <p>
-          You can add a port mapping to map external ports on our external IP <code>84.39.234.52</code>
-          to an internal port on your instance<br/><br/>
+          You can add a port mapping to map traffic from the external internet to your instance<br/><br/>
+
+          For example, if you create a port mapping of <code>42069</code> -> <code>8080</code>:<br/><br/>
+          Any traffic that is sent to:<br/>
+          <code>{{ instances[confirmCancel.action.hostname].fqdn }}:42069</code><br/>
+          will be sent to port <code>8080</code> inside your instance<br/><br/>
 
           <b class="warning--text">You should not create mappings to the following internal ports:</b>
           <ul>
@@ -968,7 +972,7 @@ export default Vue.extend({
     },
 
     async uiReload () {
-      this.uiSetInstances({})
+      // this.uiSetInstances({})
       this.loading = true
 
       try {
@@ -979,12 +983,12 @@ export default Vue.extend({
             }
           })
 
-        this.uiSetInstances(await res.json())
         this.loading = false
+        this.uiSetInstances(await res.json())
       } catch (e) {
         this.loading = false
-        this.uiSetInstances({})
         this.empty = e.message
+        this.uiSetInstances({})
       }
     },
 
@@ -1010,10 +1014,10 @@ export default Vue.extend({
         // Only refresh list when they're looking at it
         // i.e confirmcancel dialog is hidden
         if (this.confirmCancel.mode === ConfirmCancelMode.Hidden) {
-          // this.uiSilentReload()
+          this.uiSilentReload()
         }
         this.uiSilentReloadLoop()
-      }, 2000)
+      }, 4000 + (Math.random() * 1000))
     },
 
     async uiReloadTemplates () {
