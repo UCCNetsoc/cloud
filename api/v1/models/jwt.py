@@ -43,7 +43,7 @@ class Serialized(BaseModel):
         """Attempt to deserialize and verify the JWT's signature. Then against the claims in a given payload model"""
 
         key = jwk.JWK.from_pem(data=public_key.encode("utf-8"))
-        t = jwt.JWT(key=key, jwt=self.token)
+        t = jwt.JWT(key=key, jwt=self.token, algs=["RS256"])
 
         return model.parse_raw(t.claims)
 
