@@ -4,7 +4,7 @@ import structlog
 from fastapi import Depends, Security
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 from pydantic import ValidationError
-from typing import List
+from typing import List, Tuple
 
 from v1 import exceptions, models, providers
 from v1.config import config
@@ -72,3 +72,38 @@ def ensure_sysadmin_or_acting_on_self(
             )
         )
     
+
+def ensure_sysadmin(
+    bearer_account: models.account.Account,
+):
+    """
+    Raises an Unauthorized exception if the Bearer account (i.e the currently logged in user) is not a SysAdmin
+    """
+    for groupname, group in bearer_account.groups.items():
+        if group.gid == models.group.NetsocSysAdmin.gid:
+            return
+
+    raise exceptions.rest.Error(
+        401, 
+        models.rest.Detail(
+            msg=f"You do not have permission to access this resource"
+        )
+    )
+    
+from cryptography.hazmat.primitives import serialization as crypto_serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.backends import default_backend as crypto_default_backend
+
+def generate_rsa_public_private_ssh_key_pair(
+    key_size=2048
+) -> Tuple[str, str]:
+    key = rsa.generate_private_key(
+        backend=crypto_default_backend(),
+        public_exponent=65537,
+        key_size=key_size
+    )
+
+    return (
+        key.public_key().public_bytes(crypto_serialization.Encoding.OpenSSH, crypto_serialization.PublicFormat.OpenSSH).decode("utf-8"),
+        key.private_bytes(crypto_serialization.Encoding.PEM, crypto_serialization.PrivateFormat.PKCS8, crypto_serialization.NoEncryption()).decode("utf-8") 
+    )

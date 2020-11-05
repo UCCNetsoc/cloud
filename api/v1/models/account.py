@@ -7,7 +7,6 @@ from . import group
 
 from typing import List
 
-
 Username = {
     "default": None,
     "title": "Username",

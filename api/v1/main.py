@@ -10,7 +10,7 @@ from prometheus_client import Gauge
 from starlette.middleware.cors import CORSMiddleware
 from starlette_prometheus import metrics, PrometheusMiddleware
 
-from . import exceptions, routers, models, webserver_configurator, homedir_consistency, logging_config
+from . import exceptions, routers, models, homedir_consistency, logging_config, utilities
 
 from .config import config
 
@@ -25,32 +25,14 @@ logger.info("adding prometheus middleware")
 api.add_middleware(PrometheusMiddleware)
 api.add_route("/metrics/", metrics)
 
-hb = Gauge('netsocadmin_heartbeat', 'Unixtime Netsoc Admin heartbeat')
+hb = Gauge('netsocadmin_heartbeat', 'Unixtime Netsoc Cloud heartbeat')
+
+utilities.yaml.use_prettier_multiline_strings()
 
 @api.on_event("startup")
 @repeat_every(seconds=1)
 def heartbeat():
     hb.set_to_current_time()
-
-@api.on_event("startup")
-@repeat_every(seconds=config.webserver_configurator.push_interval)
-def run_configurator():
-    logger.info("webserver_configurator began running")
-    try:
-        webserver_configurator.configure()
-        logger.info("webserver_configurator finished running")
-    except Exception as e:
-        logging.error("webserver_configurator had an exception while running", e=e, exc_info=True)
-
-@api.on_event("startup")
-@repeat_every(seconds=config.homedir_consistency.scan_interval)
-def run_homedir_consistency():
-    try:
-        logger.info("homedir_consistency began running")
-        homedir_consistency.ensure()
-        logger.info("homedir_consistency finished running")
-    except Exception as e:
-        logging.error("homedir_consistency had an exception while running", e=e, exc_info=True)
 
 @api.on_event("startup")
 def start_metrics():
@@ -74,27 +56,9 @@ api.include_router(
 )
 
 api.include_router(
-    routers.backups.router,
-    prefix='/v1/backups',
-    tags=['backups']
-)
-
-api.include_router(
-    routers.mysql.router,
-    prefix='/v1/mysql',
-    tags=['mysql']
-)
-
-api.include_router(
-    routers.mentorships.router,
-    prefix='/v1/mentorships',
-    tags=['mentorships']
-)
-
-api.include_router(
-    routers.websites.router,
-    prefix='/v1/websites',
-    tags=['websites']
+    routers.proxmox.router,
+    prefix='/v1/proxmox',
+    tags=['proxmox']
 )
 
 """

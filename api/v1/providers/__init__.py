@@ -8,7 +8,7 @@ import random
 from pathlib import Path
 
 from v1 import exceptions
-from . import accounts, websites, email, backups, mysql, mkhomedir
+from . import accounts, email, mkhomedir, proxmox
 
 from v1.config import config
 
@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 try:
   accounts = accounts.FreeIPA()
-  websites = websites.HomeDirFolder()
 
   if config.production is True:
     email = email.SendGrid()
@@ -27,8 +26,8 @@ try:
 
   mkhomedir = mkhomedir.MkDir()
 
-  backups = backups.HomeDirFolder()
-  mysql = mysql.MySQL()
+  proxmox = proxmox.Proxmox()
+
 except exceptions.provider.Unavailable as e:
   # Kills the docker container
   t = random.randint(2,6)

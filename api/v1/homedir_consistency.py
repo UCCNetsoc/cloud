@@ -8,9 +8,9 @@ logger = logging.getLogger(__name__)
 
 from prometheus_client import Gauge
 
-a = Gauge('netsocadmin_homedir_consistency_num_accounts', 'Number of Netsoc Admin accounts')
-av = Gauge('netsocadmin_homedir_consistency_num_verified_accounts', 'Number of verified Netsoc Admin accounts')
-auv = Gauge('netsocadmin_homedir_consistency_num_unverified_accounts', 'Number of unverified Netsoc Admin accounts')
+a = Gauge('netsocadmin_homedir_consistency_num_accounts', 'Number of Netsoc Cloud accounts')
+av = Gauge('netsocadmin_homedir_consistency_num_verified_accounts', 'Number of verified Netsoc Cloud accounts')
+auv = Gauge('netsocadmin_homedir_consistency_num_unverified_accounts', 'Number of unverified Netsoc Cloud accounts')
 lca = Gauge('netsocadmin_homedir_consistency_last_attempted_config_time', 'Unixtime of the last time we attempted to ensure home dir permissions consistency')
 lsc = Gauge('netsocadmin_homedir_consistency_last_successful_config_time', 'Unixtime of the last time we successfully ensured home dir permissions consistency')
 

@@ -2,49 +2,49 @@
   <v-container fluid class="d-flex mx-1">
     <v-row >
       <v-card class="flex-grow-1 ma-1">
-        <v-card-title>
-          <v-img
-            alt="admin logo"
-            class="shrink"
-            contain
-            src="@/assets/admin-logo.svg"
-            transition="scale-transition"
-            width="160"
-          />
-        </v-card-title>
-        <!-- <v-card-subtitle class="mt-0">admin pre-release</v-card-subtitle> -->
-        <v-card-text>
-          Having issues or unexpected errors?
-          <a href="https://github.com/UCCNetsoc/admin">
-            Report all problems on our GitHub
-          </a>
-        </v-card-text>
-      </v-card>
-      <v-card class="flex-grow-1 ma-1">
         <v-card-title>About</v-card-title>
-        <v-card-subtitle>History of Netsoc Admin</v-card-subtitle>
+        <v-card-subtitle>Learn a little more about us...</v-card-subtitle>
         <v-card-text>
           <p>
-            Originally started in 2015.
+            Netsoc Cloud is hosted right here in Cork at <a target="_blank" href="https://www.cloudcix.com/">CloudCIX</a><br/>
+            Our primary aim is to provide a non-profit service to help students gain access to server hardware for educational and self-development purposes.
+            <br/>
+            <br/>
+            We would not be able to do this without the help and generosity of:<br/>
+            Jerry Sweeney (CEO of CloudCIX),<br/>
+            <a target="_blank" href="https://societies.ucc.ie/">The UCC Societies Executive,</a><br/>
+            <a target="_blank" href="https://www.ucc.ie/en/it/">UCC IT Services</a><br/>
+            <br/>
+            Having issues, unexpected errors or want to contribute?<br/>
+            <a target="_blank" href="https://github.com/UCCNetsoc/admin">
+              Check out our GitHub
+            </a>
           </p>
         </v-card-text>
       </v-card>
-      <v-card class="ma-1">
-        <v-card-title>Contributing</v-card-title>
-        <v-card-subtitle></v-card-subtitle>
-        <v-card-text>
-          <p>Open a Pull Request on our <a href="https://github.com/UCCNetsoc">GitHub</a> or simply have a chat with us in <code>#servers</code> on our <a href="https://discord.netsoc.co">Discord</a></p>
-        </v-card-text>
-      </v-card>
       <v-card :loading="contributors == null" class="flex-grow-1 ma-1">
-        <v-card-title>Contributors</v-card-title>
-        <v-card-subtitle></v-card-subtitle>
+        <v-card-title>GitHub Contributors</v-card-title>
+        <v-card-subtitle>Everyone who has contributed code changes and reported issues to the Netsoc Cloud project</v-card-subtitle>
         <v-card-text>
-          <a v-for="contributor in contributors" v-bind:key="contributor.login" :href="contributor.html_url">
-            <v-avatar class="ma-1" color="white">
-              <img transition="scale-transition" :src="contributor.avatar_url"/>
-            </v-avatar>
-          </a>
+          <v-list
+          >
+            <v-list-item-group>
+              <template v-for="(item) in contributors">
+                <v-list-item
+                  :key="item.login"
+                  @click="open(item.html_url)"
+                >
+                  <v-list-item-avatar>
+                    <v-img :src="item.avatar_url"></v-img>
+                  </v-list-item-avatar>
+
+                  <v-list-item-content>
+                    <v-list-item-title v-html="item.login"></v-list-item-title>
+                  </v-list-item-content>
+                </v-list-item>
+              </template>
+            </v-list-item-group>
+          </v-list>
         </v-card-text>
       </v-card>
     </v-row>
@@ -57,12 +57,24 @@ import Vue from 'vue'
 export default Vue.extend({
   name: 'AboutAndContributors',
   components: {},
+  methods: {
+    open (url: string) {
+      window.open(url, '_blank', '')
+    }
+  },
 
   mounted: async function () {
+    this.contributors = []
+
     try {
+<<<<<<< HEAD
       const contributorsJson = await fetch('https://api.github.com/repos/UCCNetsoc/admin/contributors')
       this.contributors = await contributorsJson.json()
       // console.log(this.contributors)
+=======
+      const contributors = await fetch('https://api.github.com/repos/UCCNetsoc/admin/contributors')
+      this.contributors = await contributors.json()
+>>>>>>> uservms
     } catch {
 
     }

@@ -2,11 +2,8 @@ from . import account
 from . import config
 from . import jwt
 from . import rest
-from . import website
 from . import group
 from . import password
 from . import sign_up
-from . import backup
-from . import mysql
-from . import mentorship
 from . import captcha
+from . import proxmox

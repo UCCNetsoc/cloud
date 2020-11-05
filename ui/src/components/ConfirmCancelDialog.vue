@@ -1,7 +1,7 @@
 <template>
   <card-dialog
     :visible="visible"
-    width="460"
+    :width="width"
     :loading="loading"
   >
     <v-card-title class="justify-center text-center white--text font-weight-light">
@@ -33,6 +33,11 @@ export default Vue.extend({
     visible: {
       type: Boolean,
       default: true
+    },
+
+    width: {
+      type: String,
+      default: '460'
     },
 
     title: {

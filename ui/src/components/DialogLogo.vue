@@ -8,10 +8,9 @@
       primary-title
     >
       <v-img
-        alt="admin logo"
         class="shrink"
         contain
-        :src="require('@/assets/admin-logo.svg')"
+        :src="require('@/assets/cloud-logo.svg')"
         transition="none"
         width="160"
         height="64"
@@ -30,10 +29,10 @@
 
 .binary-background {
   background: url("../assets/binary-repeat.png") rgba(22,22,22,1);
-  background-size: 45%;
+  background-size: 30%;
 
   animation: swipe 45s ease infinite;
-  background-repeat: round no-repeat;
+  background-repeat: round repeat;
 }
 
 </style>

@@ -9,15 +9,10 @@ import PasswordSet from '@/views/PasswordSet.vue'
 
 import Account from '@/views/Account.vue'
 import About from '@/views/About.vue'
-import Backups from '@/views/Backups.vue'
 import Cloud from '@/views/Cloud.vue'
-import Databases from '@/views/Databases.vue'
-import Help from '@/views/Help.vue'
-import Mentorships from '@/views/Mentorships.vue'
-import Terminal from '@/views/Terminal.vue'
-import Status from '@/views/Status.vue'
-import Websites from '@/views/Websites.vue'
+import CloudInstanceRequest from '@/views/CloudInstanceRequest.vue'
 
+import Terminal from '@/views/Terminal.vue'
 import { useAuthRoutes, requireAuth } from './auth'
 
 Vue.use(VueRouter)
@@ -74,6 +69,16 @@ const routes = [
     component: requireAuth(Account)
   },
   {
+    path: '/cloud',
+    name: 'Cloud',
+    component: requireAuth(Cloud)
+  },
+  {
+    path: '/cloud/:emailOrUsername/:instanceRequestType/:hostname/:token',
+    name: 'Instance Request',
+    component: requireAuth(CloudInstanceRequest)
+  },
+  {
     path: '/tutorial',
     name: 'Tutorial',
     beforeEnter (_to: Route, _from: Route, next: Function) {
@@ -112,47 +117,9 @@ const routes = [
     }
   },
   {
-    path: '/games',
-    name: 'Games',
-    beforeEnter (_to: Route, _from: Route, next: Function) {
-      window.open('https://games.netsoc.co')
-      next(false)
-    }
-  },
-  {
-    path: '/backups',
-    name: 'Backups',
-    component: requireAuth(Backups)
-  },
-  {
-    path: '/cloud',
-    name: 'Cloud',
-    component: requireAuth(Cloud)
-  },
-  {
-    path: '/databases',
-    name: 'Databases',
-    component: requireAuth(Databases)
-  },
-  {
-    path: '/mentorships',
-    name: 'Mentorships',
-    component: requireAuth(Mentorships)
-  },
-  {
-    path: '/websites',
-    name: 'Websites',
-    component: requireAuth(Websites)
-  },
-  {
-    path: '/help',
-    name: 'Help',
-    component: requireAuth(Help)
-  },
-  {
-    path: '/status',
-    name: 'Status',
-    component: requireAuth(Status)
+    path: '/file-manager',
+    name: 'File Manager',
+    component: requireAuth(Terminal)
   },
   {
     path: '/about',
@@ -181,9 +148,9 @@ useAuthRoutes(router)
 router.afterEach((to: Route) => {
   Vue.nextTick(() => {
     if (to?.name) {
-      document.title = `${to?.name} | Netsoc Admin`
+      document.title = `${to?.name} | Netsoc Cloud`
     } else {
-      document.title = 'Netsoc Admin | UCC Netsoc'
+      document.title = 'Netsoc Cloud | UCC Netsoc'
     }
   })
 })

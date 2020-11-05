@@ -22,7 +22,7 @@ def execute(url, content):
 
 def discord(url, content):
     res = requests.post(url, data=json.dumps({
-        "username": "Netsoc Admin",
+        "username": "Netsoc Cloud",
         "content": f"{content}",
         "avatar_url": "https://raw.githubusercontent.com/UCCNetsoc/wiki/master/assets/logo-icon.png"
         }).encode("utf8"),
