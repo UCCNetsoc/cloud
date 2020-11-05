@@ -40,9 +40,9 @@ async def send_verification_email(email_or_username : str, body : models.captcha
     if resource_account.verified:
         providers.email.send(
             [resource_account.email],
-            'Welcome to Netsoc Admin!',
+            'Welcome to Netsoc Cloud!',
             templates.email.netsoc.render(
-                heading="Welcome to Netsoc Admin!",
+                heading="Welcome to Netsoc Cloud!",
                 paragraph=f"""Hi {resource_account.username}!<br/><br/>It seems like you tried to create/verify an account but there already is a verified account under this email address!<br/>
                     If you have forgotten your password and want to reset it, you can click the button below:""",
                 buttons=[
@@ -60,9 +60,9 @@ async def send_verification_email(email_or_username : str, body : models.captcha
 
         providers.email.send(
             [resource_account.email],
-            'Welcome to Netsoc Admin!',
+            'Welcome to Netsoc Cloud!',
             templates.email.netsoc.render(
-                heading="Welcome to Netsoc Admin!",
+                heading="Welcome to Netsoc Cloud!",
                 paragraph=f"""Hi {resource_account.username}!<br/><br/>You're just about ready to get started using UCC Netsoc services!<br/>
                     Click the button below to verify your account""",
                 buttons=[

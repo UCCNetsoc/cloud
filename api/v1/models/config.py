@@ -26,7 +26,7 @@ class Accounts(BaseModel):
     freeipa: FreeIPA
 
 class Email(BaseModel):
-    from_name: str = "UCC Netsoc Admin"
+    from_name: str = "UCC Netsoc Cloud"
     from_address: str = "netsocadmin@netsoc.co"
     reply_to_address: str = "netsoc@uccsocieties.ie"
 

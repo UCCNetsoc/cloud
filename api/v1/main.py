@@ -25,7 +25,7 @@ logger.info("adding prometheus middleware")
 api.add_middleware(PrometheusMiddleware)
 api.add_route("/metrics/", metrics)
 
-hb = Gauge('netsocadmin_heartbeat', 'Unixtime Netsoc Admin heartbeat')
+hb = Gauge('netsocadmin_heartbeat', 'Unixtime Netsoc Cloud heartbeat')
 
 utilities.yaml.use_prettier_multiline_strings()
 
