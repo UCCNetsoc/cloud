@@ -10,7 +10,7 @@ from prometheus_client import Gauge
 from starlette.middleware.cors import CORSMiddleware
 from starlette_prometheus import metrics, PrometheusMiddleware
 
-from . import exceptions, routers, models, homedir_consistency, logging_config, utilities
+from . import exceptions, routers, models, logging_config, utilities
 
 from .config import config
 
