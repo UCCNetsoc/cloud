@@ -67,14 +67,8 @@ export default Vue.extend({
     this.contributors = []
 
     try {
-<<<<<<< HEAD
-      const contributorsJson = await fetch('https://api.github.com/repos/UCCNetsoc/admin/contributors')
-      this.contributors = await contributorsJson.json()
-      // console.log(this.contributors)
-=======
       const contributors = await fetch('https://api.github.com/repos/UCCNetsoc/admin/contributors')
       this.contributors = await contributors.json()
->>>>>>> uservms
     } catch {
 
     }
