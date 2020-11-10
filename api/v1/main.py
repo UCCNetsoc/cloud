@@ -34,13 +34,6 @@ utilities.yaml.use_prettier_multiline_strings()
 def heartbeat():
     hb.set_to_current_time()
 
-@api.on_event("startup")
-def start_metrics():
-    try:
-        prometheus_client.start_http_server(config.metrics.port)
-    except Exception as e:
-        logging.getLogger("v1.metrics").error(e,exc_info=True)
-
 
 logger.info("setting up routers")
 api.include_router(
