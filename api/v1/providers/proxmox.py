@@ -1242,15 +1242,19 @@ version: 2
         entrypoints = {}
 
         for fqdn, instance in self.read_instances().items():
+            fqdn_prefix = fqdn.replace('.', '-')
+
             # first do vhosts
             for vhost, options in instance.metadata.network.vhosts.items():
                 valid, remarks = self.validate_domain(instance.metadata.owner, vhost)
+                
+                vhost_suffix = vhost.replace('.', '-')
 
                 if valid is True:
-                    routers[f"{fqdn}[{vhost}]"] = {
+                    routers[f"{fqdn_prefix}-{vhost_suffix}"] = {
                         "entrypoints": web_entrypoints,
                         "rule": f"Host(`{vhost}`)",
-                        "service": f"{fqdn}[{vhost}]",
+                        "service": f"{fqdn_prefix}-{vhost_suffix}",
                         "tls": {
                             "certResolver": "letsencrypt"
                         }
@@ -1261,7 +1265,7 @@ version: 2
                     if options.https is True:
                         proto = "https"
 
-                    services[f"{fqdn}[{vhost}]"] = {
+                    services[f"{fqdn_prefix}-{vhost_suffix}"] = {
                         "loadBalancer": {
                             "servers": [{ 
                                 "url": f"{ proto }://{instance.metadata.network.nic_allocation.addresses[0].ip}:{ options.port }"
@@ -1278,17 +1282,17 @@ version: 2
         for external_port, internal_tuple in self.get_port_forward_map().items():
             fqdn, ip, internal_port = internal_tuple
 
-            entrypoints[f"{fqdn}[{external_port}/tcp]"] = {
+            entrypoints[f"{fqdn_prefix}-{external_port}-tcp"] = {
                 "address": f":{external_port}/tcp"
             }
 
-            tcp_routers[f"{fqdn}[{external_port}/tcp]"] = {
-                "entryPoints": [f"{fqdn}[{external_port}/tcp]"],
+            tcp_routers[f"{fqdn_prefix}-{external_port}-tcp"] = {
+                "entryPoints": [f"{fqdn_prefix}-{external_port}-tcp"],
                 "rule": "HostSNI(`*`)",
-                "service": f"{fqdn}[{external_port}/tcp]"
+                "service": f"{fqdn_prefix}-{external_port}-tcp"
             }
 
-            tcp_services[f"{fqdn}[{external_port}/tcp]"] = {
+            tcp_services[f"{fqdn_prefix}-{external_port}-tcp"] = {
                 "loadBalancer": {
                     "servers": [{
                         "address": f"{ip}:{internal_port}"
@@ -1296,16 +1300,16 @@ version: 2
                 }
             }
 
-            entrypoints[f"{fqdn}[{external_port}/udp]"] = {
+            entrypoints[f"{fqdn_prefix}-{external_port}-udp"] = {
                 "address": f":{external_port}/udp"
             }
 
-            udp_routers[f"{fqdn}[{external_port}/udp]"] = {
-                "entryPoints": [f"{fqdn}[{external_port}/udp]"],
-                "service": f"{fqdn}[{external_port}/udp]"
+            udp_routers[f"{fqdn_prefix}-{external_port}-udp"] = {
+                "entryPoints": [f"{fqdn_prefix}-{external_port}-udp"],
+                "service": f"{fqdn_prefix}-{external_port}-udp"
             }
 
-            udp_services[f"{fqdn}[{external_port}/udp]"] = {
+            udp_services[f"{fqdn_prefix}-{external_port}-udp"] = {
                 "loadBalancer": {
                     "servers": [{
                         "address": f"{ip}:{internal_port}"
