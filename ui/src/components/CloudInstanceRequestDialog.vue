@@ -128,8 +128,9 @@ export default Vue.extend({
   },
 
   data () {
-    const template: Template | undefined = undefined
-    const request: Request | undefined = undefined
+    let template: Template | undefined
+    let request: Request | undefined
+
     return {
       template,
       request,
@@ -153,7 +154,7 @@ export default Vue.extend({
   },
 
   methods: {
-    async uiLoad (): Template {
+    async uiLoad () {
       this.loading = true
       const headers = {
         Authorization: `Bearer ${this.$store.state.auth.user.access_token}`
@@ -166,10 +167,11 @@ export default Vue.extend({
           headers
         })
 
-        this.request = await req.json()
+        const request: Request = await req.json()
+        this.request = request
 
         req = await fetchRest(
-          `${config.apiBaseUrl}/v1/proxmox/${this.emailOrUsername}/${this.request.type}-template/${this.request.detail.template_id}`, {
+          `${config.apiBaseUrl}/v1/proxmox/${this.emailOrUsername}/${request.type}-template/${request.detail.template_id}`, {
             method: 'GET',
             headers
           })

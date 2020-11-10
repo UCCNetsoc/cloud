@@ -694,9 +694,10 @@ enum ConfirmCancelMode {
 
 export interface ConfirmCancelAction {
   template?: Template;
-  templateId?: Template;
+  templateId?: string;
   hostname?: string;
   reason?: string;
+  host?: string;
 
   respecReason?: string;
   portMapExternal?: number;
@@ -1021,7 +1022,7 @@ export default Vue.extend({
     },
 
     async uiReloadTemplates () {
-      this.templates = []
+      this.templates = {}
 
       try {
         const res = await fetchRest(

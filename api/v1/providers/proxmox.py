@@ -142,6 +142,9 @@ class Proxmox():
             if (node['maxcpu'] >= specs.cores):
                 scoreboard[node_name] += 1
 
+            if node_name in config.proxmox.blacklisted_nodes:
+                del scoreboard[node_name]
+
         # return the node with the highest score
         return sorted(scoreboard, key=scoreboard.get, reverse=True)[0]
 
@@ -303,6 +306,7 @@ class Proxmox():
 
                 # See if the image exists
                 try:
+                    logger.info(image_path)
                     con.sftp.stat(image_path)
 
                     # Checksum image    
@@ -314,6 +318,7 @@ class Proxmox():
                         raise exceptions.resource.Unavailable(f"Template does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
                 except (exceptions.resource.Unavailable, FileNotFoundError) as e:
                     # If a fallback URL exists to download the image
+                    logger.info("error", e=e, exc_info=True)
                     if template.disk_file_fallback_url is not None:
                         # Original image does not exist, we gotta download it
                         stdin, stdout, stderr = con.ssh.exec_command(
@@ -517,6 +522,8 @@ class Proxmox():
             )
 
             self._wait_vmid_lock(instance_type, node_name, vm_id)
+
+            return password, user_ssh_private_key
 
     def delete_instance(
         self,

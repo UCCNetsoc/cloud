@@ -212,7 +212,7 @@ async def approve_instance_request(
         f"""**{resource_account.username} ({resource_account.email}) request for an instance named `{hostname}` was granted! Installing...**"""
     )
 
-    providers.proxmox.create_instance(
+    password, private_key = providers.proxmox.create_instance(
         instance_type,
         resource_account,
         hostname,
@@ -233,8 +233,14 @@ async def approve_instance_request(
                 We received your request for a {fancy_name(instance_type)} named '{hostname}'<br/>
                 We're delighted to inform you that your request has been granted!<br/><br/>
                 <br/>
+                You will find a password and a private key below that can be used for Root SSH access.</br>
+                For guides on how to SSH into your instance, consult the <a href='https://tutorial.netsoc.co'>tutorial</a>
                 <br/>
-            """
+            """,
+            embeds=[
+                { "text": password },
+                { "text": private_key }
+            ]
         ),
         "text/html"
     )

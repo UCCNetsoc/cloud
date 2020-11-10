@@ -118,10 +118,11 @@ class Proxmox(BaseModel):
     lxc: LXC
     bridge: str = "vmbr0"
     network: ipaddress.IPv4Interface = ipaddress.IPv4Interface("10.50.0.0/16")
-    vlan: int = 69
+    vlan: int = 50
     dir_pool: str = "local"
     port_forward: PortForward = PortForward()
     vhosts: VHosts = VHosts()
+    blacklisted_nodes: List[str]
 
 class Config(BaseModel):
     production: bool = False

@@ -54,6 +54,12 @@
 <script lang="ts">
 import Vue from 'vue'
 
+interface Contributor {
+  login: string;
+  avatar_url: string;
+  html_url: string;
+}
+
 export default Vue.extend({
   name: 'AboutAndContributors',
   components: {},
@@ -64,8 +70,6 @@ export default Vue.extend({
   },
 
   mounted: async function () {
-    this.contributors = []
-
     try {
       const contributors = await fetch('https://api.github.com/repos/UCCNetsoc/admin/contributors')
       this.contributors = await contributors.json()
@@ -74,8 +78,12 @@ export default Vue.extend({
     }
   },
 
-  data: () => ({
-    contributors: null
-  })
+  data: () => {
+    const contributors: Contributor[] = []
+
+    return {
+      contributors
+    }
+  }
 })
 </script>
