@@ -1310,7 +1310,6 @@ version: 2
  
  
         config = {
-            "entryPoints": entrypoints,
             "http": {
                 "routers": routers,
                 "services": services
