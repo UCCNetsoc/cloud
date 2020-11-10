@@ -24,7 +24,7 @@ const locSplit: string[] = window.location.href.split("/")
 const userManager = new UserManager({
   clockSkew: 8 * (60 * 60),
   authority: config.oidcAuthority,
-  client_id: 'netsocadmin',
+  client_id: 'netsoc-cloud',
   response_type: 'code',
   redirect_uri: `${locSplit[0]}//${locSplit[2]}/accounts/login/finish`,
   silent_redirect_uri: `${locSplit[0]}//${locSplit[2]}/accounts/login/finish-silent`,
@@ -49,31 +49,31 @@ userManager.events.addUserLoaded((user: OidcUser) => {
   // console.log("User loaded", user)
   store.commit('auth/setUser', { user: user });
 
-  (async () => {
-    try {
-      let res = await fetchRest(
-        `${config.apiBaseUrl}/v1/accounts/${user.profile.preferred_username}/home-directory`, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${user.access_token}`
-          }
-        }, [200, 404]
-      )
+  // (async () => {
+  //   try {
+  //     let res = await fetchRest(
+  //       `${config.apiBaseUrl}/v1/accounts/${user.profile.preferred_username}/home-directory`, {
+  //         method: 'GET',
+  //         headers: {
+  //           Authorization: `Bearer ${user.access_token}`
+  //         }
+  //       }, [200, 404]
+  //     )
       
-      // Home directory does not exist, we need to create it
-      if (res.status == 404) {
-        res = await fetchRest(
-          `${config.apiBaseUrl}/v1/accounts/${user.profile.preferred_username}/home-directory`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${user.access_token}`
-            }
-          }, [201])
-      }
-    } catch (e) {
-      alert(`Could not ensure home directory created: ${e}. Try refreshing the page`)
-    }
-  })()
+  //     // Home directory does not exist, we need to create it
+  //     if (res.status == 404) {
+  //       res = await fetchRest(
+  //         `${config.apiBaseUrl}/v1/accounts/${user.profile.preferred_username}/home-directory`, {
+  //           method: 'POST',
+  //           headers: {
+  //             Authorization: `Bearer ${user.access_token}`
+  //           }
+  //         }, [201])
+  //     }
+  //   } catch (e) {
+  //     alert(`Could not ensure home directory created: ${e}. Try refreshing the page`)
+  //   }
+  // })()
 })
 
 userManager.events.addUserUnloaded(() => {

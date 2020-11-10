@@ -15,7 +15,7 @@ class Auth(BaseModel):
     jwt: JWT
 
 class Accounts(BaseModel):
-    home_dirs: Path
+    home_dirs: Path = Path("/home/users")
     username_blacklist: List[str]
 
     class FreeIPA(BaseModel):
@@ -126,13 +126,12 @@ class Proxmox(BaseModel):
 
 class Config(BaseModel):
     production: bool = False
-    home_dirs: Path = Path("/home/users")
     accounts: Accounts
     auth: Auth
     email: Email
     links: Links
     webhooks: Webhooks
-    homedir_consistency: HomeDirConsistency
+    # homedir_consistency: HomeDirConsistency
     metrics: Metrics
     captcha: Optional[Captcha]
     proxmox: Proxmox

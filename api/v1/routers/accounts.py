@@ -235,65 +235,65 @@ async def get_gpdr_data(
     return providers.accounts.read_gdpr_data(resource_account)
 
     
-@router.get(
-    '/{email_or_username}/home-directory',
-    status_code=200,
-    response_model=models.rest.Info
-)
-async def get_home_directory(
-    email_or_username : str,
-    bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
-):
-    resource_account = providers.accounts.find_account(email_or_username)
-    utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
+# @router.get(
+#     '/{email_or_username}/home-directory',
+#     status_code=200,
+#     response_model=models.rest.Info
+# )
+# async def get_home_directory(
+#     email_or_username : str,
+#     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
+# ):
+#     resource_account = providers.accounts.find_account(email_or_username)
+#     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
-    if resource_account.verified is False:
-        raise exceptions.rest.Error(
-            status_code=400,
-            detail=models.rest.Detail(
-                msg="Account is not verified, cannot have a home directory yet"
-            )
-        )
+#     if resource_account.verified is False:
+#         raise exceptions.rest.Error(
+#             status_code=400,
+#             detail=models.rest.Detail(
+#                 msg="Account is not verified, cannot have a home directory yet"
+#             )
+#         )
 
-    if resource_account.home_dir.exists():
-        return models.rest.Info(
-            detail=models.rest.Detail(
-                msg="Home directory exists"
-            )
-        )
-    else:
-        raise exceptions.rest.Error(
-            status_code=404,
-            detail=models.rest.Detail(
-                msg="Home directory doesn't exist"
-            )
-        )
+#     if resource_account.home_dir.exists():
+#         return models.rest.Info(
+#             detail=models.rest.Detail(
+#                 msg="Home directory exists"
+#             )
+#         )
+#     else:
+#         raise exceptions.rest.Error(
+#             status_code=404,
+#             detail=models.rest.Detail(
+#                 msg="Home directory doesn't exist"
+#             )
+#         )
 
-@router.post(
-    '/{email_or_username}/home-directory',
-    status_code=201
-)
-async def create_home_directory(
-    email_or_username : str,
-    bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
-):
-    resource_account = providers.accounts.find_account(email_or_username)
-    utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
+# @router.post(
+#     '/{email_or_username}/home-directory',
+#     status_code=201
+# )
+# async def create_home_directory(
+#     email_or_username : str,
+#     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
+# ):
+#     resource_account = providers.accounts.find_account(email_or_username)
+#     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
     
-    if resource_account.verified is False:
-        raise exceptions.rest.Error(
-            status_code=400,
-            detail=models.rest.Detail(
-                msg="Account is not verified, cannot have a home directory yet"
-            )
-        )
+#     if resource_account.verified is False:
+#         raise exceptions.rest.Error(
+#             status_code=400,
+#             detail=models.rest.Detail(
+#                 msg="Account is not verified, cannot have a home directory yet"
+#             )
+#         )
 
-    providers.mkhomedir.create(resource_account)
-    utilities.webhook.info(f"**Home directory created** - {resource_account.username} ({resource_account.email})")
+#     providers.mkhomedir.create(resource_account)
+#     utilities.webhook.info(f"**Home directory created** - {resource_account.username} ({resource_account.email})")
 
-    return models.rest.Info(
-        detail=models.rest.Detail(
-            msg="Home directory created"
-        )
-    )
+#     return models.rest.Info(
+#         detail=models.rest.Detail(
+#             msg="Home directory created"
+#         )
+#     )
 
