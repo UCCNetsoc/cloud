@@ -1239,7 +1239,6 @@ version: 2
     ) -> dict:
         services = {}
         routers = {}
-        entrypoints = {}
 
         for fqdn, instance in self.read_instances().items():
             fqdn_prefix = fqdn.replace('.', '-')
@@ -1282,12 +1281,8 @@ version: 2
         for external_port, internal_tuple in self.get_port_forward_map().items():
             fqdn, ip, internal_port = internal_tuple
 
-            entrypoints[f"{fqdn_prefix}-{external_port}-tcp"] = {
-                "address": f":{external_port}/tcp"
-            }
-
             tcp_routers[f"{fqdn_prefix}-{external_port}-tcp"] = {
-                "entryPoints": [f"{fqdn_prefix}-{external_port}-tcp"],
+                "entryPoints": [f"netsoc-cloud-{external_port}-tcp"],
                 "rule": "HostSNI(`*`)",
                 "service": f"{fqdn_prefix}-{external_port}-tcp"
             }
@@ -1300,12 +1295,8 @@ version: 2
                 }
             }
 
-            entrypoints[f"{fqdn_prefix}-{external_port}-udp"] = {
-                "address": f":{external_port}/udp"
-            }
-
             udp_routers[f"{fqdn_prefix}-{external_port}-udp"] = {
-                "entryPoints": [f"{fqdn_prefix}-{external_port}-udp"],
+                "entryPoints": [f"netsoc-cloud-{external_port}-udp"],
                 "service": f"{fqdn_prefix}-{external_port}-udp"
             }
 
