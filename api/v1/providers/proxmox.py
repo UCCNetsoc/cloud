@@ -84,7 +84,8 @@ class Proxmox():
         self.prox = ProxmoxAPI(
             host=config.proxmox.api.server,
             user=config.proxmox.api.username,
-            password=config.proxmox.api.password,
+            token_name=config.proxmox.api.token_name,
+            token_value=config.proxmox.api.token_value,
             port=config.proxmox.api.port,
             verify_ssl=False
         )
@@ -232,9 +233,19 @@ class Proxmox():
         yaml_description = self._serialize_metadata(instance.metadata)
         
         if instance.type == models.proxmox.Type.LXC:
-            self.prox.nodes(instance.node).lxc(f"{instance.id}/config").put(description=yaml_description)
+            self.prox.nodes(f"{instance.node}/lxc/{instance.id}/config").put(description=yaml_description)
         elif instance.type == models.proxmox.Type.VPS:
-            self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(description=yaml_description)
+            self.prox.nodes(f"{instance.node}/qemu/{instance.id}/config").put(description=yaml_description)
+
+    def _hash_fqdn(
+        self,
+        fqdn: str
+    ) -> int:
+        random.seed(fqdn)
+        hash_id = random.randint(1000, 5000000)
+        random.seed()
+
+        return hash_id
 
     def create_instance(
         self,
@@ -277,9 +288,7 @@ class Proxmox():
             wake_on_request=template.wake_on_request
         )
 
-        random.seed(f"{fqdn}-{node_name}")
-        hash_id = random.randint(1000, 5000000)
-        random.seed()
+        hash_id = self._hash_fqdn(fqdn)
 
         # Store VM metadata in the description field
         yaml_description = self._serialize_metadata(metadata)
@@ -576,18 +585,22 @@ class Proxmox():
         self,
         instance_type: models.proxmox.Type,
         node: str,
-        vmid: int
+        vmid: int,
+        expected_fqdn: Optional[str] = None
     ) -> models.proxmox.Instance:
 
         if instance_type == models.proxmox.Type.LXC:
             try:
-                lxc_config = self.prox.nodes(node).lxc.get(f"{vmid}/config")
+                lxc_config = self.prox.nodes(f"{node}/lxc/{vmid}/config").get()
             except Exception as e:
                 raise exceptions.resource.NotFound("The instance does not exist")
 
             # proxmox uses hostname as the lxc name
             # but name for vm name, god help me
             fqdn = lxc_config['hostname']
+
+            if expected_fqdn is not None and fqdn != expected_fqdn:
+                raise exceptions.resource.NotFound("The instance at the specified VM ID does not have the expected FQDN")
 
             # decode description
             try:
@@ -640,7 +653,7 @@ class Proxmox():
                 disk_space=disk_space
             )
 
-            current_status = self.prox.nodes(node).lxc.get(f"{vmid}/status/current")
+            current_status = self.prox.nodes(f"{node}/lxc/{vmid}/status/current").get()
             if current_status['status'] == 'running':
                 status = models.proxmox.Status.Running
             elif current_status['status'] == 'stopped':
@@ -671,11 +684,14 @@ class Proxmox():
             return instance
         elif instance_type == models.proxmox.Type.VPS:
             try:
-                vm_config = self.prox.nodes(node).qemu.get(f"{vmid}/config")
+                vm_config = self.prox.nodes(f"{node}/qemu/{vmid}/config").get()
             except Exception as e:
                 raise exceptions.resource.NotFound("The instance does not exist")
 
             fqdn = vm_config['name']
+
+            if expected_fqdn is not None and fqdn != expected_fqdn:
+                raise exceptions.resource.NotFound("The instance at the specified VM ID does not have the expected FQDN")
             
             # decode description
             try:
@@ -724,7 +740,7 @@ class Proxmox():
                 disk_space=disk_space
             )
 
-            current_status = self.prox.nodes(node).qemu.get(f"{vmid}/status/current")
+            current_status = self.prox.nodes(f"{node}/qemu/{vmid}/status/current").get()
             if current_status['status'] == 'running':
                 status = models.proxmox.Status.Running
             elif current_status['status'] == 'stopped':
@@ -764,21 +780,13 @@ class Proxmox():
         instance_type: models.proxmox.Type,
         fqdn: str
     ) -> models.proxmox.Instance:
-        if instance_type == models.proxmox.Type.LXC:
-            for node in self.prox.nodes().get():
-                for potential in self.prox.nodes(node['node']).lxc.get():
-                    # is it an one of our lxc fqdns?
-                    if potential['name'] == fqdn:
-                        instance = self._read_instance_on_node(instance_type, node['node'], potential['vmid'])
-                        return instance
+        # First try hashing it and see if we get an instant hit
+        lxcs_qemus = self.prox.cluster.resources.get(type="vm")
 
-        elif instance_type == models.proxmox.Type.VPS:
-            for node in self.prox.nodes().get():
-                for potential in self.prox.nodes(node['node']).qemu.get():
-                    if potential['name'] == fqdn:
-                        instance = self._read_instance_on_node(instance_type, node['node'], potential['vmid'])
-                        return instance
-
+        for entry in lxcs_qemus:
+            if entry['name'] == fqdn:
+                instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
+                return instance
 
         raise exceptions.resource.NotFound("The instance does not exist")
 
@@ -798,53 +806,41 @@ class Proxmox():
         instance_type: models.proxmox.Type,
         account: models.account.Account
     ) -> Dict[str, models.proxmox.Instance]:
-        if instance_type == models.proxmox.Type.LXC:
-            ret = { }
-            
-            for node in self.prox.nodes().get():
-                for lxc_dict in self.prox.nodes(node['node']).lxc.get():
-                    if lxc_dict['name'].endswith(self._get_instance_fqdn_for_account(instance_type, account, "")):
-                        lxc = self._read_instance_on_node(instance_type, node['node'], lxc_dict['vmid'])
-                        ret[lxc.hostname] = lxc
+        
+        ret = { }
+
+        lxcs_qemus = self.prox.cluster.resources.get(type="vm")
+        
+        for entry in lxcs_qemus:
+            if entry['name'].endswith(self._get_instance_fqdn_for_account(instance_type, account, "")):
+                instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
+                ret[instance.hostname] = instance
                         
-            
-            return ret
-        elif instance_type == models.proxmox.Type.VPS:
-            ret = { }
-            
-            for node in self.prox.nodes().get():
-                for vps_dict in self.prox.nodes(node['node']).qemu.get():
-                    if vps_dict['name'].endswith(self._get_instance_fqdn_for_account(instance_type, account, "")):
-                        vps = self._read_instance_on_node(instance_type, node['node'], vps_dict['vmid'])
-                        ret[vps.hostname] = vps
-                        
-            
-            return ret
+        return ret
 
     def read_instances(
         self,
         instance_type: Optional[models.proxmox.Type] = None
     ) -> Dict[str, models.proxmox.Instance]:
+
+        ret = { }
+
+        lxcs_qemus = self.prox.cluster.resources.get(type="vm")
+
         if instance_type == models.proxmox.Type.LXC:
-            ret = {}
-
-            for node in self.prox.nodes().get():
-                for lxc_dict in self.prox.nodes(node['node']).lxc.get():
-                    if lxc_dict['name'].endswith(config.proxmox.lxc.base_fqdn):
-                        lxc = self._read_instance_on_node(instance_type, node['node'], lxc_dict['vmid'])
-                        ret[lxc.fqdn] = lxc
-
-            return ret  
+            for entry in lxcs_qemus:
+                if entry['name'].endswith(config.proxmox.lxc.base_fqdn):
+                    instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
+                    ret[instance.fqdn] = instance
+                            
+            return ret
         elif instance_type == models.proxmox.Type.VPS:
-            ret = {}
-
-            for node in self.prox.nodes().get():
-                for vps_dict in self.prox.nodes(node['node']).qemu.get():
-                    if vps_dict['name'].endswith(config.proxmox.vps.base_fqdn):
-                        vps = self._read_instance_on_node(instance_type, node['node'], vps_dict['vmid'])
-                        ret[vps.fqdn] = vps
-
-            return ret  
+            for entry in lxcs_qemus:
+                if entry['name'].endswith(config.proxmox.vps.base_fqdn):
+                    instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
+                    ret[instance.fqdn] = instance
+                            
+            return ret
         elif instance_type == None:
             lxcs = self.read_instances(models.proxmox.Type.LXC)
             vpses = self.read_instances(models.proxmox.Type.VPS)

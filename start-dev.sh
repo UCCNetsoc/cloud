@@ -20,10 +20,10 @@ fi
 WD=`pwd`
 cd $1
 
-if [ ! -f "./admin/docker-compose.override.yml" ]; then
+if [ ! -f "./cloud/docker-compose.override.yml" ]; then
 	echo "version: \"3.7\" 
 services:
-  admin:
+  cloud:
     volumes:
       - ${WD}/ui:/app
   api:
@@ -31,7 +31,7 @@ services:
       - ${WD}/api:/app
       - ${WD}/api/requirements.txt:/requirements.txt
       - ${WD}/config.sample.yml:/config.yml
-" > ./admin/docker-compose.override.yml
+" > ./cloud/docker-compose.override.yml
 fi
 
-bash --init-file <(echo "source bin/activate") -c "./dev-env up admin api"
+bash --init-file <(echo "source bin/activate") -c "./dev-env up cloud api"

@@ -26,7 +26,7 @@
             :disabled='$route.params.token !== undefined'
           ></v-text-field>
            <v-text-field
-            label='Password'
+            label='Set your password'
             v-model='password'
             :rules='passwordRules'
             type='password'

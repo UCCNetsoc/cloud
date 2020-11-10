@@ -18,7 +18,7 @@ steps:
       target: dev
       context: ui
       dockerfile: ui/Dockerfile
-      repo: uccnetsoc/admin-ui
+      repo: uccnetsoc/cloud-ui
       registry: docker.io
       custom_dns: [1.1.1.1]
       username:
@@ -43,7 +43,7 @@ steps:
       context: ui
       target: prod
       dockerfile: ui/Dockerfile
-      repo: uccnetsoc/admin-ui
+      repo: uccnetsoc/cloud-ui
       registry: docker.io
       custom_dns: [1.1.1.1]
       username:
@@ -68,7 +68,7 @@ steps:
       target: dev
       context: api
       dockerfile: api/Dockerfile
-      repo: uccnetsoc/admin-api
+      repo: uccnetsoc/cloud-api
       registry: docker.io
       custom_dns: [1.1.1.1]
       username:
@@ -93,7 +93,7 @@ steps:
       target: prod
       context: api
       dockerfile: api/Dockerfile
-      repo: uccnetsoc/admin-api
+      repo: uccnetsoc/cloud-api
       registry: docker.io
       custom_dns: [1.1.1.1]
       username:
@@ -117,7 +117,7 @@ steps:
       username: Netsoc CI
       avatar_url: https://raw.githubusercontent.com/drone/brand/3051b0d85318a2a20b62927ba19fc07e24c0d751/logos/png/white/drone-logo-png-white-256.png
       color: "#42f483"
-      message: admin successfully built and pushed. Build num {{build.number}}. {{build.link}}
+      message: Cloud successfully built and pushed. Build num {{build.number}}. {{build.link}}
     when:
       event:
         - push
@@ -137,7 +137,7 @@ steps:
       username: Netsoc CI
       avatar_url: https://raw.githubusercontent.com/drone/brand/3051b0d85318a2a20b62927ba19fc07e24c0d751/logos/png/white/drone-logo-png-white-256.png
       color: "#e04414"
-      message: admin failed for {{build.author}}. Build num {{build.number}}. {{build.link}}
+      message: Cloud failed for {{build.author}}. Build num {{build.number}}. {{build.link}}
     when:
       event:
         - push

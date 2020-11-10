@@ -1018,7 +1018,7 @@ export default Vue.extend({
           this.uiSilentReload()
         }
         this.uiSilentReloadLoop()
-      }, 4000 + (Math.random() * 1000))
+      }, 30000 + (-7500 + (Math.random() * 7500)))
     },
 
     async uiReloadTemplates () {

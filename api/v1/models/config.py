@@ -77,7 +77,8 @@ class Proxmox(BaseModel):
         server: str
         port: str
         username: str
-        password: str
+        token_name: str
+        token_value: str
 
     class VPS(BaseModel):
         base_fqdn: str = "vps.cloud.netsoc.co"
@@ -107,7 +108,7 @@ class Proxmox(BaseModel):
             allowed_a_aaaa: Set[str] = set(["84.39.234.52"])
 
         class NetsocSupplied(BaseModel):
-            base_domain: str = "netsoc.co"
+            base_domain: str = "netsoc.cloud"
 
         netsoc_supplied: NetsocSupplied = NetsocSupplied()
         user_supplied: UserSupplied = UserSupplied()

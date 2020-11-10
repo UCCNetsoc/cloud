@@ -75,7 +75,7 @@ export default Vue.extend({
       { icon: 'mdi-information', name: 'About', route: '/about' },
       { icon: 'mdi-account-circle', name: 'Account', route: '/account' },
       { icon: 'mdi-cloud', name: 'Cloud', route: '/cloud' },
-      { icon: 'mdi-console-line', name: 'Terminal', route: '/terminal' },
+      // { icon: 'mdi-console-line', name: 'Terminal', route: '/terminal' },
       { icon: 'mdi-lifebuoy', name: 'Tutorial', route: '/tutorial' },
       { icon: 'mdi-book', name: 'Wiki', route: '/wiki' }
     ]
