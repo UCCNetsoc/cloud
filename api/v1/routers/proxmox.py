@@ -238,8 +238,8 @@ async def approve_instance_request(
                 <br/>
             """,
             embeds=[
-                { "text": password },
-                { "text": private_key }
+                { "text": f"<code>{password}</code>" },
+                { "text": f"<code>{private_key}</code>" }
             ]
         ),
         "text/html"
@@ -594,8 +594,8 @@ async def reset_instance_root_user(
                 You will find them the password followed by the SSH private key below:<br/><br/>
             """,
             embeds=[
-                { "text": password },
-                { "text": private_key }
+                { "text": f"<code>{password}</code>" },
+                { "text": f"<code>{private_key}</code>" }
             ]
         ),
         "text/html"

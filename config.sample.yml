@@ -8,6 +8,8 @@ auth:
       -----END PUBLIC KEY-----
     signing_algorithm: "RS256"
 proxmox:
+  blacklisted_nodes:
+    - feynman
   ssh:
     server: "feynman.netsoc.co"
     port: 2222
@@ -15,9 +17,10 @@ proxmox:
     password: "-"
   api:
     server: "feynman.netsoc.co"
-    port: 8006
+    port: 8007
     username: "root@pam"
-    password: "-"
+    token_name: "NetsocCloud"
+    token_value: "-"
   dir_pool: "local"
   vps:
     templates:
@@ -73,9 +76,8 @@ proxmox:
           disk_space: 10
           memory: 512
           swap: 512
-
 links:
-  base_url: "http://admin.netsoc.local"
+  base_url: "http://cloud.netsoc.local"
   jwt:
     public_key: |
       -----BEGIN PUBLIC KEY-----
@@ -118,6 +120,7 @@ links:
 accounts:
   home_dirs: "/home/users"
   username_blacklist:
+    - api
     - admin
     - blog
     - ldap

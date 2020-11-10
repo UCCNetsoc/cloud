@@ -784,7 +784,7 @@ class Proxmox():
         lxcs_qemus = self.prox.cluster.resources.get(type="vm")
 
         for entry in lxcs_qemus:
-            if entry['name'] == fqdn:
+            if 'name' in entry and entry['name'] == fqdn:
                 instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
                 return instance
 
@@ -812,7 +812,7 @@ class Proxmox():
         lxcs_qemus = self.prox.cluster.resources.get(type="vm")
         
         for entry in lxcs_qemus:
-            if entry['name'].endswith(self._get_instance_fqdn_for_account(instance_type, account, "")):
+            if 'name' in entry and entry['name'].endswith(self._get_instance_fqdn_for_account(instance_type, account, "")):
                 instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
                 ret[instance.hostname] = instance
                         
@@ -829,14 +829,14 @@ class Proxmox():
 
         if instance_type == models.proxmox.Type.LXC:
             for entry in lxcs_qemus:
-                if entry['name'].endswith(config.proxmox.lxc.base_fqdn):
+                if 'name' in entry and entry['name'].endswith(config.proxmox.lxc.base_fqdn):
                     instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
                     ret[instance.fqdn] = instance
                             
             return ret
         elif instance_type == models.proxmox.Type.VPS:
             for entry in lxcs_qemus:
-                if entry['name'].endswith(config.proxmox.vps.base_fqdn):
+                if 'name' in entry and entry['name'].endswith(config.proxmox.vps.base_fqdn):
                     instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
                     ret[instance.fqdn] = instance
                             
