@@ -14,9 +14,7 @@
             Email: <span class="white--text text--lighten-1">{{ $store.state.auth.user.profile.email }}</span><br/>
             <br/>
             <p>
-              Your account is used for logging into UCC Netsoc web services and our portal server.<br/>
-              The portal server is used to connect inside our network so that you can then connect to any of your Cloud instances
-              <br/>
+              Your account is used for logging into UCC Netsoc web services
               <br/>
               Please remember to keep the <b>Terms of Use</b> and its <b>Acceptable Use Policy</b> in mind as you share server hardware with our other users.
             </p>

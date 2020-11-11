@@ -7,7 +7,7 @@
     </v-row>
     <v-row v-if="!visible" class="mt-12 justify-center text-center text-no-wrap">
       <v-col cols="12" sm="12">
-        <v-img style="height: min(24rem, 35vh)" :src="require('@/assets/netsoc-logo.svg')" contain></v-img>
+        <v-img style="height: min(14rem, 24vh)" :src="require('@/assets/cloud-logo.svg')" contain></v-img>
       </v-col>
     </v-row>
     <v-row v-if="!visible" class="justify-center text-center">
@@ -74,7 +74,7 @@ export default Vue.extend({
     menu: [
       { icon: 'mdi-information', name: 'About', route: '/about' },
       { icon: 'mdi-account-circle', name: 'Account', route: '/account' },
-      { icon: 'mdi-cloud', name: 'Cloud', route: '/cloud' },
+      { icon: 'mdi-server', name: 'Instances', route: '/instances' },
       // { icon: 'mdi-console-line', name: 'Terminal', route: '/terminal' },
       { icon: 'mdi-lifebuoy', name: 'Tutorial', route: '/tutorial' },
       { icon: 'mdi-book', name: 'Wiki', route: '/wiki' }

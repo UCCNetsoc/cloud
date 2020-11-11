@@ -270,6 +270,14 @@ class Proxmox():
         mgmt_ssh_public_key, mgmt_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
         password = self._random_password()
 
+        # Give the host it's fqdn by default as a vhost
+        # (we allow this in validate_domain)
+        vhosts_dict = {}
+        vhosts_dict[fqdn] = models.proxmox.VHostOptions(
+            https=False,
+            port=80
+        )
+
         metadata = models.proxmox.Metadata(
             owner=account.username,
             request_detail=request_detail,
@@ -277,7 +285,8 @@ class Proxmox():
                 marked_active_at=datetime.date.today()
             ),
             network=models.proxmox.Network(
-                nic_allocation=self._allocate_nic(instance_type)
+                nic_allocation=self._allocate_nic(instance_type),
+                vhosts=vhosts_dict
             ),
             root_user=models.proxmox.RootUser(
                 password_hash=self._hash_password(password),
@@ -380,7 +389,8 @@ class Proxmox():
                     "mtu": 1450 # if we ever decide to move to vxlan
                 })
             })
-
+            
+            logger.info(hash_id)
             self._wait_vmid_lock(instance_type, node_name, hash_id)
             
             # if there is an id collision, proxmox will do id+1, so we need to search for the lxc again
@@ -676,7 +686,7 @@ class Proxmox():
 
             # Build remarks about the thing, problems, etc...
             for vhost in instance.metadata.network.vhosts:
-                valid, remarks = self.validate_domain(instance.metadata.owner, vhost)
+                valid, remarks = self.validate_domain(instance, vhost)
 
                 if valid is not True:
                     instance.remarks += remarks
@@ -766,7 +776,7 @@ class Proxmox():
 
             # Build remarks about the thing, problems, etc...
             for vhost in instance.metadata.network.vhosts:
-                valid, remarks = self.validate_domain(instance.metadata.owner, vhost)
+                valid, remarks = self.validate_domain(instance, vhost)
 
                 if valid is not True:
                     instance.remarks += remarks
@@ -780,7 +790,6 @@ class Proxmox():
         instance_type: models.proxmox.Type,
         fqdn: str
     ) -> models.proxmox.Instance:
-        # First try hashing it and see if we get an instant hit
         lxcs_qemus = self.prox.cluster.resources.get(type="vm")
 
         for entry in lxcs_qemus:
@@ -1125,24 +1134,44 @@ version: 2
 
     def validate_domain(
         self,
-        username: models.account.Username,
+        instance: models.proxmox.Instance,
         domain: str
     ) -> (bool, Optional[List[str]]):
         """
-        Verifies a single domain, if the domain is valid, None is returned
-        If the domain is invalid, a list of remarks is returned
+        Verifies a single domain, if the domain is valid, (True, None) is returned
+        If the domain is invalid, (False, a list of remarks is returned)
+
+        We allow the instance fqdn as a domain, so if the FQDN == domain 
+        i.e. <hostname>.<owner_username>.<base_fqdn_for_this_instance_type> / server1.ocanty.vps.netsoc.cloud
+        You will _need_ to blacklist accounts that have the same subdomain as instance fqdn i.e 'vps' and 'container'
+
+        We also allow users to use <username>.<base_domain>, i.e ocanty.netsoc.cloud or
+        make use of a subdomain like <subdomain>.<username>.<base_domain>
+        i.e blog.ocanty.netsoc.cloud
         """
+        username = instance.metadata.owner
+
         txt_name = config.proxmox.vhosts.user_supplied.verification_txt_name
         txt_content = username
 
-        base_domain = config.proxmox.vhosts.netsoc_supplied.base_domain
+        base_domain = config.proxmox.base_domain
         allowed_a_aaaa = config.proxmox.vhosts.user_supplied.allowed_a_aaaa
 
         split = domain.split(".")
 
         remarks = []
-            
-        # *.netsoc.co etc
+
+        # Allow fqdn
+        if domain == instance.fqdn:
+            return (True, None)
+
+        # Ban any domain that tries to use the base fqdn that isn't the fqdn
+        if instance.type == models.proxmox.Type.LXC and domain.endswith(config.proxmox.lxc.base_fqdn):
+            return (False, [f"Invalid domain {domain}: only {instance.fqdn} is allowed to be used when domain ends with {config.proxmox.lxc.base_fqdn}"])
+        elif instance.type == models.proxmox.Type.VPS and domain.endswith(config.proxmox.vps.base_fqdn):
+            return (False, [f"Invalid domain {domain}: only {instance.fqdn} is allowed to be used when domain ends with {config.proxmox.vps.base_fqdn}"])
+
+        # *.netsoc.cloud etc
         if domain.endswith(f".{base_domain}"):
             # the stuff at the start, i.e if they specified blog.ocanty.netsoc.co
             # prefix is blog.ocanty
@@ -1154,7 +1183,7 @@ version: 2
                 # Valid domain
                 return (True, None)
             else:
-                remarks.append(f"Domain {domain}: subdomain {split_prefix[-1]} is invalid, must be the same as username {username}")
+                remarks.append(f"Invalid domain {domain}: subdomain {split_prefix[-1]} is invalid, must be the same as username {username}")
         else: # custom domain
             try:
                 info_list = socket.getaddrinfo(domain, 80)
@@ -1164,11 +1193,11 @@ version: 2
             a_aaaa = set(map(lambda info: info[4][0], filter(lambda x: x[0] in [socket.AddressFamily.AF_INET, socket.AddressFamily.AF_INET6], info_list)))
             
             if len(a_aaaa) == 0:
-                remarks.append(f"Domain {domain}: no A or AAAA records present")
+                remarks.append(f"Invalid domain {domain}: no A or AAAA records present")
 
             for record in a_aaaa:
                 if record not in allowed_a_aaaa:
-                    remarks.append(f"Domain {domain}: unknown A/AAAA record on domain ({record}), must be one of {allowed_a_aaaa}")
+                    remarks.append(f"Invalid domain {domain}: unknown A/AAAA record ({record}), must be one of {allowed_a_aaaa}")
 
             # we need to check if they have the appropiate TXT record with the correct value
             custom_base = f"{split[len(split)-2]}.{split[len(split)-1]}"
@@ -1182,13 +1211,13 @@ version: 2
                 txt_res = set(map(lambda x: str(x).strip('"'),q))
 
                 if txt_content not in txt_res:
-                    remarks.append(f"Domain {domain}: could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}, instead found {txt_res}!")
+                    remarks.append(f"Invalid domain {domain}: could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}, instead found {txt_res}!")
             except dns.resolver.NXDOMAIN:
-                remarks.append(f"Domain {domain}: could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}")
+                remarks.append(f"Invalid domain {domain}: could not find TXT record {txt_name} ({txt_name}.{custom_base}) set to {txt_content}")
             except dns.exception.DNSException as e:
-                remarks.append(f"Domain {domain}: unable to lookup record ({txt_name}.{custom_base}): ({e})")
+                remarks.append(f"Invalid domain {domain}: unable to lookup record ({txt_name}.{custom_base}): ({e})")
             except Exception as e:
-                remarks.append(f"Domain {domain}: error {e} (contact SysAdmins)")
+                remarks.append(f"Invalid domain {domain}: error {e} (contact SysAdmins)")
 
         if len(remarks) == 0:
             return (True, None)
@@ -1245,7 +1274,7 @@ version: 2
 
             # first do vhosts
             for vhost, options in instance.metadata.network.vhosts.items():
-                valid, remarks = self.validate_domain(instance.metadata.owner, vhost)
+                valid, remarks = self.validate_domain(instance, vhost)
                 
                 vhost_suffix = vhost.replace('.', '-')
 

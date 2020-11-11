@@ -94,7 +94,7 @@ f"""**{resource_account.username} ({resource_account.email}) requested an instan
 
 They want **{template.title} {fancy_name(instance_type)} ({fancy_specs(template.specs)})** for the following reason: ```{detail.reason}```
 To approve this request, sign in as a SysAdmin and click the following link:
-{config.links.base_url}/cloud/{resource_account.username}/{instance_type}-request/{hostname}/{serialized.token}
+{config.links.base_url}/instances/{resource_account.username}/{instance_type}-request/{hostname}/{serialized.token}
 """
     )
 
@@ -512,16 +512,13 @@ async def remove_instance_port(
         f"""**{resource_account.username} ({resource_account.email}) removed instance `{instance.hostname}` portmap for external port {external_port}**"""
     )
 
-# @router.get(
-#     '/{email_or_username}/{instance_type}/{hostname}/vhost-netsoc-supplied-base-domain',
-#     status_code=200,
-# )
-# async def get_vhost_base_domain(
-#     email_or_username: str,
-#     instance_type: models.proxmox.Type,
-#     hostname: str = Path(**models.proxmox.Hostname)
-# ):
-#     return config.proxmox.vhosts.netsoc_supplied.base_domain
+@router.get(
+    '/base-domain',
+    status_code=200,
+    response_model=str
+)
+async def get_base_domain() -> str:
+    return config.proxmox.base_domain
 
 @router.post(
     '/{email_or_username}/{instance_type}/{hostname}/vhost/{vhost}',

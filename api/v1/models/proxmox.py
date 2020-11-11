@@ -27,7 +27,7 @@ FQDN = {
     "default": None,
     "title": "FQDN",
     "description": "",
-    "regex": r"^[a-z0-9-.]+.netsoc.co$",
+    "regex": r"^[a-z0-9-.]+.$",
     "max_length": 150 
 }
 

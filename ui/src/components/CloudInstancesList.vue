@@ -16,50 +16,54 @@
           <template v-slot:item="row">
             <tr>
               <td>
-                <b>{{row.item[1].hostname}}</b>
-              </td>
-              <td>
                 <v-container class="pa-0 ma-0">
-                  <v-row no-gutters justify="start" align="center">
-                    <v-col sm="12" md="4">
+                  <v-row justify="start">
+                    <v-col sm="12" md="3" align="center" justify="center">
                       <v-avatar
-                        size="32"
+                        size="36"
                         tile
+                        class="my-2"
                       >
                         <img
                           :src="templates[row.item[1].metadata.request_detail.template_id].logo_url"
                         >
                       </v-avatar>
                     </v-col>
-                    <v-col sm="12" md="8">
-                      {{ templates[row.item[1].metadata.request_detail.template_id].title }}
+                    <v-col sm="12" md="9">
+                      <h2 class="pa-0 ma-0">{{row.item[1].hostname}}</h2>
+                      <h4 class="mb-2">{{ templates[row.item[1].metadata.request_detail.template_id].title }}</h4>
+                      <div class="caption" v-for="spec in getSpecList(row.item[1].specs)" :key="spec">
+                        {{ spec }}
+                      </div>
+                      <v-btn
+                        x-small
+                        class="my-2 blue"
+                        @click="openConfirmCancel(ConfirmCancelMode.RequestRespec, { hostname: row.item[0] })"
+                      >
+                        <v-icon>
+                          mdi-server-plus
+                        </v-icon>
+                        respec
+                      </v-btn>
                     </v-col>
                   </v-row>
                 </v-container>
               </td>
               <td class="py-4">
-                <div v-for="spec in getSpecList(row.item[1].specs)" :key="spec">
-                  {{ spec }}
-                </div>
-                <v-btn
-                  x-small
-                  class="my-1 blue"
-                  @click="openConfirmCancel(ConfirmCancelMode.RequestRespec, { hostname: row.item[0] })"
-                >
-                  <v-icon>
-                    mdi-server-plus
-                  </v-icon>
-                  respec
-                </v-btn>
-              </td>
-              <td>
-                {{row.item[1].metadata.network.nic_allocation.addresses[0].split('/')[0] }}
-              </td>
-              <td class="py-4">
-                <v-container v-for="(internal, external) in row.item[1].metadata.network.ports" :key="external" class="pa-0 ma-0 my-2">
+                <v-container v-for="(internal, external) in row.item[1].metadata.network.ports" :key="external" class="pa-0 ma-0 my-4">
+                  <v-row no-gutters justify="start" align="center">
+                    <p class="caption">
+                      Forwarded ports available on:<br/>
+                      {{row.item[1].fqdn}}
+                    </p>
+                  </v-row>
                   <v-row no-gutters justify="start" align="center">
                     <v-col sm="12" md="10">
-                      {{external}} -> {{internal}}
+                      <code>:{{external}}</code>
+                      <v-icon x-small class="ma-1">
+                        mdi-arrow-expand-right
+                      </v-icon>
+                      <code>{{internal}}</code>
                     </v-col>
                     <v-col sm="12" md="2">
                       <v-btn
@@ -77,6 +81,7 @@
                 <v-btn
                   x-small
                   @click="openConfirmCancel(ConfirmCancelMode.AddPort, { hostname: row.item[0] })"
+                  class="purple"
                 >
                   <v-icon>
                     mdi-plus
@@ -85,10 +90,15 @@
                 </v-btn>
               </td>
               <td class="py-4">
-                <v-container v-for="(opts, vhost) in row.item[1].metadata.network.vhosts" :key="vhost" class="pa-0 ma-0 my-2">
+                <v-container v-for="(opts, vhost) in row.item[1].metadata.network.vhosts" :key="vhost" class="pa-0 ma-0 my-3">
+                  <v-row no-gutters justify="start" align="center">
+                    <v-col sm="12" md="12">
+                      <a class="white--text" :href="'https://'+vhost">https://{{vhost}}</a>
+                    </v-col>
+                  </v-row>
                   <v-row no-gutters justify="start" align="center">
                     <v-col sm="12" md="10">
-                      {{vhost}}<br/>({{opts.port}}, {{opts.https === true ? "HTTPS" : "HTTP"}})
+                      <span style="font-size: 12px">({{opts.port}}, {{opts.https === true ? "HTTPS" : "HTTP"}})</span>
                     </v-col>
                     <v-col sm="12" md="2">
                       <v-btn
@@ -106,6 +116,7 @@
                 <v-btn
                   x-small
                   @click="openConfirmCancel(ConfirmCancelMode.AddVirtualHost, { hostname: row.item[0] })"
+                  class="purple"
                 >
                   <v-icon>
                     mdi-plus
@@ -521,17 +532,21 @@
         @submit="confirm()"
       >
         <p>
-          You can add a port mapping to map traffic from the external internet to your instance<br/><br/>
+          You can add a port forwardng rule to map traffic from the external internet to your instance<br/><br/>
 
-          For example, if you create a port mapping of <code>42069</code> -> <code>8080</code>:<br/><br/>
-          Any traffic that is sent to:<br/>
+          A port mapping of<br/>
+          <code>42069</code>
+          <v-icon x-small class="ma-1">
+            mdi-arrow-expand-right
+          </v-icon>
+          <code>8080</code><br/>
+          would cause any traffic sent to<br/>
           <code>{{ instances[confirmCancel.action.hostname].fqdn }}:42069</code><br/>
-          will be sent to port <code>8080</code> inside your instance<br/><br/>
+          to be sent to port <code>8080</code> inside your instance<br/><br/>
 
           <b class="warning--text">You should not create mappings to the following internal ports:</b>
           <ul>
             <li>21 (FTP, use SFTP)</li>
-            <li>22 (SSH, see our guide on how to SSH into your instance)</li>
             <li>23 (Telnet, use SSH)</li>
             <li>25 (SMTP, we forbid hosting mail servers)</li>
             <li>53 (DNS, we forbid hosting DNS servers)</li>
@@ -577,26 +592,25 @@
         @submit="confirm()"
       >
         <h3>
-          Using your free UCC Netsoc subdomain
+          Using your free Netsoc Cloud domain
         </h3>
         <p>
-          You can use any subdomains that match the following forms:
+          You can use any domain that match the following forms:
           <ul>
-            <li>ocanty.netsoc.co</li>
+            <li>{{ $store.state.auth.user.profile.preferred_username }}.{{ baseDomain }}</li>
             <li>
-              *.ocanty.netsoc.co
+              *.{{ $store.state.auth.user.profile.preferred_username }}.{{ baseDomain }}
               <ul>
-                <li>e.g. blog.ocanty.netsoc.co</li>
+                <li>e.g. blog.{{ $store.state.auth.user.profile.preferred_username }}.{{ baseDomain }}</li>
               </ul>
             </li>
+            <li>{{ instances[confirmCancel.action.hostname].fqdn }}</li>
           </ul>
         </p>
         <h3>
           Using your own domain
         </h3>
         <p>
-          If you wish to use your own domain, there are extra steps you must perform.<br/><br/>
-
           You must visit the website for your domain registrar and add the following records to your domain:
           <ul>
             <li><code>TXT</code> record of key <code>_netsoc</code> with value <code>{{ $store.state.auth.user.profile.preferred_username }}</code></li>
@@ -605,10 +619,10 @@
           <b class="warning--text">These values may be subject to change.<br/>We will make an announcement in the <code>#servers</code> channel on our Discord if this is the case</b>
         </p>
         <v-text-field
-          label='Virtual host to reverse proxy'
+          label='Virtual Host'
           v-model='confirmCancel.action.vHostDomain'
           :rules='websiteHostRules'
-          :placeholder='$store.state.auth.user.profile.preferred_username+".netsoc.co"'
+          :placeholder='$store.state.auth.user.profile.preferred_username+"."+baseDomain'
         ></v-text-field>
         <v-text-field
           label='HTTP(S) port to reverse proxy'
@@ -619,7 +633,7 @@
         <v-switch
           v-model='confirmCancel.action.vHostHttps'
           class="ma-0 pa-0"
-          label="HTTPS enabled on reverse proxied port?"
+          label="Is the internal service using HTTPS (typically not)?"
         ></v-switch>
       </v-form>
       <p v-else-if="confirmCancel.mode == ConfirmCancelMode.RemoveVirtualHost">
@@ -977,6 +991,16 @@ export default Vue.extend({
       this.loading = true
 
       try {
+        const bdRes = await fetchRest(
+          `${config.apiBaseUrl}/v1/proxmox/base-domain`, {
+            headers: {
+              Authorization: `Bearer ${this.$store.state.auth.user.access_token}`
+            }
+          })
+
+        this.baseDomain = await bdRes.text()
+        this.baseDomain = this.baseDomain.replace(/['"]+/g, '')
+
         const res = await fetchRest(
           `${config.apiBaseUrl}/v1/proxmox/${this.$store.state.auth.user.profile.preferred_username}/${this.type}`, {
             headers: {
@@ -1060,6 +1084,7 @@ export default Vue.extend({
       templates,
 
       templateIdx,
+      baseDomain: 'netsoc.cloud',
 
       confirmCancel: {
         mode: ConfirmCancelMode.Hidden,
@@ -1068,12 +1093,9 @@ export default Vue.extend({
       },
 
       headers: [
-        { text: 'Hostname' },
-        { text: 'Template' },
-        { text: 'Specs' },
-        { text: 'IP Address' },
-        { text: 'Port Mappings' },
-        { text: 'HTTP(S) Virtual Hosts' },
+        { text: 'Instance' },
+        { text: 'Port Forwarding' },
+        { text: 'Virtual Hosts' },
         { text: 'Remarks' },
         { text: 'Activation' },
         { text: 'Status' },

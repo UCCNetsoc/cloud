@@ -37,19 +37,19 @@
       <v-app-bar-nav-icon @click.stop="drawer = !drawer" v-else>
         <v-icon>mdi-menu</v-icon>
       </v-app-bar-nav-icon> -->
-      <v-toolbar-title>
-        <div class="d-flex align-center">
+      <v-toolbar-title class="ma-0">
+        <div>
           <v-img
             alt="logo"
-            class="shrink mr-2"
+            class="shrink"
             contain
             :src="require('@/assets/cloud-logo.svg')"
             transition="scale-transition"
             aspect-ratio="1"
             width="120"
-            height="48"
+            height="42"
             @click="gotoLanding()"
-            style="cursor: pointer"
+            style="cursor: pointer;"
           />
         </div>
       </v-toolbar-title>

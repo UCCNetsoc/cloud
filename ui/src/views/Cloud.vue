@@ -6,10 +6,10 @@
           <v-container fluid class="d-flex flex-xs-wrap flex-sm-wrap flex-md-nowrap py-2">
             <v-card flat>
               <v-card-title>
-                Cloud
+                Instances
               </v-card-title>
               <v-card-subtitle>
-                Provision instances on demand
+                An instance is a remote virtualized machine that you can run whatever software you want on
               </v-card-subtitle>
               <v-card-text>
                 <h3>How To Guides</h3>

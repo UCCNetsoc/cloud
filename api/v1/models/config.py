@@ -16,7 +16,75 @@ class Auth(BaseModel):
 
 class Accounts(BaseModel):
     home_dirs: Path = Path("/home/users")
-    username_blacklist: List[str]
+    username_blacklist: List[str] = [
+        # vps and container _must_ be blacklisted
+        "vps",
+        "container",
+        "_apt",
+        "admin",
+        "apache2",
+        "api",
+        "backup",
+        "bareos",
+        "bigbertha",
+        "bin",
+        "bind",
+        "blog",
+        "boole",
+        "ci",
+        "cloud",
+        "colord",
+        "control",
+        "cron",
+        "daemon",
+        "dnsmasq",
+        "docker",
+        "fail2ban",
+        "feynman",
+        "games",
+        "gnats",
+        "httpd",
+        "infra",
+        "irc",
+        "ircd",
+        "ldap",
+        "leela",
+        "libvirt-dnsmasq",
+        "libvirt-qemu",
+        "list",
+        "lovelace",
+        "lp",
+        "lxd",
+        "mail",
+        "man",
+        "messagebus",
+        "mysql",
+        "netsoc",
+        "news",
+        "nobody",
+        "ntp",
+        "portainer",
+        "postfix",
+        "postgres",
+        "proxy",
+        "redis",
+        "root",
+        "sshd",
+        "sync",
+        "sys",
+        "syslog",
+        "systemd-bus-prox",
+        "systemd-bus-proxy",
+        "systemd-network",
+        "systemd-resolve",
+        "systemd-timesync",
+        "thief",
+        "unf2b",
+        "uucp",
+        "uuidd",
+        "wiki",
+        "www-data"
+    ]
 
     class FreeIPA(BaseModel):
         server: str
@@ -26,8 +94,8 @@ class Accounts(BaseModel):
     freeipa: FreeIPA
 
 class Email(BaseModel):
-    from_name: str = "UCC Netsoc Cloud"
-    from_address: str = "netsocadmin@netsoc.co"
+    from_name: str = "Netsoc Cloud"
+    from_address: str = "cloud@netsoc.co"
     reply_to_address: str = "netsoc@uccsocieties.ie"
 
     class SendGrid(BaseModel):
@@ -36,7 +104,7 @@ class Email(BaseModel):
     sendgrid: SendGrid
 
 class Links(BaseModel):
-    base_url: str = "https://admin.netsoc.co"
+    base_url: str = "https://netsoc.cloud"
     
     class JWT(BaseModel):
         public_key: str
@@ -81,7 +149,7 @@ class Proxmox(BaseModel):
         token_value: str
 
     class VPS(BaseModel):
-        base_fqdn: str = "vps.cloud.netsoc.co"
+        base_fqdn: str = "vps.netsoc.cloud"
         templates: Dict[str, Template] = {}
         dir_pool: str = "local"
 
@@ -91,7 +159,7 @@ class Proxmox(BaseModel):
         inactivity_deletion_num_days: int = 120
 
     class LXC(BaseModel):
-        base_fqdn: str = "container.cloud.netsoc.co"
+        base_fqdn: str = "container.netsoc.cloud"
         templates: Dict[str, Template] = {}
 
         inactivity_shutdown_warning_num_days: int = 60
@@ -107,10 +175,6 @@ class Proxmox(BaseModel):
             verification_txt_name: str = "_netsoc"
             allowed_a_aaaa: Set[str] = set(["84.39.234.52"])
 
-        class NetsocSupplied(BaseModel):
-            base_domain: str = "netsoc.cloud"
-
-        netsoc_supplied: NetsocSupplied = NetsocSupplied()
         user_supplied: UserSupplied = UserSupplied()
 
     ssh: SSH
@@ -122,6 +186,7 @@ class Proxmox(BaseModel):
     vlan: int = 50
     dir_pool: str = "local"
     port_forward: PortForward = PortForward()
+    base_domain: str = "netsoc.cloud"
     vhosts: VHosts = VHosts()
     blacklisted_nodes: List[str]
 
@@ -133,6 +198,6 @@ class Config(BaseModel):
     links: Links
     webhooks: Webhooks
     # homedir_consistency: HomeDirConsistency
-    metrics: Metrics
+    metrics: Metrics = Metrics()
     captcha: Optional[Captcha]
     proxmox: Proxmox

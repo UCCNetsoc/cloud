@@ -69,12 +69,12 @@ const routes = [
     component: requireAuth(Account)
   },
   {
-    path: '/cloud',
-    name: 'Cloud',
+    path: '/instances',
+    name: 'Instances',
     component: requireAuth(Cloud)
   },
   {
-    path: '/cloud/:emailOrUsername/:instanceRequestType/:hostname/:token',
+    path: '/instances/:emailOrUsername/:instanceRequestType/:hostname/:token',
     name: 'Instance Request',
     component: requireAuth(CloudInstanceRequest)
   },
