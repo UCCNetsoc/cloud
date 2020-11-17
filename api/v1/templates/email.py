@@ -35,7 +35,8 @@ netsoc = Template("""
                 <p style="border-top: 1px solid rgb(55,55,55);border-bottom: 1px solid rgb(55,55,55);color: white;text-align: center;max-width: 500px;color: #fff;padding: 1em;">
                     {{ paragraph }}
                 </p>
-                
+            </div>
+            <div style="max-width: 1000px; margin: 1em auto">
                 {% if embeds is defined %}
                     {% for item in embeds %}
                         <div style="background-color: #111;max-width: fit-content; margin: 10px auto 10px auto;padding: 10px; border-left: #2196F3 solid 4px;">
@@ -51,15 +52,14 @@ netsoc = Template("""
                         </a>
                     {% endfor %}
                 {% endif %}
-
-                <footer style="color: white;font-size: .8em;text-align: center;max-width: 500px;margin: 1em auto 3em auto;padding-bottom:3em;">
-                    <a target="_blank" clicktracking="off" style="color: white;" href="https://discord.netsoc.co">Discord</a>
-                    <span> &bull; </span>
-                    <a target="_blank" clicktracking="off" style="color: white;" href="https://wiki.netsoc.co/en/services/privacy-policy">Privacy Policy</a>
-                    <span> &bull; </span>
-                    <a target="_blank" clicktracking="off" style="color: white;" href="https://wiki.netsoc.co/en/services/terms-of-service">Terms of Service</a>
-                </footer>
             </div>
+            <footer style="color: white;font-size: .8em;text-align: center;max-width: 500px;margin: 1em auto 3em auto;padding-bottom:3em;">
+                <a target="_blank" clicktracking="off" style="color: white;" href="https://discord.netsoc.co">Discord</a>
+                <span> &bull; </span>
+                <a target="_blank" clicktracking="off" style="color: white;" href="https://wiki.netsoc.co/en/services/privacy-policy">Privacy Policy</a>
+                <span> &bull; </span>
+                <a target="_blank" clicktracking="off" style="color: white;" href="https://wiki.netsoc.co/en/services/terms-of-service">Terms of Service</a>
+            </footer>
         </div>
     </body>
 </html>

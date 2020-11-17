@@ -20,6 +20,8 @@ class Accounts(BaseModel):
         # vps and container _must_ be blacklisted
         "vps",
         "container",
+        "api",
+        "proxy"
         "_apt",
         "admin",
         "apache2",
@@ -135,18 +137,22 @@ class HomeDirConsistency(BaseModel):
 
 from .proxmox import Template
 class Proxmox(BaseModel):
-    class SSH(BaseModel):
-        server: str
-        port: str
-        username: str
-        password: str
+    class Cluster(BaseModel):
+        class SSH(BaseModel):
+            server: str
+            port: str = 22
+            username: str = "root"
+            password: str
 
-    class API(BaseModel):
-        server: str
-        port: str
-        username: str
-        token_name: str
-        token_value: str
+        class API(BaseModel):
+            server: str
+            port: str
+            username: str = "root@pam"
+            token_name: str
+            token_value: str
+
+        api: API
+        ssh: SSH
 
     class VPS(BaseModel):
         base_fqdn: str = "vps.netsoc.cloud"
@@ -167,28 +173,49 @@ class Proxmox(BaseModel):
         inactivity_deletion_warning_num_days: int = 120
         inactivity_deletion_num_days: int = 150
 
-    class PortForward(BaseModel):
-        range: Tuple[int,int] = (16384,32767)
+    class Network(BaseModel):
+        class PortForward(BaseModel):
+            range: Tuple[int,int] = (16384,32767)
 
-    class VHosts(BaseModel):
-        class UserSupplied(BaseModel):
-            verification_txt_name: str = "_netsoc"
-            allowed_a_aaaa: Set[str] = set(["84.39.234.52"])
+        class VHosts(BaseModel):
+            class UserSupplied(BaseModel):
+                verification_txt_name: str = "_netsoc"
+                allowed_a_aaaa: Set[str] = set(["84.39.234.52"])
 
-        user_supplied: UserSupplied = UserSupplied()
+            base_domain: str = "netsoc.cloud"
+            user_supplied: UserSupplied = UserSupplied()
 
-    ssh: SSH
-    api: API
-    vps: VPS
-    lxc: LXC
-    bridge: str = "vmbr0"
-    network: ipaddress.IPv4Interface = ipaddress.IPv4Interface("10.50.0.0/16")
-    vlan: int = 50
-    dir_pool: str = "local"
-    port_forward: PortForward = PortForward()
-    base_domain: str = "netsoc.cloud"
-    vhosts: VHosts = VHosts()
+        class VLANJumpHost(BaseModel):
+            server: str
+            port: str = 22
+            username: str = "jumphost"
+            password: Optional[str] = None
+            private_key: Optional[str] = None
+
+
+        bridge: str = "vmbr0"
+        vlan: int = 40
+        gateway: ipaddress.IPv4Address = ipaddress.IPv4Address("10.40.0.1")
+        network: ipaddress.IPv4Interface = ipaddress.IPv4Interface("10.40.0.0/16")
+        range: Tuple[ipaddress.IPv4Address, ipaddress.IPv4Address] = (
+            ipaddress.IPv4Address("10.40.0.3"),
+            ipaddress.IPv4Address("10.40.0.254")
+        )
+
+        vlan_jumphost: VLANJumpHost
+
+        port_forward: PortForward = PortForward()
+        vhosts: VHosts = VHosts()
+
+
     blacklisted_nodes: List[str]
+
+    cluster: Cluster
+    lxc: LXC
+    vps: VPS
+    network: Network
+
+    dir_pool: str = "local"
 
 class Config(BaseModel):
     production: bool = False
@@ -197,7 +224,6 @@ class Config(BaseModel):
     email: Email
     links: Links
     webhooks: Webhooks
-    # homedir_consistency: HomeDirConsistency
     metrics: Metrics = Metrics()
     captcha: Optional[Captcha]
     proxmox: Proxmox

@@ -14,6 +14,7 @@ import dns.exception
 import ipaddress
 import io
 import crypt
+import functools
 import string
 import time
 
@@ -24,7 +25,7 @@ from urllib.parse import urlparse, unquote
 from typing import Optional, Tuple, List, Dict, Union, Generator
 from proxmoxer import ProxmoxAPI
 
-from v1 import models, exceptions, utilities
+from v1 import models, exceptions, utilities, templates
 from v1.config import config
 
 logger = logging.getLogger(__name__)
@@ -48,10 +49,10 @@ class ProxmoxNodeSSH:
         self.jump.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         self.jump.connect(
-            hostname=config.proxmox.ssh.server,
-            username=config.proxmox.ssh.username,
-            password=config.proxmox.ssh.password,
-            port=config.proxmox.ssh.port
+            hostname=config.proxmox.cluster.ssh.server,
+            username=config.proxmox.cluster.ssh.username,
+            password=config.proxmox.cluster.ssh.password,
+            port=config.proxmox.cluster.ssh.port
         )
 
         self.jump_transport = self.jump.get_transport()
@@ -60,8 +61,8 @@ class ProxmoxNodeSSH:
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh.connect(
             self.node_name, # nodes should be setup in /etc/hosts correctly
-            username=config.proxmox.ssh.username,
-            password=config.proxmox.ssh.password,
+            username=config.proxmox.cluster.ssh.username,
+            password=config.proxmox.cluster.ssh.password,
             port=22,
             sock=self.jump_channel
         )
@@ -82,11 +83,11 @@ def build_proxmox_config_string(options: dict):
 class Proxmox():
     def __init__(self):
         self.prox = ProxmoxAPI(
-            host=config.proxmox.api.server,
-            user=config.proxmox.api.username,
-            token_name=config.proxmox.api.token_name,
-            token_value=config.proxmox.api.token_value,
-            port=config.proxmox.api.port,
+            host=config.proxmox.cluster.api.server,
+            user=config.proxmox.cluster.api.username,
+            token_name=config.proxmox.cluster.api.token_name,
+            token_value=config.proxmox.cluster.api.token_value,
+            port=config.proxmox.cluster.api.port,
             verify_ssl=False
         )
 
@@ -173,22 +174,39 @@ class Proxmox():
         instance_type: models.proxmox.Type
     ) -> models.proxmox.NICAllocation:
         # world's most ghetto ip allocation algorithm
-        network = config.proxmox.network.network
-        base_ip = config.proxmox.network.ip
+        network = config.proxmox.network.network.network
+        base_ip = config.proxmox.network.network.ip
         gateway = base_ip + 1
 
         # returns set with network and broadcast address removed
         ips = set(network.hosts())
 
-        # remove router/gateway address
-        ips.remove(gateway)
+
+        logger.info(config.proxmox.network)
+
+        # list of possible ips an instance can have
+        allowed_ips = functools.reduce(
+            lambda x,y: x+y,
+            map(
+                list,
+                [ipaddr for ipaddr in ipaddress.summarize_address_range(
+                    config.proxmox.network.range[0],
+                    config.proxmox.network.range[1]
+                )]
+            ), []
+        )
+
+        ips = ips.intersection(allowed_ips)
+
+        if gateway in ips:
+            ips.remove(gateway)
 
         # remove any addresses assigned to any of the other instances
         for fqdn, instance in self.read_instances().items():
             for address in instance.metadata.network.nic_allocation.addresses:
                 if address.ip in ips:
                     ips.remove(address.ip)
-
+    
         if len(ips) > 0:
             ip_addr = next(iter(ips))
 
@@ -266,9 +284,6 @@ class Proxmox():
         node_name = self._select_best_node(template.specs)
         fqdn = self._get_instance_fqdn_for_account(instance_type, account, hostname)
 
-        user_ssh_public_key, user_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
-        mgmt_ssh_public_key, mgmt_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
-        password = self._random_password()
 
         # Give the host it's fqdn by default as a vhost
         # (we allow this in validate_domain)
@@ -277,6 +292,8 @@ class Proxmox():
             https=False,
             port=80
         )
+
+        password, user_ssh_private_key, root_user = self._generate_instance_root_user()
 
         metadata = models.proxmox.Metadata(
             owner=account.username,
@@ -288,12 +305,7 @@ class Proxmox():
                 nic_allocation=self._allocate_nic(instance_type),
                 vhosts=vhosts_dict
             ),
-            root_user=models.proxmox.RootUser(
-                password_hash=self._hash_password(password),
-                ssh_public_key=user_ssh_public_key,
-                mgmt_ssh_public_key=mgmt_ssh_public_key,
-                mgmt_ssh_private_key=mgmt_ssh_private_key
-            ),
+            root_user=root_user,
             wake_on_request=template.wake_on_request
         )
 
@@ -303,7 +315,7 @@ class Proxmox():
         yaml_description = self._serialize_metadata(metadata)
 
         if instance_type == models.proxmox.Type.LXC:
-            metadata.groups = ["lxc", "cloudlxc", "cloud"]
+            metadata.groups = set(["lxc", "cloudlxc", "cloud"])
 
             if template.disk_format != models.proxmox.Template.DiskFormat.TarGZ:
                 raise exceptions.resource.Unavailable(f"Templates (on LXC instances) {detail.template_id} must use TarGZ of RootFS format!")
@@ -333,7 +345,9 @@ class Proxmox():
                     )
 
                     if template.disk_sha256sum not in str(stdout.read()):
-                        raise exceptions.resource.Unavailable(f"Template does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
+                        logger.info(f"Template does not pass SHA256 sums given, falling back to download", status=status, stderr=stderr.read(), stdout=stdout.read())
+                        raise exceptions.resource.Unavailable()
+
                 except (exceptions.resource.Unavailable, FileNotFoundError) as e:
                     # If a fallback URL exists to download the image
                     logger.info("error", e=e, exc_info=True)
@@ -376,36 +390,32 @@ class Proxmox():
                 "swap": template.specs.swap,
                 "storage": config.proxmox.dir_pool,
                 "unprivileged": 1,
-                "ssh-public-keys": f"{user_ssh_public_key}\n{mgmt_ssh_public_key}",
                 "nameserver": "1.1.1.1",
                 "net0": build_proxmox_config_string({
                     "rate": "100",
                     "name": "eth0",
-                    "bridge": config.proxmox.bridge,
-                    "tag": config.proxmox.vlan,
+                    "bridge": config.proxmox.network.bridge,
+                    "tag": config.proxmox.network.vlan,
                     "hwaddr": metadata.network.nic_allocation.macaddress,
                     "ip": metadata.network.nic_allocation.addresses[0],
                     "gw": metadata.network.nic_allocation.gateway4,
                     "mtu": 1450 # if we ever decide to move to vxlan
                 })
             })
-            
-            logger.info(hash_id)
-            self._wait_vmid_lock(instance_type, node_name, hash_id)
-            
-            # if there is an id collision, proxmox will do id+1, so we need to search for the lxc again
-            lxc = self._read_instance_by_fqdn(instance_type, fqdn)
+    
+            self._wait_for_instance_created(instance_type, fqdn)
 
-            self.prox.nodes(lxc.node).lxc(f"{lxc.id}/resize").put(
+            instance = self._read_instance_by_fqdn(instance_type, fqdn)
+
+            self.prox.nodes(instance.node).lxc(f"{instance.id}/resize").put(
                 disk='rootfs',
                 size=f'{template.specs.disk_space}G'
             )
 
-            self._wait_vmid_lock(instance_type, node_name, lxc.id)
+            self._wait_vmid_lock(instance.type, instance.node, instance.id)
 
-            return password, user_ssh_private_key
         elif instance_type == models.proxmox.Type.VPS:
-            metadata.groups = ["vm", "cloudvm", "cloud"]
+            metadata.groups = set(["vm", "cloudvm", "cloud"])
 
             if template.disk_format != models.proxmox.Template.DiskFormat.QCOW2:
                 raise exceptions.resource.Unavailable(f"Templates (on VPS instances) {detail.template_id} must use QCOW2 disk image format!")
@@ -542,7 +552,10 @@ class Proxmox():
 
             self._wait_vmid_lock(instance_type, node_name, vm_id)
 
-            return password, user_ssh_private_key
+
+        
+        instance = self._read_instance_by_fqdn(instance_type, fqdn)
+        self._wait_vmid_lock(instance.type, instance.node, instance.id)
 
     def delete_instance(
         self,
@@ -580,13 +593,78 @@ class Proxmox():
             elif instance_type == models.proxmox.Type.VPS:
                 res = self.prox.nodes(node_name).qemu(f"{vm_id}/config").get()
 
-            now = time.time()
 
             if 'lock' not in res: 
                 break
 
+            now = time.time()
             if (now-start) > timeout:
                 raise exceptions.resource.Unavailable("Timeout occured waiting for instance to unlock.")
+
+            time.sleep(poll_interval)
+
+    def _wait_for_instance_created(
+        self,
+        instance_type: models.proxmox.Type,
+        fqdn: str,
+        timeout: int = 60,
+        poll_interval: int = 1
+    ):
+        """Wait for an instance of the specified name to appear in the Proxmox cluster"""
+
+        created = False
+        start = time.time()
+        while not created:
+            now = time.time()
+
+            lxcs_qemus = self.prox.cluster.resources.get(type="vm")
+
+            for entry in lxcs_qemus:
+                if 'name' in entry and entry['name'] == fqdn:
+                    if instance_type == models.proxmox.Type.LXC:
+                        config = self.prox.nodes(f"{entry['node']}/lxc/{entry['vmid']}/config").get()
+
+                        # logger.info(config)
+                        if 'lock' not in config and 'hostname' in config and config['hostname'] == fqdn:
+                            return
+
+                    elif instance_type == models.proxmox.Type.VPS:
+                        config = self.prox.nodes(f"{entry['node']}/qemu/{entry['vmid']}/config").get()
+
+                        if 'name' in config and config['name'] == fqdn and 'lock' not in config:
+                            return
+
+            if (now-start) > timeout:
+                raise exceptions.resource.Unavailable(f"Timeout occured waiting for instance to created")
+
+            time.sleep(poll_interval)
+
+
+    def _wait_for_instance_status(
+        self,
+        instance: models.proxmox.Type,
+        wait_for_status: models.proxmox.Status = models.proxmox.Status.Running,
+        timeout: int = 25,
+        poll_interval: int = 1
+    ):
+        """Waits for Proxmox to unlock the VM, it typically locks it when it's resizing a disk/creating a vm/etc..."""
+        start = time.time()
+        while True:
+            now = time.time()
+
+            if instance.type == models.proxmox.Type.LXC:
+                current = self.prox.nodes(instance.node).lxc(f"{instance.id}/status/current").get()
+            elif instance.type == models.proxmox.Type.VPS:
+                current = self.prox.nodes(insatnce.node).qemu(f"{instance.id}/status/current").get()
+
+            if current['status'] == 'running' and wait_for_status == models.proxmox.Status.Running:
+                break
+            elif current['status'] == 'stopped' and wait_for_status == models.proxmox.Status.Stopped:
+                break
+
+
+            if (now-start) > timeout:
+                raise exceptions.resource.Unavailable(f"Timeout occured waiting for instance to change from {current['status']} status")
 
             time.sleep(poll_interval)
 
@@ -605,8 +683,6 @@ class Proxmox():
             except Exception as e:
                 raise exceptions.resource.NotFound("The instance does not exist")
 
-            # proxmox uses hostname as the lxc name
-            # but name for vm name, god help me
             fqdn = lxc_config['hostname']
 
             if expected_fqdn is not None and fqdn != expected_fqdn:
@@ -851,34 +927,52 @@ class Proxmox():
                             
             return ret
         elif instance_type == None:
-            lxcs = self.read_instances(models.proxmox.Type.LXC)
-            vpses = self.read_instances(models.proxmox.Type.VPS)
+            for entry in lxcs_qemus:
+                if 'name' in entry and entry['name'].endswith(config.proxmox.lxc.base_fqdn):
+                    instance = self._read_instance_on_node(models.proxmox.Type.LXC, entry['node'], entry['vmid'])
+                    ret[instance.fqdn] = instance
+
+                if 'name' in entry and entry['name'].endswith(config.proxmox.vps.base_fqdn):
+                    instance = self._read_instance_on_node(models.proxmox.Type.VPS, entry['node'], entry['vmid'])
+                    ret[instance.fqdn] = instance
             
-            return {**lxcs, **vpses}
+            return ret
 
 
-    def reset_instance_root_user(
-        self,
-        instance: models.proxmox.Instance
-    ) -> Tuple[str, str]:
-        """Returns a tuple of password, private_key"""
+    def _generate_instance_root_user(
+        self
+    ) -> Tuple[str, str, models.proxmox.RootUser]:
         user_ssh_public_key, user_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
         mgmt_ssh_public_key, mgmt_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
 
         password = self._random_password()
 
-        root_user = models.proxmox.RootUser(
+        return password, user_ssh_private_key, models.proxmox.RootUser(
             password_hash=self._hash_password(password),
             ssh_public_key=user_ssh_public_key,
             mgmt_ssh_public_key=mgmt_ssh_public_key,
             mgmt_ssh_private_key=mgmt_ssh_private_key
         )
 
+    def reset_instance_root_user(
+        self,
+        instance: models.proxmox.Instance,
+        root_user: Optional[models.proxmox.RootUser] = None
+    ) -> Tuple[str, str, models.proxmox.RootUser]:
+        """Returns a tuple of password, private_key"""
+
+        if root_user is None:
+            password, user_ssh_private_key, root_user = self._generate_instance_root_user()
+
         if instance.type == models.proxmox.Type.LXC:
             if instance.status == models.proxmox.Status.Stopped:
-                raise exceptions.resource.Unavailable("The instance must be running to reset the root password")
+                self.start_instance(instance)
+                self._wait_for_instance_status(instance, models.proxmox.Status.Running)
+
+            self._wait_vmid_lock(instance.type, instance.node, instance.id)
 
             with ProxmoxNodeSSH(instance.node) as con:
+                # Install root password
                 stdin, stdout, stderr = con.ssh.exec_command(
                     f"echo -e 'root:{root_user.password_hash}' | pct exec {instance.id} -- chpasswd -e"
                 )
@@ -889,6 +983,7 @@ class Proxmox():
                         f"Could not start instance: unable to set root password: {status}: {stdout.read()} {stderr.read()}"
                     )
 
+                # Install user and mgmt keys
                 stdin, stdout, stderr = con.ssh.exec_command(
                     f"echo -e '# --- BEGIN PVE ---\\n{root_user.ssh_public_key}\\n{root_user.mgmt_ssh_public_key}\\n# --- END PVE ---' | pct push { instance.id } /dev/stdin '/root/.ssh/authorized_keys' --perms 0600 --user 0 --group 0"
                 )
@@ -898,14 +993,59 @@ class Proxmox():
                     raise exceptions.resource.Unavailable(
                         f"Could not start instance: unable to inject ssh keys {status}: {stdout.read()} {stderr.read()}"
                     )
+                
+                # Install banner
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"echo -e \"{ templates.sshd.banner.render() }\" | pct push { instance.id } /dev/stdin '/etc/banner' --perms 0644 --user 0 --group 0"
+                )
+                status = stdout.channel.recv_exit_status()
 
+                if status != 0:
+                    raise exceptions.resource.Unavailable(
+                        f"Could not start instance: could not install banner {status}: {stdout.read()} {stderr.read()}"
+                    )
+
+                # Install sshd config
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"echo -e \"{ templates.sshd.config_allow_root_login.render(banner_path='/etc/banner') }\" | pct push { instance.id } /dev/stdin '/etc/ssh/sshd_config' --perms 0644 --user 0 --group 0"
+                )
+                status = stdout.channel.recv_exit_status()
+
+                if status != 0:
+                    raise exceptions.resource.Unavailable(
+                        f"Could not start instance: unable to reset ssh configuration {status}: {stdout.read()} {stderr.read()}"
+                    )
+
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"pct exec {instance.id} -- systemctl enable ssh"
+                )
+                status = stdout.channel.recv_exit_status()
+
+                if status != 0:
+                    raise exceptions.resource.Unavailable(
+                        f"Could not start instance: unable to enable sshd server: {status}: {stdout.read()} {stderr.read()}"
+                    )
+
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"pct exec {instance.id} -- systemctl restart ssh"
+                )
+                status = stdout.channel.recv_exit_status()
+
+                if status != 0:
+                    raise exceptions.resource.Unavailable(
+                        f"Could not start instance: unable to (re)start sshd server: {status}: {stdout.read()} {stderr.read()}"
+                    )
+                
             instance.metadata.root_user = root_user
             self.write_out_instance_metadata(instance)
+            self.stop_instance(instance)
 
         elif instance.type == models.proxmox.Type.VPS:
             if instance.status == models.proxmox.Status.Running:
                 # VPS needs to be stopped because we set the root pw using cloudinit on boot
-                raise exceptions.resource.Unavailable("The instance must be stopped to reset the root password")
+                self.stop_instance(instance)
+
+            self._wait_vmid_lock(instance.type, instance.node, instance.id)
 
             instance.metadata.root_user = root_user
             self.write_out_instance_metadata(instance)    
@@ -913,7 +1053,7 @@ class Proxmox():
             # rerun cloudinit - will write ssh keys and root pass
             self.start_instance(instance, vps_rerun_cloudinit=True)
 
-        return password, user_ssh_private_key
+        return password, user_ssh_private_key, root_user
 
     def start_instance(
         self,
@@ -927,8 +1067,8 @@ class Proxmox():
                     "net0": build_proxmox_config_string({
                         "rate": "100",
                         "name": "eth0",
-                        "bridge": config.proxmox.bridge,
-                        "tag": config.proxmox.vlan,
+                        "bridge": config.proxmox.network.bridge,
+                        "tag": config.proxmox.network.vlan,
                         "hwaddr": instance.metadata.network.nic_allocation.macaddress,
                         "ip": instance.metadata.network.nic_allocation.addresses[0],
                         "gw": instance.metadata.network.nic_allocation.gateway4,
@@ -986,6 +1126,8 @@ write_files:
       path: /root/.ssh/authorized_keys
       content: |
         {instance.metadata.root_user.ssh_public_key}
+        
+        # Do NOT remove the below key or you will lose access to crucial Netsoc Cloud features
         {instance.metadata.root_user.mgmt_ssh_public_key}
 users:
 """
@@ -1015,7 +1157,7 @@ ethernets:
             addresses:
                 - 1.1.1.1
                 - 8.8.8.8
-        gateway4: { config.proxmox.network.ip + 1 }
+        gateway4: { config.proxmox.network.gateway }
         optional: true
         addresses:
             - { instance.metadata.network.nic_allocation.addresses[0] }
@@ -1035,8 +1177,8 @@ version: 2
                 self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
                     net0=build_proxmox_config_string({
                         "virtio": instance.metadata.network.nic_allocation.macaddress,
-                        "bridge": config.proxmox.bridge,
-                        "tag": config.proxmox.vlan
+                        "bridge": config.proxmox.network.bridge,
+                        "tag": config.proxmox.network.vlan
                     })
                 )
 
@@ -1108,7 +1250,7 @@ version: 2
                     logger.warning(f"warning, conflicting port map: {instance.fqdn} tried to map {external_port} but it's already taken!")
                     continue
 
-                if config.proxmox.port_forward.range[0] > external_port or external_port > config.proxmox.port_forward.range[1]:
+                if config.proxmox.network.port_forward.range[0] > external_port or external_port > config.proxmox.network.port_forward.range[1]:
                     logger.warning(f"warning, port out of range: {instance.fqdn} tried to map {external_port} but it's out of range!")
                     continue
                 
@@ -1122,7 +1264,7 @@ version: 2
         port_map = self.get_port_forward_map()
 
         occupied_set = set(port_map.keys())
-        full_range_set = set(range(config.proxmox.port_forward.range[0],config.proxmox.port_forward.range[1]+1))
+        full_range_set = set(range(config.proxmox.network.port_forward.range[0],config.proxmox.network.port_forward.range[1]+1))
 
         remaining = full_range_set-occupied_set
 
@@ -1151,11 +1293,11 @@ version: 2
         """
         username = instance.metadata.owner
 
-        txt_name = config.proxmox.vhosts.user_supplied.verification_txt_name
+        txt_name = config.proxmox.network.vhosts.user_supplied.verification_txt_name
         txt_content = username
 
-        base_domain = config.proxmox.base_domain
-        allowed_a_aaaa = config.proxmox.vhosts.user_supplied.allowed_a_aaaa
+        base_domain = config.proxmox.network.vhosts.base_domain
+        allowed_a_aaaa = config.proxmox.network.vhosts.user_supplied.allowed_a_aaaa
 
         split = domain.split(".")
 

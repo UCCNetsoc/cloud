@@ -212,7 +212,7 @@ async def approve_instance_request(
         f"""**{resource_account.username} ({resource_account.email}) request for an instance named `{hostname}` was granted! Installing...**"""
     )
 
-    password, private_key = providers.proxmox.create_instance(
+    providers.proxmox.create_instance(
         instance_type,
         resource_account,
         hostname,
@@ -231,22 +231,17 @@ async def approve_instance_request(
             paragraph=
             f"""Hi {resource_account.username}!<br/><br/>
                 We received your request for a {fancy_name(instance_type)} named '{hostname}'<br/>
-                We're delighted to inform you that your request has been granted!<br/><br/>
+                We're delighted to inform you that your instance request has been granted!<br/><br/>
                 <br/>
-                You will find a password and a private key below that can be used for Root SSH access.</br>
                 For guides on how to SSH into your instance, consult the <a href='https://tutorial.netsoc.co'>tutorial</a>
                 <br/>
-            """,
-            embeds=[
-                { "text": f"<code>{password}</code>" },
-                { "text": f"<code>{private_key}</code>" }
-            ]
+            """
         ),
         "text/html"
     )
 
     utilities.webhook.info(
-        f"""**{resource_account.username} ({resource_account.email})'s instance `{hostname}` was emailed about installation details!**"""
+        f"""**{resource_account.username} ({resource_account.email})'s instance `{hostname}` was emailed about installation!**"""
     )
     
 
@@ -455,7 +450,7 @@ async def delete_instance(
     )
 
 
-ranged_port = models.proxmox.generate_ranged_port_field_args(config.proxmox.port_forward.range[0], config.proxmox.port_forward.range[1])
+ranged_port = models.proxmox.generate_ranged_port_field_args(config.proxmox.network.port_forward.range[0], config.proxmox.network.port_forward.range[1])
 
 @router.post(
     '/{email_or_username}/{instance_type}/{hostname}/port/{external_port}/{internal_port}',
@@ -518,7 +513,7 @@ async def remove_instance_port(
     response_model=str
 )
 async def get_base_domain() -> str:
-    return config.proxmox.base_domain
+    return config.proxmox.network.vhosts.base_domain
 
 @router.post(
     '/{email_or_username}/{instance_type}/{hostname}/vhost/{vhost}',
@@ -579,16 +574,16 @@ async def reset_instance_root_user(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
-    password, private_key = providers.proxmox.reset_instance_root_user(instance)
+    password, private_key, root_user = providers.proxmox.reset_instance_root_user(instance)
 
     providers.email.send(
         [resource_account.email],
-        f"{fancy_name(instance_type)} '{hostname}' root password reset",
+        f"{fancy_name(instance_type)} '{hostname}' root user information",
         templates.email.netsoc.render(
-            heading=f"{fancy_name(instance_type)} '{hostname}' root password reset",
+            heading=f"{fancy_name(instance_type)} '{hostname}' root user information",
             paragraph=f"""Hi {resource_account.username}!<br/><br/>
-                We successfully reset the password and SSH identity for the root user on your {fancy_name(instance_type)} named '{hostname}'<br/>
-                You will find them the password followed by the SSH private key below:<br/><br/>
+                We successfully set the password and SSH identity for the root user on your {fancy_name(instance_type)} named '{hostname}'<br/>
+                You will find the password followed by the SSH private key below:<br/><br/>
             """,
             embeds=[
                 { "text": f"<code>{password}</code>" },
