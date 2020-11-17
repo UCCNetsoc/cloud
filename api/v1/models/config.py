@@ -189,9 +189,8 @@ class Proxmox(BaseModel):
             server: str
             port: str = 22
             username: str = "jumphost"
-            password: Optional[str] = None
+            public_key: Optional[str] = None
             private_key: Optional[str] = None
-
 
         bridge: str = "vmbr0"
         vlan: int = 40

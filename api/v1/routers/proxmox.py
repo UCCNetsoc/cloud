@@ -587,7 +587,7 @@ async def reset_instance_root_user(
             """,
             embeds=[
                 { "text": f"<code>{password}</code>" },
-                { "text": f"<code>{private_key}</code>" }
+                { "text": f"<pre>{private_key}</pre>" }
             ]
         ),
         "text/html"
