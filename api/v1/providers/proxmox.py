@@ -1451,7 +1451,8 @@ version: 2
         # then do tcp/udp port mappings
         for external_port, internal_tuple in self.get_port_forward_map().items():
             fqdn, ip, internal_port = internal_tuple
-
+            fqdn_prefix = fqdn.replace('.', '-')
+            
             tcp_routers[f"{fqdn_prefix}-{external_port}-tcp"] = {
                 "entryPoints": [f"netsoc-cloud-{external_port}-tcp"],
                 "rule": "HostSNI(`*`)",
