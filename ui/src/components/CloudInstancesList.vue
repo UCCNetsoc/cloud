@@ -93,7 +93,7 @@
                 <v-container v-for="(opts, vhost) in row.item[1].metadata.network.vhosts" :key="vhost" class="pa-0 ma-0 my-3">
                   <v-row no-gutters justify="start" align="center">
                     <v-col sm="12" md="12">
-                      <a class="white--text" :href="'https://'+vhost">https://{{vhost}}</a>
+                      <a class="white--text" target="_blank" :href="'https://'+vhost">https://{{vhost}}</a>
                     </v-col>
                   </v-row>
                   <v-row no-gutters justify="start" align="center">
