@@ -582,8 +582,8 @@ async def reset_instance_root_user(
         templates.email.netsoc.render(
             heading=f"{fancy_name(instance_type)} '{hostname}' root user information",
             paragraph=f"""Hi {resource_account.username}!<br/><br/>
-                We successfully set the password and SSH identity for the root user on your {fancy_name(instance_type)} named '{hostname}'<br/>
-                You will find the password followed by the SSH private key below:<br/><br/>
+                We successfully set the password and SSH identity for the root user on your {fancy_name(instance_type)} named '{hostname}'<br/><br/>
+                You will find the password followed by the SSH private key below:<br/>
             """,
             embeds=[
                 { "text": f"<code>{password}</code>" },
