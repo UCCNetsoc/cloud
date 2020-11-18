@@ -2,6 +2,7 @@
 import random
 import yaml
 import datetime
+import base64
 import requests
 import hashlib
 import os
@@ -181,9 +182,6 @@ class Proxmox():
         # returns set with network and broadcast address removed
         ips = set(network.hosts())
 
-
-        logger.info(config.proxmox.network)
-
         # list of possible ips an instance can have
         allowed_ips = functools.reduce(
             lambda x,y: x+y,
@@ -266,6 +264,78 @@ class Proxmox():
 
         return hash_id
 
+    def _ensure_template_present(
+        self,
+        node_name: str,
+        template: models.proxmox.Template,
+        folder_path: str
+    ) -> str:
+        """Downloads the speciied template to the specified path (must be a folder) and returns the full path of the image file onto the node name specified"""
+
+        # Download the disk image/template
+        
+        image_path = f"{folder_path}/{template.disk_file}"
+        # needs to be unique as this could be happening on multiple workers and we don't want them to overwrite the ile mid download
+        download_path = f"{folder_path}/{socket.gethostname()}-{os.getpid()}-{template.disk_sha256sum}"
+
+        with ProxmoxNodeSSH(node_name) as con:
+            stdin, stdout, stderr = con.ssh.exec_command(
+                f"mkdir -p {folder_path}"
+            )
+            status = stdout.channel.recv_exit_status()
+
+            if status != 0:
+                raise exceptions.resource.Unavailable(f"Could not download template: could not reserve download dir {stderr.read()}")
+
+            # See if the image exists
+            try:
+                logger.info(image_path)
+                con.sftp.stat(image_path)
+
+                # Checksum image    
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"sha256sum {image_path} | cut -f 1 -d' '"
+                )
+
+                if template.disk_sha256sum not in str(stdout.read()):
+                    logger.info(f"Template does not pass SHA256 sums given, falling back to download", status=status, stderr=stderr.read(), stdout=stdout.read())
+                    raise exceptions.resource.Unavailable()
+
+            except (exceptions.resource.Unavailable, FileNotFoundError) as e:
+                # If a fallback URL exists to download the image
+                logger.info("Could not find file, falling back to download", template=template.dict(), e=e, exc_info=True)
+
+                if template.disk_file_fallback_url is not None:
+                    # Original image does not exist, we gotta download it
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"wget {template.disk_file_fallback_url} -O {download_path}"
+                    )
+                    status = stdout.channel.recv_exit_status()
+
+                    if status != 0:
+                        raise exceptions.resource.Unavailable(f"Could not download template: error {status}: {stderr.read()} {stdout.read()}")
+
+                    # Checksum image    
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"sha256sum {download_path} | cut -f 1 -d' '"
+                    )
+
+                    if template.disk_sha256sum not in str(stdout.read()):
+                        raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
+
+                    # Move image
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"rm -f {image_path} && mv {download_path} {image_path}"
+                    )
+
+                    status = stdout.channel.recv_exit_status()
+                    if status != 0:
+                        raise exceptions.resource.Unavailable(f"Couldn't rename template {status}: {stderr.read()} {stdout.read()}")
+                else:
+                    raise exceptions.resource.Unavailable(f"This template is currently unavailable: no fallback URL for template")
+   
+        return image_path
+
     def create_instance(
         self,
         instance_type: models.proxmox.Type,
@@ -285,6 +355,25 @@ class Proxmox():
         node_name = self._select_best_node(template.specs)
         fqdn = self._get_instance_fqdn_for_account(instance_type, account, hostname)
 
+        pool_folder_path = None
+
+        if instance_type == models.proxmox.Type.LXC:
+            if template.disk_format != models.proxmox.Template.DiskFormat.TarGZ:
+                raise exceptions.resource.Unavailable(f"Templates (on Container instances) {detail.template_id} must use TarGZ of RootFS format!")
+
+            pool_folder_path = f"{self.prox.storage(config.proxmox.dir_pool).get()['path']}/template/cache"
+        elif instance_type == models.proxmox.Type.VPS:
+            if template.disk_format != models.proxmox.Template.DiskFormat.QCOW2:
+                raise exceptions.resource.Unavailable(f"Templates (on VPS instances) {detail.template_id} must use QCOW2 disk image format!")
+
+            pool_folder_path = f"{self.prox.storage(config.proxmox.dir_pool).get()['path']}/template/vps" 
+
+        # Checks that template exists & tries to download it if it doesn't
+        disk_image_path = self._ensure_template_present(
+            node_name,
+            template,
+            pool_folder_path
+        )
 
         # Give the host it's fqdn by default as a vhost
         # (we allow this in validate_domain)
@@ -316,71 +405,8 @@ class Proxmox():
         yaml_description = self._serialize_metadata(metadata)
 
         if instance_type == models.proxmox.Type.LXC:
-            metadata.groups = set(["lxc", "cloudlxc", "cloud"])
+            metadata.groups = set(["lxc", "cloud_lxc", "cloud_instance"])
 
-            if template.disk_format != models.proxmox.Template.DiskFormat.TarGZ:
-                raise exceptions.resource.Unavailable(f"Templates (on LXC instances) {detail.template_id} must use TarGZ of RootFS format!")
-
-            # Download the disk image/template
-            lxc_images_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/template/cache"
-            image_path = f"{lxc_images_path}/{template.disk_file}"
-            download_path = f"{lxc_images_path}/{socket.gethostname()}-{os.getpid()}-{template.disk_sha256sum}"
-
-            with ProxmoxNodeSSH(node_name) as con:
-                stdin, stdout, stderr = con.ssh.exec_command(
-                    f"mkdir -p {lxc_images_path}"
-                )
-                status = stdout.channel.recv_exit_status()
-
-                if status != 0:
-                    raise exceptions.resource.Unavailable(f"Could not download template: could not reserve download dir")
-
-                # See if the image exists
-                try:
-                    logger.info(image_path)
-                    con.sftp.stat(image_path)
-
-                    # Checksum image    
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"sha256sum {image_path} | cut -f 1 -d' '"
-                    )
-
-                    if template.disk_sha256sum not in str(stdout.read()):
-                        logger.info(f"Template does not pass SHA256 sums given, falling back to download", status=status, stderr=stderr.read(), stdout=stdout.read())
-                        raise exceptions.resource.Unavailable()
-
-                except (exceptions.resource.Unavailable, FileNotFoundError) as e:
-                    # If a fallback URL exists to download the image
-                    logger.info("error", e=e, exc_info=True)
-                    if template.disk_file_fallback_url is not None:
-                        # Original image does not exist, we gotta download it
-                        stdin, stdout, stderr = con.ssh.exec_command(
-                            f"wget {template.disk_file_fallback_url} -O {download_path}"
-                        )
-                        status = stdout.channel.recv_exit_status()
-
-                        if status != 0:
-                            raise exceptions.resource.Unavailable(f"Could not download template: error {status}: {stderr.read()} {stdout.read()}")
-
-                        # Checksum image    
-                        stdin, stdout, stderr = con.ssh.exec_command(
-                            f"sha256sum {download_path} | cut -f 1 -d' '"
-                        )
-
-                        if template.disk_sha256sum not in str(stdout.read()):
-                            raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
-
-                        # Move image
-                        stdin, stdout, stderr = con.ssh.exec_command(
-                            f"rm -f {image_path} && mv {download_path} {image_path}"
-                        )
-
-                        status = stdout.channel.recv_exit_status()
-                        if status != 0:
-                            raise exceptions.resource.Unavailable(f"Couldn't rename template {status}: {stderr.read()} {stdout.read()}")
-                    else:
-                        raise exceptions.resource.Unavailable(f"This template is currently unavailable: no fallback URL for template")
-            
             self.prox.nodes(f"{node_name}/lxc").post(**{
                 "hostname": fqdn,
                 "vmid": hash_id,
@@ -414,17 +440,14 @@ class Proxmox():
             )
 
             self._wait_vmid_lock(instance.type, instance.node, instance.id)
-
         elif instance_type == models.proxmox.Type.VPS:
-            metadata.groups = set(["vm", "cloudvm", "cloud"])
-
-            if template.disk_format != models.proxmox.Template.DiskFormat.QCOW2:
-                raise exceptions.resource.Unavailable(f"Templates (on VPS instances) {detail.template_id} must use QCOW2 disk image format!")
+            metadata.groups = set(["vm", "cloud_vm", "cloud_instance"])
 
             stub_vm_name = f"stub-{fqdn}-{socket.gethostname()}-{os.getpid()}-{time.time()}"
 
             # we need to create a 'stub' vm to reserve an id
             # the vm disk image is stored in a folder named as the id so we need to create the vm before we configure it to discover this id
+            logger.info("created")
             self.prox.nodes(f"{node_name}/qemu").post(
                 name=stub_vm_name,
                 vmid=hash_id
@@ -445,73 +468,12 @@ class Proxmox():
             def cleanup_stub():
                 self.prox.nodes(instance.node).qemu(vm_id).delete()
 
-            vps_templates_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/template/vps"
-            template_path = f"{vps_templates_path}/{template.disk_file}"
-            download_path = f"{vps_templates_path}/{socket.gethostname()}-{os.getpid()}-{template.disk_sha256sum}"
+            vms_images_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/images"
 
             with ProxmoxNodeSSH(node_name) as con:
-                # See if the image exists
-                try:
-                    con.sftp.stat(template_path)
-
-                    # Checksum image    
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"sha256sum {template_path} | cut -f 1 -d' '"
-                    )
-
-                    if template.disk_sha256sum not in str(stdout.read()):
-                        cleanup_stub()
-                        raise exceptions.resource.Unavailable(f"Downloaded image does not pass SHA256SUMS given {status}: {stderr.read()} {stdout.read()}")
-
-                except (exceptions.resource.Unavailable, FileNotFoundError) as e:
-                    # If a fallback URL exists to download the image
-                    if template.disk_file_fallback_url is not None:
-                        stdin, stdout, stderr = con.ssh.exec_command(
-                            f"mkdir -p {vps_templates_path}"
-                        )
-                        status = stdout.channel.recv_exit_status()
-
-                        if status != 0:
-                            cleanup_stub()
-                            raise exceptions.resource.Unavailable(f"Could not download template: could not reserve download dir")
-
-                        # Original image does not exist, we gotta download it
-                        stdin, stdout, stderr = con.ssh.exec_command(
-                            f"wget {template.disk_url} -O {download_path}"
-                        )
-                        status = stdout.channel.recv_exit_status()
-
-                        if status != 0:
-                            cleanup_stub()
-                            raise exceptions.resource.Unavailable(f"Could not download template: error {status}: {stderr.read()} {stdout.read()}")
-
-                        # Checksum image    
-                        stdin, stdout, stderr = con.ssh.exec_command(
-                            f"sha256sum {download_path} | cut -f 1 -d' '"
-                        )
-
-                        if template.disk_sha256sum not in str(stdout.read()):
-                            cleanup_stub()
-                            raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
-
-                        # Move image
-                        stdin, stdout, stderr = con.ssh.exec_command(
-                            f"rm -f {template_path} && mv {download_path} {template_path}"
-                        )
-
-                        status = stdout.channel.recv_exit_status()
-                        if status != 0:
-                            cleanup_stub()
-                            raise exceptions.resource.Unavailable(f"Couldn't rename instance template {status}: {stderr.read()} {stdout.read()}")
-                    else:
-                        raise exceptions.resource.Unavailable(f"This template is currently unavailable: no fallback URL for template")
-
-                # Images path for installed VMs
-                vms_images_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/images"
-
                 # Copy disk image
                 stdin, stdout, stderr = con.ssh.exec_command(
-                    f"cd {vms_images_path} && rm -f {vm_id} && mkdir {vm_id} && cd {vm_id} && cp {template_path} ./primary.{ template.disk_format }"
+                    f"cd {vms_images_path} && rm -f {vm_id} && mkdir {vm_id} && cd {vm_id} && cp {disk_image_path} ./primary.{ template.disk_format }"
                 )
                 status = stdout.channel.recv_exit_status()
                 
@@ -552,11 +514,6 @@ class Proxmox():
             )
 
             self._wait_vmid_lock(instance_type, node_name, vm_id)
-
-
-        
-        instance = self._read_instance_by_fqdn(instance_type, fqdn)
-        self._wait_vmid_lock(instance.type, instance.node, instance.id)
 
     def delete_instance(
         self,
@@ -1069,7 +1026,7 @@ class Proxmox():
                         "rate": "100",
                         "name": "eth0",
                         "bridge": config.proxmox.network.bridge,
-                        "tag": metadata.network.nic_allocation.vlan,
+                        "tag": instance.metadata.network.nic_allocation.vlan,
                         "hwaddr": instance.metadata.network.nic_allocation.macaddress,
                         "ip": instance.metadata.network.nic_allocation.addresses[0],
                         "gw": instance.metadata.network.nic_allocation.gateway4,
@@ -1097,10 +1054,7 @@ class Proxmox():
                 with ProxmoxNodeSSH(instance.node) as con:
                     snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
 
-                    con.sftp.putfo(
-                        io.StringIO(""),
-                        f'{ snippets_path }/{instance.fqdn}.metadata.yml'
-                    )
+
 
                     # cloud-init has a complete allergy to modifying the root user so we need to do a lot of this
                     # the non-traditional way
@@ -1116,8 +1070,6 @@ disable_root: false
 ssh_pwauth: true
 runcmd:
     - echo 'root:{instance.metadata.root_user.password_hash}' | chpasswd -e
-    - sed -i -e '/^PermitRootLogin/s/^.*$/PermitRootLogin yes/' /etc/ssh/sshd_config
-    - echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config
     - [ systemctl, restart, sshd ]
     - [ systemctl, enable, qemu-guest-agent ]
     - [ systemctl, start, qemu-guest-agent, --no-block ]  
@@ -1127,15 +1079,24 @@ write_files:
       path: /root/.ssh/authorized_keys
       content: |
         {instance.metadata.root_user.ssh_public_key}
-        
         # Do NOT remove the below key or you will lose access to crucial Netsoc Cloud features
         {instance.metadata.root_user.mgmt_ssh_public_key}
+    - owner: root:root
+      permissions: '0644'
+      path: /etc/ssh/sshd_config
+      encoding: b64
+      content: "{ base64.b64encode(templates.sshd.config_allow_root_login.render(banner_path='/etc/banner').encode()) }"
+    - owner: root:root
+      permissions: '0644'
+      path: /etc/banner
+      encoding: b64
+      content: "{ base64.b64encode(templates.sshd.banner.render().encode()) }"
 users:
 """
 
                     if vps_rerun_cloudinit == True:
                         # This will wipe previous cloud-init state from previous boot then shutdown
-                        # on the next boot, cloudinit will reapply
+                        # On the next boot, cloudinit will reapply 
                         userdata_config += f"""
 bootcmd: 
     - rm -f /etc/netplan/50-cloud-init.yaml
@@ -1143,13 +1104,8 @@ bootcmd:
     - shutdown now
 """         
 
-                    con.sftp.putfo(
-                        io.StringIO(userdata_config),
-                        f'{ snippets_path }/{instance.fqdn}.userdata.yml'
-                    )
 
-                    con.sftp.putfo(
-                        io.StringIO(f"""
+                    network_config = f"""
 ethernets:
     net0:
         match:
@@ -1164,8 +1120,21 @@ ethernets:
             - { instance.metadata.network.nic_allocation.addresses[0] }
         mtu: 1450 
 version: 2
-                        """),
+"""
+
+                    con.sftp.putfo(
+                        io.StringIO(network_config),
                         f'{ snippets_path }/{instance.fqdn}.networkconfig.yml'
+                    )
+
+                    con.sftp.putfo(
+                        io.StringIO(userdata_config),
+                        f'{ snippets_path }/{instance.fqdn}.userdata.yml'
+                    )
+
+                    con.sftp.putfo(
+                        io.StringIO(""),
+                        f'{ snippets_path }/{instance.fqdn}.metadata.yml'
                     )
 
                 # Insert cloud-init stuff
@@ -1179,7 +1148,7 @@ version: 2
                     net0=build_proxmox_config_string({
                         "virtio": instance.metadata.network.nic_allocation.macaddress,
                         "bridge": config.proxmox.network.bridge,
-                        "tag": metadata.network.nic_allocation.vlan
+                        "tag": instance.metadata.network.nic_allocation.vlan
                     })
                 )
 
