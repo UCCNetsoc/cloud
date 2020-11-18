@@ -30,3 +30,4 @@ starlette==0.13.6
 starlette-prometheus==0.7.0
 structlog==20.1.0
 urllib3==1.25.10
+python-multipart==0.0.5
