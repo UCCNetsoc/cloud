@@ -215,7 +215,8 @@ class Proxmox():
                     ipaddress.IPv4Interface(f"{ip_addr}/{network.prefixlen}")
                 ],
                 gateway4=gateway,
-                macaddress="02:00:00:%02x:%02x:%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+                macaddress="02:00:00:%02x:%02x:%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)),
+                vlan=config.proxmox.network.vlan
             )
         else:
             raise exception.resource.Unavailable("Could not allocate an IP for the instance. No IPs available")
@@ -395,7 +396,7 @@ class Proxmox():
                     "rate": "100",
                     "name": "eth0",
                     "bridge": config.proxmox.network.bridge,
-                    "tag": config.proxmox.network.vlan,
+                    "tag": metadata.network.nic_allocation.vlan,
                     "hwaddr": metadata.network.nic_allocation.macaddress,
                     "ip": metadata.network.nic_allocation.addresses[0],
                     "gw": metadata.network.nic_allocation.gateway4,
@@ -1068,7 +1069,7 @@ class Proxmox():
                         "rate": "100",
                         "name": "eth0",
                         "bridge": config.proxmox.network.bridge,
-                        "tag": config.proxmox.network.vlan,
+                        "tag": metadata.network.nic_allocation.vlan,
                         "hwaddr": instance.metadata.network.nic_allocation.macaddress,
                         "ip": instance.metadata.network.nic_allocation.addresses[0],
                         "gw": instance.metadata.network.nic_allocation.gateway4,
@@ -1178,7 +1179,7 @@ version: 2
                     net0=build_proxmox_config_string({
                         "virtio": instance.metadata.network.nic_allocation.macaddress,
                         "bridge": config.proxmox.network.bridge,
-                        "tag": config.proxmox.network.vlan
+                        "tag": metadata.network.nic_allocation.vlan
                     })
                 )
 

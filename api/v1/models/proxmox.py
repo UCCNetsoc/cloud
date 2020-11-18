@@ -135,6 +135,7 @@ class NICAllocation(BaseModel):
     addresses: List[ipaddress.IPv4Interface] = []
     gateway4: ipaddress.IPv4Address
     macaddress: str
+    vlan: int
 
 class VHostOptions(BaseModel):
     port: int = Field(**Port)
