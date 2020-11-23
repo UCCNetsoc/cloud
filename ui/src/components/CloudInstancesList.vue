@@ -135,7 +135,7 @@
                         size="24"
                         tile
                       >
-                        <v-icon size="24" :class="row.item[1].active ? 'blue--text' : 'red--text'">
+                        <v-icon size="24" :class="row.item[1].active ? 'green--text' : 'red--text'">
                           {{row.item[1].active ? 'mdi-check-circle' : 'mdi-close-circle'}}
                         </v-icon>
                       </v-avatar>
@@ -144,10 +144,10 @@
                       <div v-if="row.item[1].metadata.tos.suspended == true" class="red--text">
                         Suspended ({{ row.item[1].metadata.tos.reason }})
                       </div>
-                      <div v-else-if="row.item[1].metadata.permanent == true" class="blue--text">
+                      <div v-else-if="row.item[1].metadata.permanent == true" class="green--text">
                         Permanent
                       </div>
-                      <div v-else-if="row.item[1].active == true" class="blue--text">
+                      <div v-else-if="row.item[1].active == true" class="green--text">
                         Active until <b>{{ row.item[1].inactivity_shutdown_date }}</b>
                       </div>
                       <div v-else-if="row.item[1].active == false" class="red--text">
@@ -157,7 +157,7 @@
                         v-if="row.item[1].metadata.tos.suspended == false && row.item[1].metadata.permanent == false"
                         :ripple="false"
                         x-small
-                        :class="row.item[1].active ? 'blue mt-1' : 'red mt-1'"
+                        :class="row.item[1].active ? 'green mt-1' : 'red mt-1'"
                         inline
                         @click="openConfirmCancel(ConfirmCancelMode.RenewActivation, { hostname: row.item[0] })"
                       >
