@@ -23,13 +23,37 @@ def fancy_name(instance_type: models.proxmox.Type) -> str:
 def fancy_specs(specs: models.proxmox.Specs) -> str:
     return f"{specs.cores} CPU, {specs.memory}MB RAM, {specs.disk_space}GB disk space, {specs.swap}MB swap"
 
+def ensure_active(instance: models.proxmox.Instance):
+    """Throws exception saying instance must be active to perform action if instance is not active"""
+
+    if instance.active == False:
+        raise exceptions.rest.Error(status_code=403, detail=models.rest.Detail(
+            msg="Instance must be activated to perform this action"
+        ))
+
+def ensure_not_tos_suspended(instance: models.proxmox.Instance):
+    """Throws exception saying instance must be not suspended"""
+
+    if metadata.tos.suspended == True:
+        raise exceptions.rest.Error(status_code=403, detail=models.rest.Detail(
+            msg=f"Instance is suspended for Terms of Service violations ({metadata.tos.reason})"
+        ))
+
 @router.get(
     '/traefik-config',
     status_code=200,
     response_model=dict,
     responses={400: {"model": models.rest.Error}}
 )
-async def get_traefik_config():
+async def get_traefik_config(
+    key: str = ""
+):
+    if key != config.proxmox.network.traefik_config_key:
+        raise exceptions.rest.Error(status_code=403, detail=models.rest.Detail(
+            msg=f"invalid config key"
+        ))
+
+
     return providers.proxmox.build_traefik_config("web-secure")
 
 @router.get(
@@ -342,6 +366,8 @@ async def start_instance(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
+    ensure_active(instance)
+
     providers.proxmox.start_instance(instance)
 
     utilities.webhook.info(
@@ -362,6 +388,8 @@ async def stop_instance(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
+    ensure_active(instance)
+
     providers.proxmox.stop_instance(instance)
 
     utilities.webhook.info(
@@ -382,6 +410,8 @@ async def shutdown_instance(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
+    ensure_active(instance)
+
     providers.proxmox.shutdown_instance(instance)
 
     utilities.webhook.info(
@@ -403,6 +433,7 @@ async def request_instance_respec(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
+    ensure_active(instance)
 
     utilities.webhook.info(
         f"""**{resource_account.username} ({resource_account.email}) requested new specifications for `{instance.hostname}`!**```{respec.details}```"""
@@ -423,6 +454,7 @@ async def mark_instance_active(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
+    ensure_not_tos_suspended(instance)
     providers.proxmox.mark_instance_active(instance)
 
     utilities.webhook.info(
@@ -443,6 +475,8 @@ async def delete_instance(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
+    ensure_active(instance)
+    
     providers.proxmox.delete_instance(instance)
 
     utilities.webhook.info(
@@ -468,6 +502,8 @@ async def add_instance_port(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
+    ensure_active(instance)
+
     providers.proxmox.add_instance_port(instance, external_port, internal_port)
 
     utilities.webhook.info(
@@ -501,6 +537,8 @@ async def remove_instance_port(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
+    ensure_active(instance)
+
     providers.proxmox.remove_instance_port(instance, external_port)
 
     utilities.webhook.info(
@@ -514,6 +552,14 @@ async def remove_instance_port(
 )
 async def get_base_domain() -> str:
     return config.proxmox.network.vhosts.base_domain
+
+@router.get(
+    '/allowed-a-aaaa',
+    status_code=200,
+    response_model=str
+)
+async def get_allowed_a_aaaa() -> str:
+    return config.proxmox.network.vhosts.user_supplied.allowed_a_aaaa
 
 @router.post(
     '/{email_or_username}/{instance_type}/{hostname}/vhost/{vhost}',
@@ -531,6 +577,8 @@ async def add_instance_vhost(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
+    ensure_active(instance)
+
     providers.proxmox.add_instance_vhost(instance, vhost, options)
 
     utilities.webhook.info(
@@ -552,6 +600,8 @@ async def remove_instance_vhost(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
+    ensure_active(instance)
+
     providers.proxmox.remove_instance_vhost(instance, vhost)
 
     utilities.webhook.info(
@@ -574,6 +624,8 @@ async def reset_instance_root_user(
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
+    ensure_active(instance)
+
     password, private_key, root_user = providers.proxmox.reset_instance_root_user(instance)
 
     providers.email.send(

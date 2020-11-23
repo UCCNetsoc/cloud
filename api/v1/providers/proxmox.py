@@ -14,6 +14,7 @@ import dns.resolver
 import dns.exception
 import ipaddress
 import io
+import re
 import crypt
 import functools
 import string
@@ -417,17 +418,7 @@ class Proxmox():
                 "swap": template.specs.swap,
                 "storage": config.proxmox.dir_pool,
                 "unprivileged": 1,
-                "nameserver": "1.1.1.1",
-                "net0": build_proxmox_config_string({
-                    "rate": "100",
-                    "name": "eth0",
-                    "bridge": config.proxmox.network.bridge,
-                    "tag": metadata.network.nic_allocation.vlan,
-                    "hwaddr": metadata.network.nic_allocation.macaddress,
-                    "ip": metadata.network.nic_allocation.addresses[0],
-                    "gw": metadata.network.nic_allocation.gateway4,
-                    "mtu": 1450 # if we ever decide to move to vxlan
-                })
+                "nameserver": "1.1.1.1"
             })
     
             self._wait_for_instance_created(instance_type, fqdn)
@@ -494,6 +485,7 @@ class Proxmox():
             # Reconfigure stub
             self.prox.nodes(f"{node_name}/qemu/{vm_id}/config").put(
                 name=fqdn,
+                agent=1,
                 description=yaml_description,
                 virtio0=f"{config.proxmox.dir_pool}:{vm_id}/primary.{ template.disk_format }",
                 cores=template.specs.cores,
@@ -600,7 +592,7 @@ class Proxmox():
 
     def _wait_for_instance_status(
         self,
-        instance: models.proxmox.Type,
+        instance: models.proxmox.Instance,
         wait_for_status: models.proxmox.Status = models.proxmox.Status.Running,
         timeout: int = 25,
         poll_interval: int = 1
@@ -613,11 +605,14 @@ class Proxmox():
             if instance.type == models.proxmox.Type.LXC:
                 current = self.prox.nodes(instance.node).lxc(f"{instance.id}/status/current").get()
             elif instance.type == models.proxmox.Type.VPS:
-                current = self.prox.nodes(insatnce.node).qemu(f"{instance.id}/status/current").get()
+                current = self.prox.nodes(instance.node).qemu(f"{instance.id}/status/current").get()
+
+            logger.info("wait_for_instance_status", current=current['status'], wait_for_status=wait_for_status)
 
             if current['status'] == 'running' and wait_for_status == models.proxmox.Status.Running:
                 break
-            elif current['status'] == 'stopped' and wait_for_status == models.proxmox.Status.Stopped:
+            
+            if current['status'] == 'stopped' and wait_for_status == models.proxmox.Status.Stopped:
                 break
 
 
@@ -625,7 +620,6 @@ class Proxmox():
                 raise exceptions.resource.Unavailable(f"Timeout occured waiting for instance to change from {current['status']} status")
 
             time.sleep(poll_interval)
-
 
     def _read_instance_on_node(
         self,
@@ -847,7 +841,8 @@ class Proxmox():
     def read_instances_by_account(
         self,
         instance_type: models.proxmox.Type,
-        account: models.account.Account
+        account: models.account.Account,
+        ignore_errors: bool = True
     ) -> Dict[str, models.proxmox.Instance]:
         
         ret = { }
@@ -856,45 +851,51 @@ class Proxmox():
         
         for entry in lxcs_qemus:
             if 'name' in entry and entry['name'].endswith(self._get_instance_fqdn_for_account(instance_type, account, "")):
-                instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
-                ret[instance.hostname] = instance
+                if ignore_errors == True:
+                    try:
+                        instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
+                        ret[instance.hostname] = instance
+                    except Exception as e:
+                        logger.info("read_instances_by_account ignoring instance with error", ignore_errors=ignore_errors, account=account)
+                else:
+                    instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
+                    ret[instance.hostname] = instance
                         
         return ret
 
     def read_instances(
         self,
-        instance_type: Optional[models.proxmox.Type] = None
+        instance_type: Optional[models.proxmox.Type] = None,
+        ignore_errors: bool = True
     ) -> Dict[str, models.proxmox.Instance]:
 
         ret = { }
 
         lxcs_qemus = self.prox.cluster.resources.get(type="vm")
 
-        if instance_type == models.proxmox.Type.LXC:
-            for entry in lxcs_qemus:
-                if 'name' in entry and entry['name'].endswith(config.proxmox.lxc.base_fqdn):
-                    instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
-                    ret[instance.fqdn] = instance
-                            
-            return ret
-        elif instance_type == models.proxmox.Type.VPS:
-            for entry in lxcs_qemus:
-                if 'name' in entry and entry['name'].endswith(config.proxmox.vps.base_fqdn):
-                    instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
-                    ret[instance.fqdn] = instance
-                            
-            return ret
-        elif instance_type == None:
-            for entry in lxcs_qemus:
-                if 'name' in entry and entry['name'].endswith(config.proxmox.lxc.base_fqdn):
+        for entry in lxcs_qemus:
+            if entry['type'] == 'qemu' and (instance_type == None or instance_type == models.proxmox.Type.VPS) and 'name' in entry and entry['name'].endswith(config.proxmox.vps.base_fqdn):
+                if ignore_errors == True:
+                    try:
+                        instance =  self._read_instance_on_node(models.proxmox.Type.VPS, entry['node'], entry['vmid'])
+                        ret[instance.fqdn] = instance
+                    except Exception as e:
+                        logger.info("read_instances ignoring instance with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
+                else:
                     instance = self._read_instance_on_node(models.proxmox.Type.LXC, entry['node'], entry['vmid'])
                     ret[instance.fqdn] = instance
-
-                if 'name' in entry and entry['name'].endswith(config.proxmox.vps.base_fqdn):
-                    instance = self._read_instance_on_node(models.proxmox.Type.VPS, entry['node'], entry['vmid'])
+            elif entry['type'] == 'lxc' and (instance_type == None or instance_type == models.proxmox.Type.LXC) and 'name' in entry and entry['name'].endswith(config.proxmox.lxc.base_fqdn):
+                if ignore_errors == True:
+                    try:
+                        instance = self._read_instance_on_node(models.proxmox.Type.LXC, entry['node'], entry['vmid'])
+                        ret[instance.fqdn] = instance
+                    except Exception as e:
+                        logger.info("read_instances ignoring instance with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
+                else:
+                    instance = self._read_instance_on_node(models.proxmox.Type.LXC, entry['node'], entry['vmid'])
                     ret[instance.fqdn] = instance
             
-            return ret
+        return ret
 
 
     def _generate_instance_root_user(
@@ -912,6 +913,34 @@ class Proxmox():
             mgmt_ssh_private_key=mgmt_ssh_private_key
         )
 
+    def _wait_for_qemu_guest_agent_ping(
+        self,
+        instance: models.proxmox.Instance,
+        timeout: int = 25,
+        poll_interval: int = 1
+    ):
+        """Waits for the qemu-guest-agent process to start on a vm"""
+
+        if instance.type != models.proxmox.Type.VPS:
+            raise exceptions.resource.Unavailable("Can't wait on guest agent for non QEMU VM")
+
+        start = time.time()
+        while True:
+            now = time.time()
+
+            try:
+                self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/ping").post()
+                # throws an error if ping fails, we ignore error in exception handler
+                # if ping is successful break out of the loop
+                break
+            except Exception as e:
+                pass
+
+            if (now-start) > timeout:
+                raise exceptions.resource.Unavailable(f"Timeout occured waiting for instance to start qemu-guest-agent")
+
+            time.sleep(poll_interval)
+
     def reset_instance_root_user(
         self,
         instance: models.proxmox.Instance,
@@ -919,16 +948,15 @@ class Proxmox():
     ) -> Tuple[str, str, models.proxmox.RootUser]:
         """Returns a tuple of password, private_key"""
 
+        if instance.status == models.proxmox.Status.Stopped:
+            raise exceptions.resource.Unavailable("Instance must be running to reset root user")
+
         if root_user is None:
             password, user_ssh_private_key, root_user = self._generate_instance_root_user()
 
+        self._wait_vmid_lock(instance.type, instance.node, instance.id)
+
         if instance.type == models.proxmox.Type.LXC:
-            if instance.status == models.proxmox.Status.Stopped:
-                self.start_instance(instance)
-                self._wait_for_instance_status(instance, models.proxmox.Status.Running)
-
-            self._wait_vmid_lock(instance.type, instance.node, instance.id)
-
             with ProxmoxNodeSSH(instance.node) as con:
                 # Install root password
                 stdin, stdout, stderr = con.ssh.exec_command(
@@ -993,56 +1021,78 @@ class Proxmox():
                     raise exceptions.resource.Unavailable(
                         f"Could not start instance: unable to (re)start sshd server: {status}: {stdout.read()} {stderr.read()}"
                     )
-                
-            instance.metadata.root_user = root_user
-            self.write_out_instance_metadata(instance)
-            self.stop_instance(instance)
 
         elif instance.type == models.proxmox.Type.VPS:
-            if instance.status == models.proxmox.Status.Running:
-                # VPS needs to be stopped because we set the root pw using cloudinit on boot
-                self.stop_instance(instance)
+            self._wait_for_qemu_guest_agent_ping(instance)
 
-            self._wait_vmid_lock(instance.type, instance.node, instance.id)
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/exec").post(**{
+                'command': 'chpasswd -e',
+                'input-data': f'root:{root_user.password_hash}'
+            })
 
-            instance.metadata.root_user = root_user
-            self.write_out_instance_metadata(instance)    
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/file-write").post(
+                file="/root/.ssh/authorized_keys",
+                content=f"# --- BEGIN PVE ---\n{root_user.ssh_public_key}\n{root_user.mgmt_ssh_public_key}\n# --- END PVE ---"
+            )
 
-            # rerun cloudinit - will write ssh keys and root pass
-            self.start_instance(instance, vps_rerun_cloudinit=True)
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/file-write").post(
+                file="/etc/ssh/sshd_config",
+                content=templates.sshd.config_allow_root_login.render(banner_path='/etc/banner')
+            )
+
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/file-write").post(
+                file="/etc/banner",
+                content=re.sub(r'[^\x00-\xff]',r'', templates.sshd.banner.render())
+            )
+
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/exec").post(
+                command="systemctl enable ssh",
+            )
+
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/exec").post(
+                command="systemctl restart ssh",
+            )
+
+        instance.metadata.root_user = root_user
+        self.write_out_instance_metadata(instance)
 
         return password, user_ssh_private_key, root_user
 
     def start_instance(
         self,
         instance: models.proxmox.Instance,
-        vps_rerun_cloudinit: bool = False
+        vps_clear_cloudinit: bool = False
     ):
-        if instance.status != models.proxmox.Status.Running:
-            if instance.type == models.proxmox.Type.LXC:
-                self.prox.nodes(instance.node).lxc(f"{instance.id}/config").put(**{
-                    "nameserver": "1.1.1.1",
-                    "net0": build_proxmox_config_string({
-                        "rate": "100",
-                        "name": "eth0",
-                        "bridge": config.proxmox.network.bridge,
-                        "tag": instance.metadata.network.nic_allocation.vlan,
-                        "hwaddr": instance.metadata.network.nic_allocation.macaddress,
-                        "ip": instance.metadata.network.nic_allocation.addresses[0],
-                        "gw": instance.metadata.network.nic_allocation.gateway4,
-                        "mtu": 1450 # if we ever decide to move to vxlan
-                    })
+        if instance.type == models.proxmox.Type.LXC:
+            self.prox.nodes(instance.node).lxc(f"{instance.id}/config").put(**{
+                "nameserver": "1.1.1.1",
+                "net0": build_proxmox_config_string({
+                    "rate": "100",
+                    "name": "eth0",
+                    "bridge": config.proxmox.network.bridge,
+                    "tag": instance.metadata.network.nic_allocation.vlan,
+                    "hwaddr": instance.metadata.network.nic_allocation.macaddress,
+                    "ip": instance.metadata.network.nic_allocation.addresses[0],
+                    "gw": instance.metadata.network.nic_allocation.gateway4,
+                    "mtu": 1450 # if we ever decide to move to vxlan
                 })
+            })
 
-                self.prox.nodes(instance.node).lxc(f"{instance.id}/status/start").post()
-            elif instance.type == models.proxmox.Type.VPS:
-                # delete cloud-init data
-                with ProxmoxNodeSSH(instance.node) as con:
-                    snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
+            self.prox.nodes(instance.node).lxc(f"{instance.id}/firewall/options").put(**{
+                "macfilter": 1,
+                "ipfilter": 1
+            })
 
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"rm -f '{ snippets_path }/{instance.fqdn}.networkconfig.yml' '{ snippets_path }/{instance.fqdn}.userdata.yml' '{ snippets_path }/{instance.fqdn}.metadata.yml'"
-                    )
+
+            self.prox.nodes(instance.node).lxc(f"{instance.id}/status/start").post()
+        elif instance.type == models.proxmox.Type.VPS:
+            # delete cloud-init data
+            with ProxmoxNodeSSH(instance.node) as con:
+                snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
+
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"rm -f '{ snippets_path }/{instance.fqdn}.networkconfig.yml' '{ snippets_path }/{instance.fqdn}.userdata.yml' '{ snippets_path }/{instance.fqdn}.metadata.yml'"
+                )
 
                 # Detach existing cloud-init drive (if any)
                 self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
@@ -1051,11 +1101,20 @@ class Proxmox():
                 )
 
                 # install cloud-init data
-                with ProxmoxNodeSSH(instance.node) as con:
-                    snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
+                snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
 
 
-
+                if vps_clear_cloudinit == True:
+                    # This will wipe previous cloud-init state from previous boot then shutdown
+                    # On the next boot, cloudinit will reapply without this bool set to true
+                    userdata_config = f"""#cloud-config
+bootcmd:
+    - rm -f /etc/netplan/50-cloud-init.yaml
+    - cloud-init clean --logs
+    - rm -Rf /var/lib/cloud/*
+    - shutdown now
+"""         
+                else:
                     # cloud-init has a complete allergy to modifying the root user so we need to do a lot of this
                     # the non-traditional way
                     userdata_config = f"""#cloud-config
@@ -1069,43 +1128,11 @@ chpasswd:
 disable_root: false
 ssh_pwauth: true
 runcmd:
-    - echo 'root:{instance.metadata.root_user.password_hash}' | chpasswd -e
-    - [ systemctl, restart, sshd ]
     - [ systemctl, enable, qemu-guest-agent ]
     - [ systemctl, start, qemu-guest-agent, --no-block ]  
-write_files:
-    - owner: root:root
-      permissions: '0600'
-      path: /root/.ssh/authorized_keys
-      content: |
-        {instance.metadata.root_user.ssh_public_key}
-        # Do NOT remove the below key or you will lose access to crucial Netsoc Cloud features
-        {instance.metadata.root_user.mgmt_ssh_public_key}
-    - owner: root:root
-      permissions: '0644'
-      path: /etc/ssh/sshd_config
-      encoding: b64
-      content: "{ base64.b64encode(templates.sshd.config_allow_root_login.render(banner_path='/etc/banner').encode()) }"
-    - owner: root:root
-      permissions: '0644'
-      path: /etc/banner
-      encoding: b64
-      content: "{ base64.b64encode(templates.sshd.banner.render().encode()) }"
-users:
 """
 
-                    if vps_rerun_cloudinit == True:
-                        # This will wipe previous cloud-init state from previous boot then shutdown
-                        # On the next boot, cloudinit will reapply 
-                        userdata_config += f"""
-bootcmd: 
-    - rm -f /etc/netplan/50-cloud-init.yaml
-    - rm -rf /var/lib/cloud
-    - shutdown now
-"""         
-
-
-                    network_config = f"""
+                network_config = f"""---
 ethernets:
     net0:
         match:
@@ -1122,37 +1149,42 @@ ethernets:
 version: 2
 """
 
-                    con.sftp.putfo(
-                        io.StringIO(network_config),
-                        f'{ snippets_path }/{instance.fqdn}.networkconfig.yml'
-                    )
-
-                    con.sftp.putfo(
-                        io.StringIO(userdata_config),
-                        f'{ snippets_path }/{instance.fqdn}.userdata.yml'
-                    )
-
-                    con.sftp.putfo(
-                        io.StringIO(""),
-                        f'{ snippets_path }/{instance.fqdn}.metadata.yml'
-                    )
-
-                # Insert cloud-init stuff
-                self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
-                    cicustom=f"user={ config.proxmox.dir_pool }:snippets/{instance.fqdn}.userdata.yml,network={ config.proxmox.dir_pool }:snippets/{instance.fqdn}.networkconfig.yml,meta={ config.proxmox.dir_pool }:snippets/{instance.fqdn}.metadata.yml",
-                    ide2=f"{ config.proxmox.dir_pool }:cloudinit,format=qcow2"
+                con.sftp.putfo(
+                    io.StringIO(network_config),
+                    f'{ snippets_path }/{instance.fqdn}.networkconfig.yml'
                 )
 
-                # Set network card
-                self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
-                    net0=build_proxmox_config_string({
-                        "virtio": instance.metadata.network.nic_allocation.macaddress,
-                        "bridge": config.proxmox.network.bridge,
-                        "tag": instance.metadata.network.nic_allocation.vlan
-                    })
+                con.sftp.putfo(
+                    io.StringIO(userdata_config),
+                    f'{ snippets_path }/{instance.fqdn}.userdata.yml'
                 )
 
-                self.prox.nodes(instance.node).qemu(f"{instance.id}/status/start").post()
+                con.sftp.putfo(
+                    io.StringIO(""),
+                    f'{ snippets_path }/{instance.fqdn}.metadata.yml'
+                )
+
+            # Insert cloud-init drive
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
+                cicustom=f"user={ config.proxmox.dir_pool }:snippets/{instance.fqdn}.userdata.yml,network={ config.proxmox.dir_pool }:snippets/{instance.fqdn}.networkconfig.yml,meta={ config.proxmox.dir_pool }:snippets/{instance.fqdn}.metadata.yml",
+                ide2=f"{ config.proxmox.dir_pool }:cloudinit,format=qcow2"
+            )
+
+            # Set network card
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
+                net0=build_proxmox_config_string({
+                    "virtio": instance.metadata.network.nic_allocation.macaddress,
+                    "bridge": config.proxmox.network.bridge,
+                    "tag": instance.metadata.network.nic_allocation.vlan
+                })
+            )
+
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/firewall/options").put(**{
+                "macfilter": 1,
+                "ipfilter": 1
+            })
+
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/status/start").post()
 
 
     def stop_instance(
@@ -1378,6 +1410,11 @@ version: 2
         self,
         web_entrypoints: List[str]
     ) -> dict:
+        # Traefik does not like keys with empty values
+        # so we gotta omit them by checking if the base key is already in the dict everywhere
+
+        config = {}
+
         services = {}
         routers = {}
 
@@ -1391,7 +1428,13 @@ version: 2
                 vhost_suffix = vhost.replace('.', '-')
 
                 if valid is True:
-                    routers[f"{fqdn_prefix}-{vhost_suffix}"] = {
+                    if 'http' not in config:
+                        config['http'] = {
+                            'routers': {},
+                            'services': {}
+                        }
+                    
+                    config['http']['routers'][f"{fqdn_prefix}-{vhost_suffix}"] = {
                         "entrypoints": web_entrypoints,
                         "rule": f"Host(`{vhost}`)",
                         "service": f"{fqdn_prefix}-{vhost_suffix}",
@@ -1405,7 +1448,7 @@ version: 2
                     if options.https is True:
                         proto = "https"
 
-                    services[f"{fqdn_prefix}-{vhost_suffix}"] = {
+                    config['http']['services'][f"{fqdn_prefix}-{vhost_suffix}"] = {
                         "loadBalancer": {
                             "servers": [{ 
                                 "url": f"{ proto }://{instance.metadata.network.nic_allocation.addresses[0].ip}:{ options.port }"
@@ -1413,23 +1456,30 @@ version: 2
                         }
                     }
 
-        tcp_routers = {}
-        udp_routers = {}
-        tcp_services = {}
-        udp_services = {}
 
         # then do tcp/udp port mappings
         for external_port, internal_tuple in self.get_port_forward_map().items():
             fqdn, ip, internal_port = internal_tuple
             fqdn_prefix = fqdn.replace('.', '-')
             
-            tcp_routers[f"{fqdn_prefix}-{external_port}-tcp"] = {
+            if 'tcp' not in config and 'udp' not in config:
+                config['tcp'] = {
+                    'routers': {},
+                    'services': {}
+                }
+
+                config['udp'] = {
+                    'routers': {},
+                    'services': {}
+                }
+
+            config['tcp']['routers'][f"{fqdn_prefix}-{external_port}-tcp"] = {
                 "entryPoints": [f"netsoc-cloud-{external_port}-tcp"],
                 "rule": "HostSNI(`*`)",
                 "service": f"{fqdn_prefix}-{external_port}-tcp"
             }
 
-            tcp_services[f"{fqdn_prefix}-{external_port}-tcp"] = {
+            config['tcp']['services'][f"{fqdn_prefix}-{external_port}-tcp"] = {
                 "loadBalancer": {
                     "servers": [{
                         "address": f"{ip}:{internal_port}"
@@ -1437,33 +1487,18 @@ version: 2
                 }
             }
 
-            udp_routers[f"{fqdn_prefix}-{external_port}-udp"] = {
+            config['udp']['routers'] [f"{fqdn_prefix}-{external_port}-udp"] = {
                 "entryPoints": [f"netsoc-cloud-{external_port}-udp"],
                 "service": f"{fqdn_prefix}-{external_port}-udp"
             }
 
-            udp_services[f"{fqdn_prefix}-{external_port}-udp"] = {
+            config['udp']['services'] [f"{fqdn_prefix}-{external_port}-udp"] = {
                 "loadBalancer": {
                     "servers": [{
                         "address": f"{ip}:{internal_port}"
                     }]
                 }
             }
- 
- 
-        config = {
-            "http": {
-                "routers": routers,
-                "services": services
-            },
-            "tcp": {
-                "routers": tcp_routers,
-                "services": tcp_services
-            },
-            "udp": {
-                "routers": udp_routers,
-                "services": udp_services
-            }
-        }
+            
 
         return config
