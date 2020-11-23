@@ -192,6 +192,7 @@ class Proxmox(BaseModel):
             public_key: Optional[str] = None
             private_key: Optional[str] = None
 
+        traefik_config_key: str
         bridge: str = "vmbr0"
         vlan: int = 40
         gateway: ipaddress.IPv4Address = ipaddress.IPv4Address("10.40.0.1")
@@ -208,7 +209,6 @@ class Proxmox(BaseModel):
 
 
     blacklisted_nodes: List[str]
-
     cluster: Cluster
     lxc: LXC
     vps: VPS
