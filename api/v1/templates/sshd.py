@@ -91,7 +91,7 @@ X11Forwarding yes
 #X11DisplayOffset 10
 #X11UseLocalhost yes
 #PermitTTY yes
-#PrintMotd no
+PrintMotd no
 PrintLastLog no
 #TCPKeepAlive yes
 #PermitUserEnvironment no
