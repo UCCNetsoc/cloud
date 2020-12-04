@@ -84,14 +84,23 @@ def build_proxmox_config_string(options: dict):
 
 class Proxmox():
     def __init__(self):
-        self.prox = ProxmoxAPI(
-            host=config.proxmox.cluster.api.server,
-            user=config.proxmox.cluster.api.username,
-            token_name=config.proxmox.cluster.api.token_name,
-            token_value=config.proxmox.cluster.api.token_value,
-            port=config.proxmox.cluster.api.port,
-            verify_ssl=False
-        )
+        if config.proxmox.cluster.api.password:
+            self.prox = ProxmoxAPI(
+                host=config.proxmox.cluster.api.server,
+                user=config.proxmox.cluster.api.username,
+                password=config.proxmox.cluster.api.password,
+                port=config.proxmox.cluster.api.port,
+                verify_ssl=False
+            )
+        else:
+            self.prox = ProxmoxAPI(
+                host=config.proxmox.cluster.api.server,
+                user=config.proxmox.cluster.api.username,
+                token_name=config.proxmox.cluster.api.token_name,
+                token_value=config.proxmox.cluster.api.token_value,
+                port=config.proxmox.cluster.api.port,
+                verify_ssl=False
+            )
 
     def get_templates(
         self,

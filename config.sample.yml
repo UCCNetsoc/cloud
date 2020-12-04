@@ -10,24 +10,30 @@ auth:
 proxmox:
   blacklisted_nodes:
     - feynman
-  ssh:
-    server: "feynman.netsoc.co"
-    port: 2222
-    username: "root"
-    password: "-"
-  api:
-    server: "feynman.netsoc.co"
-    port: 8007
-    username: "root@pam"
-    token_name: "NetsocCloud"
-    token_value: "-"
+  cluster:
+    ssh:
+      server: "10.10.10.2"
+      port: 22
+      username: "root"
+      password: "vagrant"
+    api:
+      server: "10.10.10.2"
+      port: 8006
+      username: "root@pam"
+      password: "vagrant"
+      token_name: "NetsocCloud"
+      token_value: "-"
+  network:
+    traefik_config_key: "-"
+    vlan_jumphost:
+      server: "10.10.10.2"
   dir_pool: "local"
   vps:
     templates:
       ubuntu-20.04:
         title: "Ubuntu 20.04"
         subtitle: "Ubuntu's version 20.04 operating system"
-        description: | 
+        description: |
           Ubuntu is a Linux distribution based on Debian mostly composed of free and open-source software.
           Ubuntu is officially released in three editions: Desktop, Server, and Core for Internet of things devices and robots.
           All the editions can run on the computer alone, or in a virtual machine
@@ -61,7 +67,7 @@ proxmox:
       ubuntu-19.10:
         title: "Ubuntu 19.10"
         subtitle: "Ubuntu's version 19.10 operating system"
-        description: | 
+        description: |
           Ubuntu is a Linux distribution based on Debian mostly composed of free and open-source software.
           Ubuntu is officially released in three editions: Desktop, Server, and Core for Internet of things devices and robots.
           All the editions can run on the computer alone, or in a virtual machine

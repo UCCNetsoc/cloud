@@ -34,4 +34,8 @@ services:
 " > ./cloud/docker-compose.override.yml
 fi
 
+cd cloud
+./vagrant-up.sh
+cd .. 
+
 bash --init-file <(echo "source bin/activate") -c "./dev-env up cloud api"
