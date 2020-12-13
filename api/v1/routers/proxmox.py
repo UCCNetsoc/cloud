@@ -1,11 +1,14 @@
+import os
 import time
 import structlog as logging
 
 
-from fastapi import APIRouter, HTTPException, Depends, Path, Query
+from fastapi import APIRouter, HTTPException, Depends, Path, Query, Response, UploadFile, File
+from fastapi.responses import StreamingResponse
+
 from pydantic import BaseModel, Field
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from v1 import providers, templates, models, exceptions, utilities, templates
 from v1.config import config
@@ -34,7 +37,7 @@ def ensure_active(instance: models.proxmox.Instance):
 def ensure_not_tos_suspended(instance: models.proxmox.Instance):
     """Throws exception saying instance must be not suspended"""
 
-    if metadata.tos.suspended == True:
+    if instance.metadata.tos.suspended == True:
         raise exceptions.rest.Error(status_code=403, detail=models.rest.Detail(
             msg=f"Instance is suspended for Terms of Service violations ({metadata.tos.reason})"
         ))
@@ -118,28 +121,28 @@ f"""**{resource_account.username} ({resource_account.email}) requested an instan
 
 They want **{template.title} {fancy_name(instance_type)} ({fancy_specs(template.specs)})** for the following reason: ```{detail.reason}```
 To approve this request, sign in as a SysAdmin and click the following link:
-{config.links.base_url}/instances/{resource_account.username}/{instance_type}-request/{hostname}/{serialized.token}
+{config.links.base_url}/instance-request/{resource_account.username}/{instance_type}-request/{hostname}/{serialized.token}
 """
     )
 
-    providers.email.send(
-        [resource_account.email],
-        f"{fancy_name(instance_type)} request '{hostname}' received",
-        templates.email.netsoc.render(
-            heading=f"{fancy_name(instance_type)} request '{hostname}' received",
-            paragraph=
-            f"""Hi {resource_account.username}!<br/><br/>
-                We've received your request for a {fancy_name(instance_type)} named '{hostname}'<br/>
-                We will notify you by email as soon as we have approved/denied your request<br/><br/>
-                If you do not receive a response within 2-3 days, contact the SysAdmins on the UCC Netsoc Discord<br/>
-                Once you make contact, they might request the information below:<br/>
-            """,
-            embeds=[
-                { "text": serialized.token }
-            ],
-        ),
-        "text/html"
-    )
+    # providers.email.send(
+    #     [resource_account.email],
+    #     f"{fancy_name(instance_type)} request '{hostname}' received",
+    #     templates.email.netsoc.render(
+    #         heading=f"{fancy_name(instance_type)} request '{hostname}' received",
+    #         paragraph=
+    #         f"""Hi {resource_account.username}!<br/><br/>
+    #             We've received your request for a {fancy_name(instance_type)} named '{hostname}'<br/>
+    #             We will notify you by email as soon as we have approved/denied your request<br/><br/>
+    #             If you do not receive a response within 2-3 days, contact the SysAdmins on the UCC Netsoc Discord<br/>
+    #             Once you make contact, they might request the information below:<br/>
+    #         """,
+    #         embeds=[
+    #             { "text": serialized.token }
+    #         ],
+    #     ),
+    #     "text/html"
+    # )
 
     return models.rest.Info(
         detail=models.rest.Detail(
@@ -255,9 +258,8 @@ async def approve_instance_request(
             paragraph=
             f"""Hi {resource_account.username}!<br/><br/>
                 We received your request for a {fancy_name(instance_type)} named '{hostname}'<br/>
-                We're delighted to inform you that your instance request has been granted!<br/><br/>
-                <br/>
-                For guides on how to SSH into your instance, consult the <a href='https://tutorial.netsoc.co'>tutorial</a>
+                We're delighted to inform you that your instance request has been granted!<br/>
+                For guides on how to SSH into your instance, please consult the <a class="color: white" href='https://tutorial.netsoc.co'>tutorial</a>
                 <br/>
             """
         ),
@@ -546,20 +548,12 @@ async def remove_instance_port(
     )
 
 @router.get(
-    '/base-domain',
+    '/vhost-requirements',
     status_code=200,
-    response_model=str
-)
-async def get_base_domain() -> str:
-    return config.proxmox.network.vhosts.base_domain
-
-@router.get(
-    '/allowed-a-aaaa',
-    status_code=200,
-    response_model=str
+    response_model=models.config.Proxmox.Network.VHostRequirements
 )
 async def get_allowed_a_aaaa() -> str:
-    return config.proxmox.network.vhosts.user_supplied.allowed_a_aaaa
+    return config.proxmox.network.vhosts
 
 @router.post(
     '/{email_or_username}/{instance_type}/{hostname}/vhost/{vhost}',
@@ -635,7 +629,7 @@ async def reset_instance_root_user(
             heading=f"{fancy_name(instance_type)} '{hostname}' root user information",
             paragraph=f"""Hi {resource_account.username}!<br/><br/>
                 We successfully set the password and SSH identity for the root user on your {fancy_name(instance_type)} named '{hostname}'<br/><br/>
-                You will find the password followed by the SSH private key below:<br/>
+                You will find the password followed by the SSH private key for the user <code>root</code> below:<br/>
             """,
             embeds=[
                 { "text": f"<code>{password}</code>" },
