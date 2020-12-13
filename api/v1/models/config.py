@@ -19,6 +19,8 @@ class Accounts(BaseModel):
     username_blacklist: List[str] = [
         # vps and container _must_ be blacklisted
         "vps",
+        "ssh",
+        "sftp",
         "container",
         "api",
         "proxy"
@@ -177,13 +179,13 @@ class Proxmox(BaseModel):
         class PortForward(BaseModel):
             range: Tuple[int,int] = (16384,32767)
 
-        class VHosts(BaseModel):
+        class VHostRequirements(BaseModel):
             class UserSupplied(BaseModel):
-                verification_txt_name: str = "_netsoc"
-                allowed_a_aaaa: Set[str] = set(["84.39.234.52"])
+                verification_txt_name: str
+                allowed_a_aaaa: Set[str]
 
-            base_domain: str = "netsoc.cloud"
-            user_supplied: UserSupplied = UserSupplied()
+            base_domain: str
+            user_supplied: UserSupplied
 
         class VLANJumpHost(BaseModel):
             server: str
@@ -191,6 +193,7 @@ class Proxmox(BaseModel):
             username: str = "jumphost"
             public_key: Optional[str] = None
             private_key: Optional[str] = None
+            password: str = None
 
         traefik_config_key: str
         bridge: str = "vmbr0"
@@ -204,8 +207,8 @@ class Proxmox(BaseModel):
 
         vlan_jumphost: VLANJumpHost
 
-        port_forward: PortForward = PortForward()
-        vhosts: VHosts = VHosts()
+        port_forward: PortForward
+        vhosts: VHostRequirements
 
 
     blacklisted_nodes: List[str]
