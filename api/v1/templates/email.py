@@ -32,7 +32,7 @@ netsoc = Template("""
                 {{ heading }}
             </h1>
             <div style="max-width: 600px; margin: 1em auto">
-                <p style="border-top: 1px solid rgb(55,55,55);border-bottom: 1px solid rgb(55,55,55);color: white;text-align: center;max-width: 500px;color: #fff;padding: 1em;">
+                <p style="border-top: 1px solid rgb(55,55,55);border-bottom: 1px solid rgb(55,55,55);color: white;text-align: center;max-width: 600px;color: #fff;padding: 1em;">
                     {{ paragraph }}
                 </p>
             </div>
