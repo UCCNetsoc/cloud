@@ -1075,7 +1075,7 @@ export default Vue.extend({
           case ConfirmCancelMode.OpenTerminal: {
             const instance = this.instances[hostname as string]
 
-            open(config.sshUrl + '/' + instance.metadata.network.nic_allocation.addresses[0].split('/')[0])
+            open(config.sshUrl + '/ssh/host/' + instance.metadata.network.nic_allocation.addresses[0].split('/')[0])
             break
           }
 
