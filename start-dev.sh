@@ -5,23 +5,25 @@ if [[ $# -eq 0 ]] ; then
     exit 1
 fi
 
+WD=`pwd`
+DEV_ENV=$(readlink -f $1)
+
 if [ ! -d "./bin" ]; then
 	virtualenv -p /usr/bin/python3 .
 	source bin/activate
 	pip3 install -r ./requirements.txt
-	cd $1/backing-services/freeipa
-	./freeipa-delete-data.sh
-	./freeipa-decompress-data.sh
-	cd - && cd ./ui
+	cd $PWD/ui
 	npm install
-	cd ..
+	cd $PWD
 fi
 
-WD=`pwd`
-cd $1
+cd $DEV_ENV
+bash --init-file <(echo "source bin/activate") -c "./dev-env stop ipa"
+$DEV_ENV/backing-services/freeipa/freeipa-delete-data.sh
+$DEV_ENV/backing-services/freeipa/freeipa-decompress-data.sh
+bash --init-file <(echo "source bin/activate") -c "./dev-env start ipa"
 
-if [ ! -f "./cloud/docker-compose.override.yml" ]; then
-	echo "version: \"3.7\" 
+echo "version: \"3.7\"
 services:
   cloud:
     volumes:
@@ -32,6 +34,5 @@ services:
       - ${WD}/api/requirements.txt:/requirements.txt
       - ${WD}/config.sample.yml:/config.yml
 " > ./cloud/docker-compose.override.yml
-fi
 
 bash --init-file <(echo "source bin/activate") -c "./dev-env up cloud api"
