@@ -152,23 +152,23 @@ export default Vue.extend({
     msg: '',
     drawer: false,
     selectedMenu: 0,
-    menu: [
-      { icon: 'mdi-account-circle', name: 'Account & User Server', route: '/account' },
-      { icon: 'mdi-backup-restore', name: 'Backups', route: '/backups' },
-      { icon: 'mdi-web', name: 'Blogs & Websites', route: '/websites' },
-      // { icon: 'mdi-cloud', name: 'Cloud', route: '/cloud' },
-      { icon: 'mdi-database', name: 'Databases', route: '/databases' },
-      { icon: 'mdi-gamepad-square', name: 'Games', route: '/games' },
-      { icon: 'mdi-teach', name: 'Mentorships', route: '/mentorships' },
-      { icon: 'mdi-console-line', name: 'Terminal', route: '/terminal' },
-      { icon: 'mdi-lifebuoy', name: 'Tutorial', route: '/tutorial' },
-      { icon: 'mdi-book', name: 'Wiki', route: '/wiki' },
-      {
-        icon: 'mdi-information',
-        name: 'About & Contributors',
-        route: '/about'
-      }
-    ]
+    menu: []
+    // menu: [
+    //   { icon: 'mdi-account-circle', name: 'Account & User Server', route: '/account' },
+    //   { icon: 'mdi-backup-restore', name: 'Backups', route: '/backups' },
+    //   { icon: 'mdi-web', name: 'Blogs & Websites', route: '/websites' },
+    //   { icon: 'mdi-database', name: 'Databases', route: '/databases' },
+    //   { icon: 'mdi-gamepad-square', name: 'Games', route: '/games' },
+    //   { icon: 'mdi-teach', name: 'Mentorships', route: '/mentorships' },
+    //   { icon: 'mdi-console-line', name: 'Terminal', route: '/terminal' },
+    //   { icon: 'mdi-lifebuoy', name: 'Tutorial', route: '/tutorial' },
+    //   { icon: 'mdi-book', name: 'Wiki', route: '/wiki' },
+    //   {
+    //     icon: 'mdi-information',
+    //     name: 'About & Contributors',
+    //     route: '/about'
+    //   }
+    // ]
   }),
 
   methods: {
@@ -205,15 +205,15 @@ export default Vue.extend({
   },
 
   updated () {
-    let i = 0
-    for (const item of this.menu) {
-      if (this.$route.path === item.route) {
-        this.selectedMenu = i
-        return
-      }
+    // let i = 0
+    // for (const item of this.menu) {
+    //   if (this.$route.path === item.route) {
+    //     this.selectedMenu = i
+    //     return
+    //   }
 
-      i++
-    }
+    //   i++
+    // }
 
     // Hide drawer if we're on a non-menu page
     // this.drawer = false

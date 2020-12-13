@@ -9,7 +9,7 @@
                 Instances
               </v-card-title>
               <v-card-subtitle>
-                An instance is a remote virtualized machine that you can run whatever software you want on
+                An instance is a remote virtualized machine that you can do with what you please
               </v-card-subtitle>
               <v-card-text>
                 <h3>How To Guides</h3>
@@ -74,7 +74,7 @@
           <v-card-subtitle>
             A container is a lightweight instance that can run almost all software and web services
           </v-card-subtitle>
-          <cloud-instances-list type="lxc" typeName="Container" />
+          <instances-list type="lxc" typeName="Container" />
         </v-card>
       </v-col>
     </v-row>
@@ -85,12 +85,12 @@
             Virtual Private Servers
           </v-card-title>
           <v-card-subtitle>
-            A virtual private server (VPS) instance is a complete emulation of a server. A VPS is required if you need to use Docker / LXD or Linux kernel tools
+            A virtual private server (VPS) instance is a complete emulation of a server.<br/>A VPS is required if you need to use Linux kernel tools
             <p>
-              <b class="warning--text">If you request a VPS, there is a very high likelihood of your request being declined if the request reason can be suitably ran inside a container-based workflow.</b>
+              <b class="warning--text">If you request a VPS, there is a very high likelihood of your request being declined<br/>if the request reason can be suitably ran inside a container-based workflow.</b>
             </p>
           </v-card-subtitle>
-          <cloud-instances-list type="vps" typeName="VPS" />
+          <instances-list type="vps" typeName="VPS" />
         </v-card>
       </v-col>
     </v-row>
@@ -99,12 +99,12 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import CloudInstancesList from '@/components/CloudInstancesList.vue'
+import InstancesList from '@/components/InstancesList.vue'
 
 export default Vue.extend({
   name: 'Websites',
   components: {
-    CloudInstancesList
+    InstancesList
   },
 
   data: () => ({

@@ -12,7 +12,7 @@ export interface Template {
   description: string;
   logo_url: string;
   disk_url: string;
-  disk_sha256sum: string;
+  disk_sha256sum?: string;
   disk_format: string;
   specs: Specs;
 }
@@ -37,6 +37,17 @@ export interface Network {
   ports: { [external: number]: number };
   vhosts: { [vhost: string]: VHostOptions};
   nic_allocation: NICAllocation;
+}
+
+export interface File {
+  st_size: number;
+  st_uid: number;
+  st_gid: number;
+  st_mode: number;
+  st_atime: number;
+  st_mtime: number;
+  group: string;
+  owner: string;
 }
 
 export interface RootUser {
@@ -91,4 +102,12 @@ export interface Instance {
   metadata: Metadata;
   remarks: string[];
   status: Status;
+}
+
+export interface VHostRequirements {
+  base_domain: string;
+  user_supplied: {
+    verification_text_name: string;
+    allowed_a_aaaa: string[];
+  };
 }

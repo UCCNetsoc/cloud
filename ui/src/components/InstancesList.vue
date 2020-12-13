@@ -14,7 +14,9 @@
           </template>
 
           <template v-slot:item="row">
-            <tr  :style="row.item[1].status == Status.Running ? 'background-color: rgba(0,255,0,0.04)' : 'background-color: rgba(255,0,0,0.04)'">
+            <tr
+              :style="row.item[1].active === true ? (row.item[1].status == Status.Running ? 'background-color: rgba(0,255,0,0.04)' : 'background-color: rgba(255,0,0,0.04)') :  'filter: grayscale(0.2); background-color: rgba(127,127,127,0.04)' "
+            >
               <td>
                 <v-container class="pa-0 ma-0">
                   <v-row justify="start">
@@ -24,26 +26,42 @@
                         tile
                         class="my-2"
                       >
+                        <v-icon v-if="getTemplate(row.item[1].metadata.request_detail.template_id).logo_url===''">
+                          mdi-help
+                        </v-icon>
                         <img
-                          :src="templates[row.item[1].metadata.request_detail.template_id].logo_url"
+                          v-else
+                          :src="getTemplate(row.item[1].metadata.request_detail.template_id).logo_url"
                         >
                       </v-avatar>
                     </v-col>
                     <v-col sm="12" md="9">
                       <h2 class="pa-0 ma-0">{{row.item[1].hostname}}</h2>
-                      <h4 class="mb-2">{{ templates[row.item[1].metadata.request_detail.template_id].title }}</h4>
+                      <h4 class="mb-2">{{ getTemplate(row.item[1].metadata.request_detail.template_id).title }}</h4>
                       <div class="caption" v-for="spec in getSpecList(row.item[1].specs)" :key="spec">
                         {{ spec }}
                       </div>
                       <v-btn
                         x-small
-                        class="my-2 blue"
+                        class="mr-1 my-2 blue"
+                        @click="msg = marked(getTemplate(row.item[1].metadata.request_detail.template_id).description)"
+                        :disabled="row.item[1].metadata.tos.suspended === true"
+                      >
+                        <v-icon>
+                          mdi-information
+                        </v-icon>
+                        info
+                      </v-btn>
+                      <v-btn
+                        x-small
+                        class="ma-1 my-2 blue"
                         @click="openConfirmCancel(ConfirmCancelMode.RequestRespec, { hostname: row.item[0] })"
+                        :disabled="row.item[1].metadata.tos.suspended === true"
                       >
                         <v-icon>
                           mdi-server-plus
                         </v-icon>
-                        respec
+                        upgrade
                       </v-btn>
                     </v-col>
                   </v-row>
@@ -54,7 +72,7 @@
                   <v-row no-gutters justify="start" align="center">
                     <p class="caption">
                       Forwarded ports available on:<br/>
-                      {{row.item[1].fqdn}}
+                      <b>{{row.item[1].fqdn}}</b>
                     </p>
                   </v-row>
                   <v-row no-gutters justify="start" align="center">
@@ -70,6 +88,7 @@
                         x-small
                         icon
                         @click="openConfirmCancel(ConfirmCancelMode.RemovePort, { hostname: row.item[0], portMapExternal: external })"
+                        :disabled="row.item[1].metadata.tos.suspended === true"
                       >
                         <v-icon>
                           mdi-delete
@@ -81,7 +100,8 @@
                 <v-btn
                   x-small
                   @click="openConfirmCancel(ConfirmCancelMode.AddPort, { hostname: row.item[0] })"
-                  class="purple"
+                  class="purple ma-1"
+                  :disabled="row.item[1].active === false"
                 >
                   <v-icon>
                     mdi-plus
@@ -105,6 +125,7 @@
                         x-small
                         icon
                         @click="openConfirmCancel(ConfirmCancelMode.RemoveVirtualHost, { hostname: row.item[0], vHostDomain: vhost })"
+                        :disabled="row.item[1].metadata.tos.suspended === true"
                       >
                         <v-icon>
                           mdi-delete
@@ -116,7 +137,8 @@
                 <v-btn
                   x-small
                   @click="openConfirmCancel(ConfirmCancelMode.AddVirtualHost, { hostname: row.item[0] })"
-                  class="purple"
+                  class="purple ma-1"
+                  :disabled="row.item[1].active == false"
                 >
                   <v-icon>
                     mdi-plus
@@ -142,10 +164,10 @@
                     </v-col>
                     <v-col sm="12" md="10">
                       <div v-if="row.item[1].metadata.tos.suspended == true" class="red--text">
-                        Suspended ({{ row.item[1].metadata.tos.reason }})
+                        <b>Suspended ({{ row.item[1].metadata.tos.reason }})</b>
                       </div>
                       <div v-else-if="row.item[1].metadata.permanent == true" class="green--text">
-                        Permanent
+                        <b>Permanent</b>
                       </div>
                       <div v-else-if="row.item[1].active == true" class="green--text">
                         Active until <b>{{ row.item[1].inactivity_shutdown_date }}</b>
@@ -157,7 +179,7 @@
                         v-if="row.item[1].metadata.tos.suspended == false && row.item[1].metadata.permanent == false"
                         :ripple="false"
                         x-small
-                        :class="row.item[1].active ? 'green mt-1' : 'red mt-1'"
+                        :class="row.item[1].active ? 'green ma-1' : 'red ma-1'"
                         inline
                         @click="openConfirmCancel(ConfirmCancelMode.RenewActivation, { hostname: row.item[0] })"
                       >
@@ -186,8 +208,42 @@
               <td class="pa-2">
                 <v-btn
                   x-small
+                  class="ma-1 blue"
+                  :disabled="row.item[1].status != Status.Running || row.item[1].active == false"
+                  @click="openConfirmCancel(ConfirmCancelMode.OpenTerminal, { hostname: row.item[0] })"
+                >
+                  <v-icon>
+                    mdi-console-line
+                  </v-icon>
+                  terminal
+                </v-btn>
+                <v-btn
+                  x-small
+                  class="ma-1 blue"
+                  :disabled="row.item[1].status != Status.Running || row.item[1].active == false"
+                  @click="openConfirmCancel(ConfirmCancelMode.OpenFilesystem, { hostname: row.item[0] })"
+                >
+                  <v-icon>
+                    mdi-file-multiple
+                  </v-icon>
+                  filesystem
+                </v-btn>
+                <v-btn
+                  x-small
+                  class="ma-1 red"
+                  @click="openConfirmCancel(ConfirmCancelMode.ResetRootUser, { hostname: row.item[0] })"
+                  :disabled="row.item[1].status == Status.Stopped || row.item[1].active == false"
+                >
+                  <v-icon>
+                    mdi-account
+                  </v-icon>
+                  reset root
+                </v-btn>
+                <br/>
+                <v-btn
+                  x-small
                   class="ma-1 green"
-                  :disabled="row.item[1].status == Status.Running"
+                  :disabled="row.item[1].status == Status.Running || row.item[1].active == false"
                   @click="openConfirmCancel(ConfirmCancelMode.StartInstance, { hostname: row.item[0] })"
                 >
                   <v-icon>
@@ -198,7 +254,7 @@
                 <v-btn
                   x-small
                   class="ma-1 warning"
-                  :disabled="row.item[1].status != Status.Running"
+                  :disabled="row.item[1].status != Status.Running || row.item[1].active == false"
                   @click="openConfirmCancel(ConfirmCancelMode.ShutdownInstance, { hostname: row.item[0] })"
                 >
                   <v-icon>
@@ -209,37 +265,19 @@
                 <v-btn
                   x-small
                   class="ma-1 red"
-                  :disabled="row.item[1].status != Status.Running"
+                  :disabled="row.item[1].status != Status.Running || row.item[1].active == false"
                   @click="openConfirmCancel(ConfirmCancelMode.StopInstance, { hostname: row.item[0] })"
                 >
                   <v-icon>
                     mdi-stop
                   </v-icon>
                   stop
-                </v-btn><br/>
-                <v-btn
-                  x-small
-                  class="mx-1 blue"
-                >
-                  <v-icon>
-                    mdi-file
-                  </v-icon>
-                  files
-                </v-btn>
-                <v-btn
-                  x-small
-                  class="ma-1 red"
-                  @click="openConfirmCancel(ConfirmCancelMode.ResetRootUser, { hostname: row.item[0] })"
-                >
-                  <v-icon>
-                    mdi-refresh
-                  </v-icon>
-                  reset root
                 </v-btn>
                 <v-btn
                   x-small
                   class="ma-1 black"
                   @click="openConfirmCancel(ConfirmCancelMode.DeleteInstance, { hostname: row.item[0] })"
+                  :disabled="row.item[1].active == false"
                 >
                   <v-icon>
                     mdi-delete
@@ -268,7 +306,7 @@
       </v-col>
     </v-row>
     <message-dialog :visible="msg.length > 0" @okay="msg = ''">
-      {{ msg }}
+      <span v-html="msg"></span>
     </message-dialog>
     <confirm-cancel-dialog
       :title="confirmCancel.mode"
@@ -354,9 +392,7 @@
                       <span class="grey--text text--lighten-2">
                         {{ confirmCancel.action.template.subtitle }}<br/>
                       </span>
-                      <span>
-                        {{ confirmCancel.action.template.description }}
-                      </span><br/><br/>
+                      <p v-html="marked(confirmCancel.action.template.description)"></p>
                       <h4 class="white--text">
                         {{ getSpecString(confirmCancel.action.template.specs) }}
                       </h4>
@@ -382,7 +418,7 @@
                           No commercial use
                         </h3>
                         <span class="grey--text text--lighten-1">
-                          Netsoc Cloud is only for educational and learning purposes
+                          Netsoc Cloud is only for educational, entertainment and learning purposes
                         </span>
                       </v-col>
                     </v-row>
@@ -597,11 +633,11 @@
         <p>
           You can use any domain that match the following forms:
           <ul>
-            <li>{{ $store.state.auth.user.profile.preferred_username }}.{{ baseDomain }}</li>
+            <li>{{ $store.state.auth.user.profile.preferred_username }}.{{ vhostRequirements.base_domain }}</li>
             <li>
-              *.{{ $store.state.auth.user.profile.preferred_username }}.{{ baseDomain }}
+              *.{{ $store.state.auth.user.profile.preferred_username }}.{{ vhostRequirements.base_domain }}
               <ul>
-                <li>e.g. blog.{{ $store.state.auth.user.profile.preferred_username }}.{{ baseDomain }}</li>
+                <li>e.g. blog.{{ $store.state.auth.user.profile.preferred_username }}.{{ vhostRequirements.base_domain }}</li>
               </ul>
             </li>
             <li>{{ instances[confirmCancel.action.hostname].fqdn }}</li>
@@ -613,8 +649,18 @@
         <p>
           You must visit the website for your domain registrar and add the following records to your domain:
           <ul>
-            <li><code>TXT</code> record of key <code>_netsoc</code> with value <code>{{ $store.state.auth.user.profile.preferred_username }}</code></li>
-            <li><code>A</code> record of value <code>84.39.234.52</code></li>
+            <li>
+              <code>TXT</code>
+              record of key
+              <code>{{ vhostRequirements.user_supplied.verification_txt_name }}</code>
+              with value
+              <code>{{ $store.state.auth.user.profile.preferred_username }}</code>
+            </li>
+            <li v-for="record in vhostRequirements.user_supplied.allowed_a_aaaa" :key="record">
+              <code>A</code>
+              record of value
+              <code>{{ record }}</code>
+            </li>
           </ul><br/>
           <b class="warning--text">These values may be subject to change.<br/>We will make an announcement in the <code>#servers</code> channel on our Discord if this is the case</b>
         </p>
@@ -622,7 +668,7 @@
           label='Virtual Host'
           v-model='confirmCancel.action.vHostDomain'
           :rules='websiteHostRules'
-          :placeholder='$store.state.auth.user.profile.preferred_username+"."+baseDomain'
+          :placeholder='$store.state.auth.user.profile.preferred_username+"."+vhostRequirements.base_domain'
         ></v-text-field>
         <v-text-field
           label='HTTP(S) port to reverse proxy'
@@ -665,6 +711,34 @@
           This action is irreversible and will possibly change the root password, rotate the host keys and re-enable root SSH access
         </b>
       </p>
+      <p v-else-if="confirmCancel.mode == ConfirmCancelMode.OpenTerminal">
+        You are about to open an SSH terminal for this instance<br><br>
+        You wll be prompted for:
+        <ul>
+          <li>Username of an account on this instance</li>
+          <li>Password of the account</li>
+        </ul><br>
+        <b class="warning--text">If you have not already reset the <code>root</code> user password, you will need to do so before you can make use of this feature</b>
+      </p>
+      <p v-else-if="confirmCancel.mode == ConfirmCancelMode.OpenFilesystem">
+        You are about to open an SFTP browser for this instance.<br><br>
+
+        You wll be prompted for:
+        <ul>
+          <li>
+            Host
+            <ul>
+              <li>You will need to enter <code>{{ instances[confirmCancel.action.hostname].metadata.network.nic_allocation.addresses[0].split('/')[0] }}</code> and port <code>22</code></li>
+            </ul>
+          </li>
+          <li>Username of an account on this instance</li>
+          <li>Password of the account</li>
+          <li>Remember to select <b>Password Authentication</b></li>
+          <li>All other fields can be left blank</li>
+        </ul>
+        <br/>
+        <b class="warning--text">If you have not already reset the <code>root</code> user password, you will need to do so before you can make use of this feature</b>
+      </p>
     </confirm-cancel-dialog>
   </v-container>
 </template>
@@ -679,6 +753,8 @@
 </style>
 
 <script lang='ts'>
+import marked from 'marked'
+
 import ConfirmCancelDialog from '@/components/ConfirmCancelDialog.vue'
 import MessageDialog from '@/components/MessageDialog.vue'
 
@@ -686,7 +762,7 @@ import { config } from '@/config'
 import { fetchRest } from '@/api/rest'
 // import { openApiGetSchemaProperty, openApiPropertyValidator } from '@/api/openapi'
 
-import { Instance, Template, Status, Specs } from '@/api/cloud'
+import { Instance, Template, Status, Specs, VHostRequirements } from '@/api/cloud'
 
 import Vue from 'vue'
 
@@ -703,7 +779,9 @@ enum ConfirmCancelMode {
   ShutdownInstance = 'shutdown instance',
   StopInstance = 'stop instance',
   DeleteInstance = 'delete instance',
-  ResetRootUser = 'reset root user'
+  ResetRootUser = 'reset root user',
+  OpenTerminal = 'open terminal',
+  OpenFilesystem = 'open filesystem'
 }
 
 export interface ConfirmCancelAction {
@@ -759,6 +837,36 @@ export default Vue.extend({
   },
 
   methods: {
+    marked (str: string) {
+      return marked(str)
+    },
+
+    open (url: string) {
+      window.open(url, '_blank', '')
+    },
+
+    getTemplate (templateId: string): Template {
+      if (templateId in this.templates) {
+        return this.templates[templateId]
+      }
+
+      return {
+        title: 'Unknown Template',
+        subtitle: 'This template has been renamed or moved',
+        description: 'This template has been renamed or moved, contact a SysAdmin on the UCC Netsoc Discord if you are having any issues',
+        logo_url: '',
+        disk_url: '',
+        disk_sha256sum: '',
+        disk_format: '',
+        specs: {
+          cores: 0,
+          disk_space: 0,
+          memory: 0,
+          swap: 0
+        }
+      }
+    },
+
     async openConfirmCancel (mode: ConfirmCancelMode, action: ConfirmCancelAction = {}) {
       this.confirmCancel.action = action
       this.confirmCancel.mode = mode
@@ -963,13 +1071,27 @@ export default Vue.extend({
               })
             break
           }
+
+          case ConfirmCancelMode.OpenTerminal: {
+            const instance = this.instances[hostname as string]
+
+            open(config.sshUrl + '/' + instance.metadata.network.nic_allocation.addresses[0].split('/')[0])
+            break
+          }
+
+          case ConfirmCancelMode.OpenFilesystem: {
+            const instance = this.instances[hostname as string]
+
+            open(config.sftpUrl)
+            break
+          }
         }
       } catch (e) {
         this.confirmCancel.loading = false
         this.msg = e.message
       } finally {
         this.closeConfirmCancel()
-        this.uiReload()
+        setTimeout(() => this.uiReload(), 10)
       }
     },
 
@@ -987,19 +1109,17 @@ export default Vue.extend({
     },
 
     async uiReload () {
-      // this.uiSetInstances({})
       this.loading = true
 
       try {
         const bdRes = await fetchRest(
-          `${config.apiBaseUrl}/v1/proxmox/base-domain`, {
+          `${config.apiBaseUrl}/v1/proxmox/vhost-requirements`, {
             headers: {
               Authorization: `Bearer ${this.$store.state.auth.user.access_token}`
             }
           })
 
-        this.baseDomain = await bdRes.text()
-        this.baseDomain = this.baseDomain.replace(/['"]+/g, '')
+        this.vhostRequirements = await bdRes.json()
 
         const res = await fetchRest(
           `${config.apiBaseUrl}/v1/proxmox/${this.$store.state.auth.user.profile.preferred_username}/${this.type}`, {
@@ -1013,11 +1133,15 @@ export default Vue.extend({
       } catch (e) {
         this.loading = false
         this.empty = e.message
-        this.uiSetInstances({})
+        this.instances = {}
       }
     },
 
     async uiSilentReload () {
+      if (this.loading === true) {
+        return
+      }
+
       // Silently reload without clearing the UI list
       try {
         const res = await fetchRest(
@@ -1029,8 +1153,9 @@ export default Vue.extend({
 
         this.uiSetInstances(await res.json())
       } catch (e) {
-        this.uiSetInstances({})
+        this.loading = false
         this.empty = e.message
+        this.instances = {}
       }
     },
 
@@ -1073,6 +1198,7 @@ export default Vue.extend({
     const action: ConfirmCancelAction = {}
     const templates: { [template_id: string]: Template} = {}
     const templateIdx: number | undefined = undefined
+    const vhostRequirements: VHostRequirements | undefined = undefined
 
     return {
       Status,
@@ -1084,7 +1210,7 @@ export default Vue.extend({
       templates,
 
       templateIdx,
-      baseDomain: 'netsoc.cloud',
+      vhostRequirements,
 
       confirmCancel: {
         mode: ConfirmCancelMode.Hidden,

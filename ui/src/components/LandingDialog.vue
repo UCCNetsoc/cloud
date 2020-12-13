@@ -63,7 +63,6 @@ export default Vue.extend({
     features: [
       { icon: 'mdi-web', title: 'Web Services', description: 'Easily deploy a web service with a few clicks. Pre-configured templates include WordPress, Ghost CMS, static hosting and more' },
       { icon: 'mdi-controller-classic', title: 'Gameservers', description: 'Spin up a game server and play games like Minecraft with your friends in seconds' },
-      { icon: 'mdi-web', title: 'Custom & Free Domains', description: 'Use our free subdomains like <username>.netsoc.co and mywebsite.<username>.netsoc.co or use your own domain' },
       { icon: 'mdi-console-network', title: 'Development Tools', description: 'Boot a container with support for any programming language you can think of' },
       { icon: 'mdi-server-network', title: 'Virtual Private Servers', description: 'Launch a Linux host like Debian / Ubuntu / Arch / CentOS and run tools like Docker, LXD and more' }
     ]

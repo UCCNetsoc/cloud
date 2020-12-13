@@ -34,6 +34,14 @@
             :rules='usernameRules'
           ></v-text-field>
           <v-checkbox
+            @change='privacyCheckChange'
+            v-model='privacyAccepted'
+          >
+            <span slot='label'>
+              I am a member of <a @click='privacyCheckChange'>UCC Netsoc</a>
+            </span>
+          </v-checkbox>
+          <v-checkbox
             v-model='tosAccepted'
             @change='tosCheckChange'
           >
@@ -41,20 +49,12 @@
               I read and accept the <a @click='tosCheckChange'>Terms of Service</a>
             </span>
           </v-checkbox>
-          <v-checkbox
-            @change='privacyCheckChange'
-            v-model='privacyAccepted'
-          >
-            <span slot='label'>
-              I read and accept the <a @click='privacyCheckChange'>Privacy Policy</a>
-            </span>
-          </v-checkbox>
-          <policy
+          <!-- <policy
             mdUrl='https://raw.githubusercontent.com/UCCNetsoc/wiki/master/services/privacy-policy.md'
             v-on:accept='privacyAccepted = true; privacyVisible = false'
             v-on:decline='privacyAccepted = false; privacyVisible = false'
             :visible='privacyVisible'
-          />
+          /> -->
           <policy
             mdUrl='https://raw.githubusercontent.com/UCCNetsoc/wiki/master/services/terms-of-service.md'
             v-on:accept='tosAccepted = true; tosVisible = false'
@@ -67,7 +67,7 @@
       <v-divider/>
       <v-card-actions class="justify-center ma-3">
         <v-btn v-on:click="submit()" :disabled='disabled' color="green">Sign Up</v-btn>
-        <v-btn v-on:click="$emit('cancelled')" color="red">Cancel</v-btn>
+        <v-btn v-on:click="$emit('cancelled')" color="darkgrey">Cancel</v-btn>
       </v-card-actions>
     </card-dialog>
     <card-dialog
@@ -134,7 +134,7 @@ export default Vue.extend({
 
   methods: {
     privacyCheckChange () {
-      this.privacyVisible = true
+      // this.privacyVisible = true
     },
 
     tosCheckChange () {
@@ -159,13 +159,13 @@ export default Vue.extend({
       // @ts-ignore
       this.$refs.form.validate()
 
-      if (!this.privacyAccepted) {
-        this.resultDialog = {
-          visible: true,
-          msg: 'You must agree to the Privacy Policy to create an account'
-        }
-        return
-      }
+      // if (!this.privacyAccepted) {
+      //   this.resultDialog = {
+      //     visible: true,
+      //     msg: 'You must agree to the Privacy Policy to create an account'
+      //   }
+      //   return
+      // }
 
       if (!this.tosAccepted) {
         this.resultDialog = {

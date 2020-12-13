@@ -9,11 +9,13 @@ import PasswordSet from '@/views/PasswordSet.vue'
 
 import Account from '@/views/Account.vue'
 import About from '@/views/About.vue'
-import Cloud from '@/views/Cloud.vue'
-import CloudInstanceRequest from '@/views/CloudInstanceRequest.vue'
+import Instances from '@/views/Instances.vue'
+import InstanceRequest from '@/views/InstanceRequest.vue'
+import InstanceFileManager from '@/views/InstanceFileManager.vue'
 
 import Terminal from '@/views/Terminal.vue'
 import { useAuthRoutes, requireAuth } from './auth'
+import { compile } from 'vue/types/umd'
 
 Vue.use(VueRouter)
 
@@ -71,12 +73,12 @@ const routes = [
   {
     path: '/instances',
     name: 'Instances',
-    component: requireAuth(Cloud)
+    component: requireAuth(Instances)
   },
   {
-    path: '/instances/:emailOrUsername/:instanceRequestType/:hostname/:token',
+    path: '/instance-request/:emailOrUsername/:instanceRequestType/:hostname/:token',
     name: 'Instance Request',
-    component: requireAuth(CloudInstanceRequest)
+    component: requireAuth(InstanceRequest)
   },
   {
     path: '/tutorial',
@@ -115,11 +117,6 @@ const routes = [
       window.open('https://wiki.netsoc.co')
       next(false)
     }
-  },
-  {
-    path: '/file-manager',
-    name: 'File Manager',
-    component: requireAuth(Terminal)
   },
   {
     path: '/about',
