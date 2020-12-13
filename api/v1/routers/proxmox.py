@@ -259,7 +259,7 @@ async def approve_instance_request(
             f"""Hi {resource_account.username}!<br/><br/>
                 We received your request for a {fancy_name(instance_type)} named '{hostname}'<br/>
                 We're delighted to inform you that your instance request has been granted!<br/>
-                For guides on how to SSH into your instance, please consult the <a class="color: white" href='https://tutorial.netsoc.co'>tutorial</a>
+                For guides on how to SSH into your instance, please consult the <a style="color: white" href='https://tutorial.netsoc.co'>tutorial</a>
                 <br/>
             """
         ),
