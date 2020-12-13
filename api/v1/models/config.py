@@ -187,13 +187,13 @@ class Proxmox(BaseModel):
             base_domain: str
             user_supplied: UserSupplied
 
-        class VLANJumpHost(BaseModel):
-            server: str
-            port: str = 22
-            username: str = "jumphost"
-            public_key: Optional[str] = None
-            private_key: Optional[str] = None
-            password: str = None
+        # class VLANJumpHost(BaseModel):
+        #     server: str
+        #     port: str = 22
+        #     username: str = "jumphost"
+        #     public_key: Optional[str] = None
+        #     private_key: Optional[str] = None
+        #     password: str = None
 
         traefik_config_key: str
         bridge: str = "vmbr0"
@@ -205,7 +205,7 @@ class Proxmox(BaseModel):
             ipaddress.IPv4Address("10.40.0.254")
         )
 
-        vlan_jumphost: VLANJumpHost
+        #vlan_jumphost: VLANJumpHost
 
         port_forward: PortForward
         vhosts: VHostRequirements
