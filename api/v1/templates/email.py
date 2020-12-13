@@ -31,7 +31,7 @@ netsoc = Template("""
             <h1 style="color: white; font-size: 18px;font-weight: 200;text-align: center;padding: 8px 0;">
                 {{ heading }}
             </h1>
-            <div style="max-width: 500px; margin: 1em auto">
+            <div style="max-width: 600px; margin: 1em auto">
                 <p style="border-top: 1px solid rgb(55,55,55);border-bottom: 1px solid rgb(55,55,55);color: white;text-align: center;max-width: 500px;color: #fff;padding: 1em;">
                     {{ paragraph }}
                 </p>
@@ -39,7 +39,7 @@ netsoc = Template("""
             <div style="max-width: 1000px; margin: 1em auto">
                 {% if embeds is defined %}
                     {% for item in embeds %}
-                        <div style="background-color: #111;max-width: fit-content; margin: 10px auto 10px auto;padding: 10px; border-left: #2196F3 solid 4px;">
+                        <div style="background-color: #111;max-width: fit-content; width:min-content; margin: 10px auto 10px auto;padding: 10px; border-left: #2196F3 solid 4px;">
                             {{ item.text }}
                         </div>
                     {% endfor %}
