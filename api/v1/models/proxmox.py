@@ -92,8 +92,8 @@ class Template(BaseModel):
     logo_url: str
     disk_file: str
     disk_file_fallback_url: Optional[str]
-    disk_sha256sum: str
-    disk_format: str
+    disk_sha256sum: Optional[str]
+    disk_format: DiskFormat
     wake_on_request: bool
     specs: Specs
 
@@ -128,9 +128,7 @@ class Inactivity(BaseModel):
 class RootUser(BaseModel):
     password_hash: str
     ssh_public_key: str
-    mgmt_ssh_public_key: str
-    mgmt_ssh_private_key: str
-
+    
 class NICAllocation(BaseModel):
     addresses: List[ipaddress.IPv4Interface] = []
     gateway4: ipaddress.IPv4Address
