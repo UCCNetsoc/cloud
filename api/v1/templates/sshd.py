@@ -162,10 +162,10 @@ banner = Template("""
 
     +-------------------------------------------------------------------+
     |                                                                   |
-    |  First time using Netsoc Cloud?     https://tutorial.netsoc.co    |
-    |  Want to chat with our members?     https://discord.netsoc.co     |
-    |  Want to learn more about us?       https://wiki.netsoc.co        |
-    |  Want to help out our SysAdmins?    https://github.com/UCCNetsoc  |
+    |  * First time using Netsoc Cloud?   https://tutorial.netsoc.co    |
+    |  * Want to chat with our members?   https://discord.netsoc.co     |
+    |  * Want to learn more about us?     https://wiki.netsoc.co        |
+    |  * Want to help out our SysAdmins?  https://github.com/UCCNetsoc  |
     |                                                                   |
     |  Your use of an instance is in agreement to the Terms of Service  |
     |       If you do not agree to Terms of Service please cease        |

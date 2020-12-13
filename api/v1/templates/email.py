@@ -42,6 +42,7 @@ netsoc = Template("""
                         <div style="display:inline-block; background-color: #111; margin: 10px auto 10px auto;padding: 10px; border-left: #2196F3 solid 4px;">
                             {{ item.text }}
                         </div>
+                        <br/>
                     {% endfor %}
                 {% endif %}
 
