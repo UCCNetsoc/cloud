@@ -134,9 +134,6 @@ class Captcha(BaseModel):
     hcaptcha: Optional[Hcaptcha]
     enabled: bool = False
 
-class HomeDirConsistency(BaseModel):
-    scan_interval: int
-
 from .proxmox import Template
 class Proxmox(BaseModel):
     class Cluster(BaseModel):
