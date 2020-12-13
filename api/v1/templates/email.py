@@ -36,10 +36,10 @@ netsoc = Template("""
                     {{ paragraph }}
                 </p>
             </div>
-            <div style="max-width: 1000px; margin: 1em auto">
+            <div style="max-width: 1000px; margin: 1em auto; text-align: center">
                 {% if embeds is defined %}
                     {% for item in embeds %}
-                        <div style="background-color: #111;max-width: fit-content; width:min-content; margin: 10px auto 10px auto;padding: 10px; border-left: #2196F3 solid 4px;">
+                        <div style="display:inline-block; background-color: #111; margin: 10px auto 10px auto;padding: 10px; border-left: #2196F3 solid 4px;">
                             {{ item.text }}
                         </div>
                     {% endfor %}
