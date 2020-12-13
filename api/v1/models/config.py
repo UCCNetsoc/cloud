@@ -147,6 +147,7 @@ class Proxmox(BaseModel):
             server: str
             port: str
             username: str = "root@pam"
+            password: Optional[str]
             token_name: str
             token_value: str
 

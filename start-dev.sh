@@ -35,4 +35,8 @@ services:
       - ${WD}/config.sample.yml:/config.yml
 " > ./cloud/docker-compose.override.yml
 
+cd cloud
+./vagrant-up.sh
+cd .. 
+
 bash --init-file <(echo "source bin/activate") -c "./dev-env up cloud api"
