@@ -69,7 +69,7 @@ Return a Rest error model whenever our API throws
 """
 @api.exception_handler(exceptions.exception.APIException)
 async def resterror_exception_handler(request: Request, e: Exception):
-    logger.error(f"API exception (500)", e=e, exc_info=True)
+    logger.exception(f"API exception (500)", e=e, exc_info=True)
 
     return JSONResponse(
         status_code=500,
