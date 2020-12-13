@@ -10,47 +10,154 @@ auth:
 proxmox:
   blacklisted_nodes:
     - feynman
-  ssh:
-    server: "feynman.netsoc.co"
-    port: 2222
-    username: "root"
-    password: "-"
-  api:
-    server: "feynman.netsoc.co"
-    port: 8007
-    username: "root@pam"
-    token_name: "NetsocCloud"
-    token_value: "-"
+  cluster:
+    ssh:
+      server: "feynman.netsoc.co"
+      port: 2222
+      username: "root"
+      password: "-"
+    api:
+      server: "feynman.netsoc.co"
+      port: 8007
+      username: "root@pam"
+      token_name: "NetsocCloud"
+      token_value: "-"
+  network:
+    traefik_config_key:  "77826907276100902243245529368278"
+    port_forward:
+      range: [16384, 17384]
+    vhosts:
+      base_domain: "netsoc.cloud"
+      user_supplied:
+        verification_txt_name: "_netsoc"
+        allowed_a_aaaa: [84.39.234.54]
   dir_pool: "local"
   vps:
     templates:
-      ubuntu-20.04:
-        title: "Ubuntu 20.04"
-        subtitle: "Ubuntu's version 20.04 operating system"
+      netsoc-ubuntu-20.04:
+        title: "Ubuntu Server 20.04.1 LTS"
+        subtitle: "An easy to use server distro"
         description: | 
           Ubuntu is a Linux distribution based on Debian mostly composed of free and open-source software.
           Ubuntu is officially released in three editions: Desktop, Server, and Core for Internet of things devices and robots.
           All the editions can run on the computer alone, or in a virtual machine
-        logo_url: "https://assets.ubuntu.com/v1/29985a98-ubuntu-logo32.png"
+        logo_url: "https://wiki.netsoc.co/assets/cloud/template-ubuntu.png"
         disk_file: "ubuntu-20.04-server-cloudimg-amd64.img"
         disk_file_fallback_url: "https://cloud-images.ubuntu.com/releases/focal/release-20200921.1/ubuntu-20.04-server-cloudimg-amd64.img"
         disk_sha256sum: "d18a9d2b890d3c1401e70a281cae44b61816aa669c4936f7a99c168e572ec8cb"
         disk_format: "qcow2"
         wake_on_request: no
         specs:
-          cores: 1
+          cores: 2
           disk_space: 10
           memory: 2048
   lxc:
     templates:
-      netsoc-nginx-alpine:
-        title: "nginx 1.19 Alpine"
-        subtitle: "For static hosting or use as a reverse proxy"
+      netsoc-devtools-ubuntu:
+        title: "Developer Tools (on Ubuntu)"
+        subtitle: "Docker, Git, Vim/Nano, Python, NodeJS, Java, C/C++, Rust, Go, Ruby"
         description: |
-          nginx is a HTTP, HTTP reverse proxy and generic TCP/UDP reverse proxy server
-        logo_url: "https://img.icons8.com/color/452/nginx.png"
-        disk_file: "netsoc-nginx-alpine.tar.gz"
-        disk_sha256sum: "675fd362609cfe31c1e3b671663a5a4ee4d2bdaa091e3ad1f115663d0d0af4ae"
+          Build to your heart's desires with this fully equipped machine
+        logo_url: "https://wiki.netsoc.co/assets/cloud/template-devtools.png"
+        disk_file: "netsoc-devtools-ubuntu.tar.gz"
+        disk_format: "tar.gz"
+        wake_on_request: yes
+        specs:
+          cores: 2
+          disk_space: 15
+          memory: 1024
+          swap: 1024
+      netsoc-ghostcms-ubuntu:
+        title: "GhostCMS"
+        subtitle: "The world's most popular modern professional publishing platform"
+        description: |
+          Used by Apple, SkyNews, Buffer, OpenAI, and thousands more.
+        logo_url: "https://wiki.netsoc.co/assets/cloud/template-ghostcms.png"
+        disk_file: "netsoc-ghostcms-ubuntu.tar.gz"
+        disk_format: "tar.gz"
+        wake_on_request: no
+        specs:
+          cores: 1
+          disk_space: 10
+          memory: 512
+          swap: 512
+      netsoc-lemp-ubuntu:
+        title: "LEMP Stack (on Ubuntu)"
+        subtitle: "Linux, (e)nginx, MySQL, PHP"
+        description: |
+          Build classic PHP applications with this instance type.
+
+          Important:
+          * The default PHP web root is `/var/www/html/`.
+          * Any files in the web root must be owned by `www-data`.
+          * You will need to run `mysql_secure_installation` as `root` to configure MySQL.
+        logo_url: "https://wiki.netsoc.co/assets/cloud/template-lemp.png"
+        disk_file: "netsoc-lemp-ubuntu.tar.gz"
+        disk_format: "tar.gz"
+        wake_on_request: no
+        specs:
+          cores: 1
+          disk_space: 10
+          memory: 1024
+          swap: 1024
+      netsoc-linuxgsm-ubuntu:
+        title: "LinuxGSM"
+        subtitle: "Quick, simple deployment and management of dedicated game servers."
+        description: |
+          An instance built for LinuxGSM. Create servers like:
+          * CS:GO
+          * Garry's Mod
+          * Minecraft
+          * Many other games: <a href="https://linuxgsm.com/servers/" target="_blank">https://linuxgsm.com/servers/</a>
+
+
+          Follow the installation steps on LinuxGSM's website to install the gameserver you require
+        logo_url: "https://wiki.netsoc.co/assets/cloud/template-linuxgsm.png"
+        disk_file: "netsoc-linuxgsm-ubuntu.tar.gz"
+        disk_format: "tar.gz"
+        wake_on_request: no
+        specs:
+          cores: 2
+          disk_space: 25  
+          memory: 2048
+          swap: 2048
+      netsoc-mean-ubuntu:
+        title: "MEAN Stack (on Ubuntu)"
+        subtitle: "MongoDB, express, Angular, NodeJS"
+        description: |
+          Everything you need to get started creating the modern website of your dreams
+        logo_url: "https://wiki.netsoc.co/assets/cloud/template-mean.png"
+        disk_file: "netsoc-mean-ubuntu.tar.gz"
+        disk_format: "tar.gz"
+        wake_on_request: no
+        specs:
+          cores: 1
+          disk_space: 10
+          memory: 1024
+          swap: 1024
+      netsoc-mysql-ubuntu:
+        title: "MySQL"
+        subtitle: "The relational database everyone knows and uses"
+        description: |
+          A simple MySQL server configured for remote access.
+          
+          Visit the instance page on creation to configure the admin user
+        logo_url: "https://wiki.netsoc.co/assets/cloud/template-mysql.png"
+        disk_file: "netsoc-mysql-ubuntu.tar.gz"
+        disk_format: "tar.gz"
+        wake_on_request: no
+        specs:
+          cores: 1
+          disk_space: 10
+          memory: 1024
+          swap: 1024
+      netsoc-wordpress-ubuntu:
+        title: "WordPress"
+        subtitle: "The most popular blog and CMS system"
+        description: |
+          WordPress is a free and open-source content management system (CMS) written in PHP and paired with a MySQL or MariaDB database. 
+        logo_url: "https://wiki.netsoc.co/assets/cloud/template-wordpress.png"
+        disk_file: "netsoc-wordpress-ubuntu.tar.gz"
         disk_format: "tar.gz"
         wake_on_request: yes
         specs:
@@ -58,24 +165,25 @@ proxmox:
           disk_space: 10
           memory: 512
           swap: 512
-      ubuntu-19.10:
-        title: "Ubuntu 19.10"
-        subtitle: "Ubuntu's version 19.10 operating system"
+      netsoc-ubuntu-20.04:
+        title: "Ubuntu Server 20.04.1 LTS"
+        subtitle: "Ubuntu Server 20.04.1 LTS"
         description: | 
           Ubuntu is a Linux distribution based on Debian mostly composed of free and open-source software.
           Ubuntu is officially released in three editions: Desktop, Server, and Core for Internet of things devices and robots.
           All the editions can run on the computer alone, or in a virtual machine
-        logo_url: "https://assets.ubuntu.com/v1/29985a98-ubuntu-logo32.png"
-        disk_file: "ubuntu-19.10-standard_19.10-1_amd64.tar.gz"
-        disk_file_fallback_url: "http://download.proxmox.com/images/system/ubuntu-19.10-standard_19.10-1_amd64.tar.gz"
-        disk_sha256sum: "6df31f74b031fc831b774b1b0f8f7f43cbc0dd422a400671d4703dde3092b829"
+        logo_url: "https://wiki.netsoc.co/assets/cloud/template-ubuntu.png"
+        disk_file: "ubuntu-20.04-standard_20.04-1_amd64.tar.gz"
+        disk_file_fallback_url: "http://download.proxmox.com/images/system/ubuntu-20.04-standard_20.04-1_amd64.tar.gz"
+        disk_sha256sum: "23895b40c84d04a666616ea2f7b9441df62133790bb51d83ee7e2c076ff89c89"
         disk_format: "tar.gz"
         wake_on_request: no
         specs:
           cores: 1
           disk_space: 10
-          memory: 512
-          swap: 512
+          memory: 1024
+          swap: 1024
+
 links:
   base_url: "http://cloud.netsoc.local"
   jwt:
@@ -119,71 +227,6 @@ links:
       -----END RSA PRIVATE KEY-----
 accounts:
   home_dirs: "/home/users"
-  username_blacklist:
-    - api
-    - admin
-    - blog
-    - ldap
-    - cloud
-    - api
-    - feynman
-    - lovelace
-    - leela
-    - bigbertha
-    - boole
-    - wiki
-    - root
-    - apache2
-    - httpd
-    - www-data
-    - thief
-    - netsoc
-    - irc
-    - ircd
-    - mysql
-    - cron
-    - fail2ban
-    - daemon
-    - games
-    - bin
-    - sys
-    - sync
-    - games
-    - man
-    - lp
-    - mail
-    - news
-    - uucp
-    - proxy
-    - backup
-    - list
-    - gnats
-    - nobody
-    - systemd-timesync
-    - systemd-network
-    - systemd-resolve
-    - systemd-bus-proxy
-    - syslog
-    - _apt
-    - lxd
-    - messagebus
-    - uuidd
-    - dnsmasq
-    - sshd
-    - redis
-    - ntp
-    - bind
-    - libvirt-qemu
-    - libvirt-dnsmasq
-    - bareos
-    - postfix
-    - postgres
-    - colord
-    - boole
-    - unf2b
-    - docker
-    - ci
-    - portainer
   freeipa:
     server: "ipa.netsoc.local"
     username: "admin"
@@ -191,17 +234,10 @@ accounts:
 webhooks:
   info: https://discordapp.com/api/webhooks/732754216883585059/6LqFp1ZsomNdlMT78PBJCQNXN5hq_luwiec4UxTVcRpLErSnLWCi7SRnMKztIYRoSK-t
   form_filled: https://discordapp.com/api/webhooks/732754216883585059/6LqFp1ZsomNdlMT78PBJCQNXN5hq_luwiec4UxTVcRpLErSnLWCi7SRnMKztIYRoSK-t
-metrics:
-  port: 8000
 email:
-  from_name: "UCC Netsoc Admin"
-  from_address: "admin@netsoc.co"
-  reply_to_address: "netsoc@uccsocieties.ie"
   sendgrid:
     key: "- no pls -"
 captcha:
   enabled: true
   hcaptcha:
     secret: "0xA31cDbEC6b6d1bBB8c83566AdCC84B98F09b6d1c"
-homedir_consistency:
-  scan_interval: 60
