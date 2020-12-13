@@ -5,6 +5,7 @@ import datetime
 import base64
 import requests
 import hashlib
+import pathlib
 import os
 import socket
 import shutil
@@ -19,6 +20,7 @@ import crypt
 import functools
 import string
 import time
+import selectors
 
 import structlog as logging
 
@@ -32,7 +34,7 @@ from v1.config import config
 
 logger = logging.getLogger(__name__)
 
-class ProxmoxNodeSSH:
+class ClusterNodeSSH:
     """Paramiko SSH client that will first SSH into an exposed Proxmox node, then jump into any of the nodes in the Cluster"""
 
     jump: paramiko.SSHClient
@@ -58,7 +60,7 @@ class ProxmoxNodeSSH:
         )
 
         self.jump_transport = self.jump.get_transport()
-        self.jump_channel = self.jump_transport.open_channel("direct-tcpip", (self.node_name, 22), ("127.0.0.1", 22))
+        self.jump_channel = self.jump_transport.open_channel("direct-tcpip", (self.node_name, 22), ("0.0.0.0", 22))
 
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh.connect(
@@ -77,6 +79,118 @@ class ProxmoxNodeSSH:
         self.sftp.close()
         self.ssh.close()
         self.jump.close()
+
+# Here for historical reasons
+# class InstanceSSH:
+#     """Paramiko SSH client that will first SSH into an exposed jump host, then jump into any of the Cloud instance"""
+
+#     jump: paramiko.SSHClient
+#     ssh: paramiko.SSHClient
+    
+#     ssh: paramiko.SSHClient
+#     sftp: paramiko.SFTPClient
+#     instance: models.proxmox.Instance
+#     _usernames: Dict[int, str]
+#     _groupnames: Dict[int, str]
+#     _uids: Dict[str, int]
+#     _gids: Dict[str, int]
+
+#     def __init__(self, instance: models.proxmox.Instance):
+#         self.jump = paramiko.SSHClient()
+#         self.ssh = paramiko.SSHClient()
+#         self.instance = instance
+#         self._uids = {}
+#         self._gids = {}
+#         self._usernames = {}
+#         self._groupnames = {}
+        
+#         if instance.status == models.proxmox.Status.Stopped:
+#             raise exceptions.resource.Unavailable("Cannot connect to instance. Instance is stopped")
+
+#     def __enter__(self):
+#         self.jump.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+#         if config.proxmox.network.vlan_jumphost.password is not None:
+#             self.jump.connect(
+#                 hostname=config.proxmox.network.vlan_jumphost.server,
+#                 username=config.proxmox.network.vlan_jumphost.username,
+#                 password=config.proxmox.cluster.ssh.password,
+#                 port=config.proxmox.network.vlan_jumphost.port
+#             )
+#         elif config.proxmox.network.vlan_jumphost.private_key is not None:
+#             self.jump.connect(
+#                 hostname=config.proxmox.network.vlan_jumphost.server,
+#                 username=config.proxmox.network.vlan_jumphost.username,
+#                 pkey=paramiko.RSAKey.from_private_key(io.StringIO(config.proxmox.network.vlan_jumphost.private_key)),
+#                 port=config.proxmox.network.vlan_jumphost.port
+#             )
+#         else:
+#             logger.error("No private key/password for cloud vlan jumphost specified")
+            
+
+#         self.jump_transport = self.jump.get_transport()
+#         ip = str(self.instance.metadata.network.nic_allocation.addresses[0].ip)
+
+#         self.jump_channel = self.jump_transport.open_channel("direct-tcpip", (ip, 22), ("0.0.0.0", 0))
+
+#         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+#         try:
+#             self.ssh.connect(
+#                 self.instance.metadata.network.nic_allocation.addresses[0], # nodes should be setup in /etc/hosts correctly
+#                 username="root",
+#                 pkey=paramiko.RSAKey.from_private_key(io.StringIO(self.instance.metadata.root_user.mgmt_ssh_private_key)),
+#                 port=22,
+#                 sock=self.jump_channel
+#             )
+#             self.sftp = self.ssh.open_sftp()
+#             # Cache usernames and groups
+
+#             with self.sftp.open("/etc/passwd") as file:
+#                 for line in file:
+#                     s = line.split(":")
+#                     self._uids[s[0]] = int(s[2])
+#                     self._usernames[int(s[2])] = s[0]
+
+#             with self.sftp.open("/etc/group") as file:
+#                 for line in file:
+#                     s = line.split(":")
+#                     self._gids[s[0]] = int(s[2])
+#                     self._groupnames[int(s[2])] = s[0]
+
+#         except ConnectionError as e:
+#             raise exceptions.resource.Unavailable("Could not connect to instance. Is SSH by root ssh key turned off")
+
+#         return self
+
+
+#     def get_uid(self, username: str) -> int:
+#         if username in self._uids:
+#             return self._uids[username]
+
+#         raise exceptions.resource.Unavailable()
+
+#     def get_username(self, uid: int) -> str:
+#         if uid in self._usernames:
+#             return self._usernames[uid]
+
+#         raise exceptions.resource.Unavailable()
+
+#     def get_group(self, gid: int) -> str:
+#         if gid in self._groupnames:
+#             return self._groupnames[gid]
+
+#         raise exceptions.resource.Unavailable()
+
+#     def get_gid(self, group: str) -> int:
+#         if group in self._gids:
+#             return self._gids[group]
+
+#         raise exceptions.resource.Unavailable()
+
+#     def __exit__(self, type, value, traceback):
+#         self.sftp.close()
+#         self.ssh.close()
+#         self.jump.close()
 
 def build_proxmox_config_string(options: dict):
     """Turns a dict into string of e.g.'key1=value1,key2=value2'"""
@@ -220,18 +334,6 @@ class Proxmox():
         else:
             raise exception.resource.Unavailable("Could not allocate an IP for the instance. No IPs available")
 
-    def _random_password(
-        self,
-        length=8
-    ) -> str:
-        return ''.join(random.choice(string.ascii_letters) for i in range(length))
-
-    def _hash_password(
-        self,
-        password: str
-    ) -> str:
-        return crypt.crypt(password, crypt.METHOD_SHA512)
-
     def _serialize_metadata(
         self,
         metadata: models.proxmox.Metadata
@@ -277,9 +379,9 @@ class Proxmox():
         
         image_path = f"{folder_path}/{template.disk_file}"
         # needs to be unique as this could be happening on multiple workers and we don't want them to overwrite the ile mid download
-        download_path = f"{folder_path}/{socket.gethostname()}-{os.getpid()}-{template.disk_sha256sum}"
+        download_path = f"{folder_path}/{socket.gethostname()}-{os.getpid()}"
 
-        with ProxmoxNodeSSH(node_name) as con:
+        with ClusterNodeSSH(node_name) as con:
             stdin, stdout, stderr = con.ssh.exec_command(
                 f"mkdir -p {folder_path}"
             )
@@ -293,14 +395,15 @@ class Proxmox():
                 logger.info(image_path)
                 con.sftp.stat(image_path)
 
-                # Checksum image    
-                stdin, stdout, stderr = con.ssh.exec_command(
-                    f"sha256sum {image_path} | cut -f 1 -d' '"
-                )
+                if template.disk_sha256sum is not None:
+                    # Checksum image    
+                    stdin, stdout, stderr = con.ssh.exec_command(
+                        f"sha256sum {image_path} | cut -f 1 -d' '"
+                    )
 
-                if template.disk_sha256sum not in str(stdout.read()):
-                    logger.info(f"Template does not pass SHA256 sums given, falling back to download", status=status, stderr=stderr.read(), stdout=stdout.read())
-                    raise exceptions.resource.Unavailable()
+                    if template.disk_sha256sum not in str(stdout.read()):
+                        logger.info(f"Template does not pass SHA256 sums given, falling back to download", status=status, stderr=stderr.read(), stdout=stdout.read())
+                        raise exceptions.resource.Unavailable()
 
             except (exceptions.resource.Unavailable, FileNotFoundError) as e:
                 # If a fallback URL exists to download the image
@@ -425,12 +528,25 @@ class Proxmox():
 
             instance = self._read_instance_by_fqdn(instance_type, fqdn)
 
+            # Enable nesting so they can use Docker
+            with ClusterNodeSSH(instance.node) as con:
+                # Copy disk image
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"pvesh set /nodes/{ instance.node }/lxc/{ instance.id }/config -features keyctl=1,nesting=1"
+                )
+
+                status = stdout.channel.recv_exit_status()
+                
+                if status != 0:
+                    raise exceptions.resource.Unavailable(f"Couldn't enable instance nesting {status}: {stderr.read()} {stdout.read()}")
+
             self.prox.nodes(instance.node).lxc(f"{instance.id}/resize").put(
                 disk='rootfs',
                 size=f'{template.specs.disk_space}G'
             )
 
             self._wait_vmid_lock(instance.type, instance.node, instance.id)
+
         elif instance_type == models.proxmox.Type.VPS:
             metadata.groups = set(["vm", "cloud_vm", "cloud_instance"])
 
@@ -461,7 +577,7 @@ class Proxmox():
 
             vms_images_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/images"
 
-            with ProxmoxNodeSSH(node_name) as con:
+            with ClusterNodeSSH(node_name) as con:
                 # Copy disk image
                 stdin, stdout, stderr = con.ssh.exec_command(
                     f"cd {vms_images_path} && rm -f {vm_id} && mkdir {vm_id} && cd {vm_id} && cp {disk_image_path} ./primary.{ template.disk_format }"
@@ -490,6 +606,7 @@ class Proxmox():
                 virtio0=f"{config.proxmox.dir_pool}:{vm_id}/primary.{ template.disk_format }",
                 cores=template.specs.cores,
                 memory=template.specs.memory,
+                balloon=min(template.specs.memory, 512),
                 bios='ovmf',
                 efidisk0=f"{config.proxmox.dir_pool}:{vm_id}/efi.qcow2",
                 scsihw='virtio-scsi-pci',
@@ -518,7 +635,7 @@ class Proxmox():
             self.prox.nodes(instance.node).lxc(f"{instance.id}").delete()
         elif instance.type == models.proxmox.Type.VPS:
             # delete cloud-init data
-            with ProxmoxNodeSSH(instance.node) as con:
+            with ClusterNodeSSH(instance.node) as con:
                 snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
 
                 stdin, stdout, stderr = con.ssh.exec_command(
@@ -882,7 +999,7 @@ class Proxmox():
                     except Exception as e:
                         logger.info("read_instances ignoring instance with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
                 else:
-                    instance = self._read_instance_on_node(models.proxmox.Type.LXC, entry['node'], entry['vmid'])
+                    instance = self._read_instance_on_node(models.proxmox.Type.VPS, entry['node'], entry['vmid'])
                     ret[instance.fqdn] = instance
             elif entry['type'] == 'lxc' and (instance_type == None or instance_type == models.proxmox.Type.LXC) and 'name' in entry and entry['name'].endswith(config.proxmox.lxc.base_fqdn):
                 if ignore_errors == True:
@@ -901,16 +1018,13 @@ class Proxmox():
     def _generate_instance_root_user(
         self
     ) -> Tuple[str, str, models.proxmox.RootUser]:
-        user_ssh_public_key, user_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
-        mgmt_ssh_public_key, mgmt_ssh_private_key = utilities.auth.generate_rsa_public_private_ssh_key_pair()
+        ssh_public_key, ssh_private_key = utilities.ssh.generate_key_pair()
 
-        password = self._random_password()
+        password = utilities.password.generate()
 
-        return password, user_ssh_private_key, models.proxmox.RootUser(
-            password_hash=self._hash_password(password),
-            ssh_public_key=user_ssh_public_key,
-            mgmt_ssh_public_key=mgmt_ssh_public_key,
-            mgmt_ssh_private_key=mgmt_ssh_private_key
+        return password, ssh_private_key, models.proxmox.RootUser(
+            password_hash=utilities.password.hash(password),
+            ssh_public_key=ssh_public_key,
         )
 
     def _wait_for_qemu_guest_agent_ping(
@@ -957,7 +1071,7 @@ class Proxmox():
         self._wait_vmid_lock(instance.type, instance.node, instance.id)
 
         if instance.type == models.proxmox.Type.LXC:
-            with ProxmoxNodeSSH(instance.node) as con:
+            with ClusterNodeSSH(instance.node) as con:
                 # Install root password
                 stdin, stdout, stderr = con.ssh.exec_command(
                     f"echo -e 'root:{root_user.password_hash}' | pct exec {instance.id} -- chpasswd -e"
@@ -969,9 +1083,19 @@ class Proxmox():
                         f"Could not start instance: unable to set root password: {status}: {stdout.read()} {stderr.read()}"
                     )
 
-                # Install user and mgmt keys
                 stdin, stdout, stderr = con.ssh.exec_command(
-                    f"echo -e '# --- BEGIN PVE ---\\n{root_user.ssh_public_key}\\n{root_user.mgmt_ssh_public_key}\\n# --- END PVE ---' | pct push { instance.id } /dev/stdin '/root/.ssh/authorized_keys' --perms 0600 --user 0 --group 0"
+                    f"pct exec {instance.id} -- mkdir -p /root/.ssh"
+                )
+                status = stdout.channel.recv_exit_status()
+
+                if status != 0:
+                    raise exceptions.resource.Unavailable(
+                        f"Could not start instance: unable to create /root/.ssh: {status}: {stdout.read()} {stderr.read()}"
+                    )
+
+                # Install ssh keys
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"echo -e '# --- BEGIN PVE ---\\n{root_user.ssh_public_key}\\n# --- END PVE ---' | pct push { instance.id } /dev/stdin '/root/.ssh/authorized_keys' --perms 0600 --user 0 --group 0"
                 )
                 status = stdout.channel.recv_exit_status()
 
@@ -1003,17 +1127,7 @@ class Proxmox():
                     )
 
                 stdin, stdout, stderr = con.ssh.exec_command(
-                    f"pct exec {instance.id} -- systemctl enable ssh"
-                )
-                status = stdout.channel.recv_exit_status()
-
-                if status != 0:
-                    raise exceptions.resource.Unavailable(
-                        f"Could not start instance: unable to enable sshd server: {status}: {stdout.read()} {stderr.read()}"
-                    )
-
-                stdin, stdout, stderr = con.ssh.exec_command(
-                    f"pct exec {instance.id} -- systemctl restart ssh"
+                    f"pct exec {instance.id} -- service ssh restart"
                 )
                 status = stdout.channel.recv_exit_status()
 
@@ -1030,9 +1144,13 @@ class Proxmox():
                 'input-data': f'root:{root_user.password_hash}'
             })
 
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/exec").post(**{
+                'command': 'mkdir -p /root/.ssh',
+            })
+
             self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/file-write").post(
                 file="/root/.ssh/authorized_keys",
-                content=f"# --- BEGIN PVE ---\n{root_user.ssh_public_key}\n{root_user.mgmt_ssh_public_key}\n# --- END PVE ---"
+                content=f"# --- BEGIN PVE ---\n{root_user.ssh_public_key}\n# --- END PVE ---"
             )
 
             self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/file-write").post(
@@ -1046,11 +1164,7 @@ class Proxmox():
             )
 
             self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/exec").post(
-                command="systemctl enable ssh",
-            )
-
-            self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/exec").post(
-                command="systemctl restart ssh",
+                command="service restart ssh",
             )
 
         instance.metadata.root_user = root_user
@@ -1067,7 +1181,7 @@ class Proxmox():
             self.prox.nodes(instance.node).lxc(f"{instance.id}/config").put(**{
                 "nameserver": "1.1.1.1",
                 "net0": build_proxmox_config_string({
-                    "rate": "100",
+                    "rate": "12.5", # 12.5MB/s
                     "name": "eth0",
                     "bridge": config.proxmox.network.bridge,
                     "tag": instance.metadata.network.nic_allocation.vlan,
@@ -1087,7 +1201,7 @@ class Proxmox():
             self.prox.nodes(instance.node).lxc(f"{instance.id}/status/start").post()
         elif instance.type == models.proxmox.Type.VPS:
             # delete cloud-init data
-            with ProxmoxNodeSSH(instance.node) as con:
+            with ClusterNodeSSH(instance.node) as con:
                 snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
 
                 stdin, stdout, stderr = con.ssh.exec_command(
@@ -1166,7 +1280,11 @@ version: 2
 
             # Insert cloud-init drive
             self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
-                cicustom=f"user={ config.proxmox.dir_pool }:snippets/{instance.fqdn}.userdata.yml,network={ config.proxmox.dir_pool }:snippets/{instance.fqdn}.networkconfig.yml,meta={ config.proxmox.dir_pool }:snippets/{instance.fqdn}.metadata.yml",
+                cicustom=build_proxmox_config_string({
+                    "user": f"{ config.proxmox.dir_pool }:snippets/{instance.fqdn}.userdata.yml",
+                    "network": f"{ config.proxmox.dir_pool }:snippets/{instance.fqdn}.networkconfig.yml",
+                    "meta": f"{ config.proxmox.dir_pool }:snippets/{instance.fqdn}.metadata.yml"
+                }),
                 ide2=f"{ config.proxmox.dir_pool }:cloudinit,format=qcow2"
             )
 
@@ -1175,14 +1293,37 @@ version: 2
                 net0=build_proxmox_config_string({
                     "virtio": instance.metadata.network.nic_allocation.macaddress,
                     "bridge": config.proxmox.network.bridge,
-                    "tag": instance.metadata.network.nic_allocation.vlan
+                    "tag": instance.metadata.network.nic_allocation.vlan,
+                    "rate": "12.5" # 12.5MBps
                 })
             )
 
+            
+            # Setup IP/ARP filter to prevent spoofing attacks
             self.prox.nodes(instance.node).qemu(f"{instance.id}/firewall/options").put(**{
                 "macfilter": 1,
                 "ipfilter": 1
             })
+
+            for i in range(len(instance.metadata.network.nic_allocation.addresses)):
+                try:
+                    ret = self.prox.nodes(instance.node).qemu(instance.id).firewall.ipset(f"ipfilter-net{i}").get()
+                    
+                    for r in ret: 
+                        self.prox.nodes(instance.node).qemu(instance.id).firewall.ipset(f"ipfilter-net{i}/{r['cidr']}").delete()
+
+                    self.prox.nodes(instance.node).qemu(instance.id).firewall.ipset(f"ipfilter-net{i}").delete()
+                except Exception as e:
+                    logger.info("Exception triggered while trying to recreate ipset, probably doesn't exist already", e=e, exc_info=True)
+
+                logger.info(str(instance.metadata.network.nic_allocation.addresses[i]))
+                self.prox.nodes(instance.node).qemu(instance.id).firewall.ipset.post(
+                    name=f"ipfilter-net{i}"
+                )
+
+                self.prox.nodes(instance.node).qemu(instance.id).firewall.ipset(f"ipfilter-net{i}").post(
+                    cidr=instance.metadata.network.nic_allocation.addresses[i].ip
+                )
 
             self.prox.nodes(instance.node).qemu(f"{instance.id}/status/start").post()
 
@@ -1418,7 +1559,7 @@ version: 2
         services = {}
         routers = {}
 
-        for fqdn, instance in self.read_instances().items():
+        for fqdn, instance in self.read_instances(ignore_errors=True).items():
             fqdn_prefix = fqdn.replace('.', '-')
 
             # first do vhosts
