@@ -1149,8 +1149,13 @@ class Proxmox():
             self._wait_for_qemu_guest_agent_ping(instance)
 
             self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/exec").post(**{
-                'command': 'chpasswd -e',
-                'input-data': f'root:{root_user.password_hash}'
+                'command': f'passwd -u root'
+            })
+
+            self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/set-user-password").post(**{
+                'username': 'root',
+                'password': root_user.password_hash,
+                'crypted': '1'
             })
 
             self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/exec").post(**{
@@ -1173,7 +1178,7 @@ class Proxmox():
             )
 
             self.prox.nodes(instance.node).qemu(f"{instance.id}/agent/exec").post(
-                command="service restart ssh",
+                command="service ssh restart",
             )
 
         instance.metadata.root_user = root_user

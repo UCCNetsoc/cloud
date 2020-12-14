@@ -68,46 +68,52 @@
                 </v-container>
               </td>
               <td class="py-4">
-                <v-container v-for="(internal, external) in row.item[1].metadata.network.ports" :key="external" class="pa-0 ma-0 my-4">
+                <v-container class="ma-0 pa-0">
                   <v-row no-gutters justify="start" align="center">
                     <p class="caption">
-                      Forwarded ports available on:<br/>
+                      Internal IP:<br/>
+                      <b>{{row.item[1].metadata.network.nic_allocation.addresses[0].split('/')[0] }}</b>
+                      <br/>
+                      <br/>
+                      Forwarded ports available on external domain:<br/>
                       <b>{{row.item[1].fqdn}}</b>
                     </p>
                   </v-row>
-                  <v-row no-gutters justify="start" align="center">
-                    <v-col sm="12" md="10">
-                      <code>:{{external}}</code>
-                      <v-icon x-small class="ma-1">
-                        mdi-arrow-expand-right
-                      </v-icon>
-                      <code>{{internal}}</code>
-                    </v-col>
-                    <v-col sm="12" md="2">
-                      <v-btn
-                        x-small
-                        icon
-                        @click="openConfirmCancel(ConfirmCancelMode.RemovePort, { hostname: row.item[0], portMapExternal: external })"
-                        :disabled="row.item[1].metadata.tos.suspended === true"
-                      >
-                        <v-icon>
-                          mdi-delete
+                  <v-container v-for="(internal, external) in row.item[1].metadata.network.ports" :key="external" class="pa-0 ma-0 my-2">
+                    <v-row no-gutters justify="start" align="center">
+                      <v-col sm="12" md="10">
+                        <code>:{{external}}</code>
+                        <v-icon x-small class="ma-1">
+                          mdi-arrow-expand-right
                         </v-icon>
-                      </v-btn>
-                    </v-col>
-                  </v-row>
+                        <code>{{internal}}</code>
+                      </v-col>
+                      <v-col sm="12" md="2">
+                        <v-btn
+                          x-small
+                          icon
+                          @click="openConfirmCancel(ConfirmCancelMode.RemovePort, { hostname: row.item[0], portMapExternal: external })"
+                          :disabled="row.item[1].metadata.tos.suspended === true"
+                        >
+                          <v-icon>
+                            mdi-delete
+                          </v-icon>
+                        </v-btn>
+                      </v-col>
+                    </v-row>
+                  </v-container>
+                  <v-btn
+                    x-small
+                    @click="openConfirmCancel(ConfirmCancelMode.AddPort, { hostname: row.item[0] })"
+                    class="purple ma-1"
+                    :disabled="row.item[1].active === false"
+                  >
+                    <v-icon>
+                      mdi-plus
+                    </v-icon>
+                    port
+                  </v-btn>
                 </v-container>
-                <v-btn
-                  x-small
-                  @click="openConfirmCancel(ConfirmCancelMode.AddPort, { hostname: row.item[0] })"
-                  class="purple ma-1"
-                  :disabled="row.item[1].active === false"
-                >
-                  <v-icon>
-                    mdi-plus
-                  </v-icon>
-                  port
-                </v-btn>
               </td>
               <td class="py-4">
                 <v-container v-for="(opts, vhost) in row.item[1].metadata.network.vhosts" :key="vhost" class="pa-0 ma-0 my-3">
