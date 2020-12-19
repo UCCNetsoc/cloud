@@ -279,7 +279,7 @@ export default Vue.extend({
         msg: ''
       },
 
-      category: 'UCC student',
+      category: 'University College Cork student',
 
       username: '',
       emailPrefix: '',
