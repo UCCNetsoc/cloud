@@ -12,18 +12,19 @@ proxmox:
     - feynman
   cluster:
     ssh:
-      server: "feynman.netsoc.co"
-      port: 2222
+      server: "control.netsoc.local"
+      port: 22
       username: "root"
-      password: "-"
+      password: "vagrant"
     api:
-      server: "feynman.netsoc.co"
-      port: 8007
+      server: "control.netsoc.local"
+      port: 8006
       username: "root@pam"
+      password: "vagrant"
       token_name: "NetsocCloud"
       token_value: "-"
   network:
-    traefik_config_key:  "77826907276100902243245529368278"
+    traefik_config_key: "77826907276100902243245529368278"
     port_forward:
       range: [16384, 17384]
     vhosts:
@@ -37,7 +38,7 @@ proxmox:
       netsoc-ubuntu-20.04:
         title: "Ubuntu Server 20.04.1 LTS"
         subtitle: "An easy to use server distro"
-        description: | 
+        description: |
           Ubuntu is a Linux distribution based on Debian mostly composed of free and open-source software.
           Ubuntu is officially released in three editions: Desktop, Server, and Core for Internet of things devices and robots.
           All the editions can run on the computer alone, or in a virtual machine
@@ -118,7 +119,7 @@ proxmox:
         wake_on_request: no
         specs:
           cores: 2
-          disk_space: 25  
+          disk_space: 25
           memory: 2048
           swap: 2048
       netsoc-mean-ubuntu:
@@ -140,7 +141,7 @@ proxmox:
         subtitle: "The relational database everyone knows and uses"
         description: |
           A simple MySQL server configured for remote access.
-          
+
           Visit the instance page on creation to configure the admin user
         logo_url: "https://wiki.netsoc.co/assets/cloud/template-mysql.png"
         disk_file: "netsoc-mysql-ubuntu.tar.gz"
@@ -155,7 +156,7 @@ proxmox:
         title: "WordPress"
         subtitle: "The most popular blog and CMS system"
         description: |
-          WordPress is a free and open-source content management system (CMS) written in PHP and paired with a MySQL or MariaDB database. 
+          WordPress is a free and open-source content management system (CMS) written in PHP and paired with a MySQL or MariaDB database.
         logo_url: "https://wiki.netsoc.co/assets/cloud/template-wordpress.png"
         disk_file: "netsoc-wordpress-ubuntu.tar.gz"
         disk_format: "tar.gz"
@@ -168,7 +169,7 @@ proxmox:
       netsoc-ubuntu-20.04:
         title: "Ubuntu Server 20.04.1 LTS"
         subtitle: "Ubuntu Server 20.04.1 LTS"
-        description: | 
+        description: |
           Ubuntu is a Linux distribution based on Debian mostly composed of free and open-source software.
           Ubuntu is officially released in three editions: Desktop, Server, and Core for Internet of things devices and robots.
           All the editions can run on the computer alone, or in a virtual machine
