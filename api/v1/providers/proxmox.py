@@ -1271,6 +1271,7 @@ ethernets:
                 - 8.8.8.8
         gateway4: { config.proxmox.network.gateway }
         optional: true
+        link-local: []
         addresses:
             - { instance.metadata.network.nic_allocation.addresses[0] }
         mtu: 1450 
