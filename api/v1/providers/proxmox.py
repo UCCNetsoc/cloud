@@ -615,7 +615,7 @@ class Proxmox():
                 virtio0=f"{config.proxmox.dir_pool}:{vm_id}/primary.{ template.disk_format }",
                 cores=template.specs.cores,
                 memory=template.specs.memory,
-                balloon=min(template.specs.memory, 512),
+                balloon=min(template.specs.memory, 256),
                 bios='ovmf',
                 efidisk0=f"{config.proxmox.dir_pool}:{vm_id}/efi.qcow2",
                 scsihw='virtio-scsi-pci',
