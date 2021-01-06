@@ -530,7 +530,8 @@ class Proxmox():
                 "swap": template.specs.swap,
                 "storage": config.proxmox.dir_pool,
                 "unprivileged": 1,
-                "nameserver": "1.1.1.1"
+                "nameserver": "1.1.1.1",
+                "rootfs": f"{template.specs.disk_space}G"
             })
     
             self._wait_for_instance_created(instance_type, fqdn)
@@ -549,13 +550,7 @@ class Proxmox():
                 if status != 0:
                     raise exceptions.resource.Unavailable(f"Couldn't enable instance nesting {status}: {stderr.read()} {stdout.read()}")
 
-            self.prox.nodes(instance.node).lxc(f"{instance.id}/resize").put(
-                disk='rootfs',
-                size=f'{template.specs.disk_space}G'
-            )
-
             self._wait_vmid_lock(instance.type, instance.node, instance.id)
-
         elif instance_type == models.proxmox.Type.VPS:
             metadata.groups = set(["vm", "cloud_vm", "cloud_instance"])
 
