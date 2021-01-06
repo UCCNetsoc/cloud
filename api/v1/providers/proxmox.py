@@ -540,9 +540,9 @@ class Proxmox():
 
             # Enable nesting so they can use Docker
             with ClusterNodeSSH(instance.node) as con:
-                # Copy disk image
+                # Can't do this via the API, need root
                 stdin, stdout, stderr = con.ssh.exec_command(
-                    f"pvesh set /nodes/{ instance.node }/lxc/{ instance.id }/config -features keyctl=1,nesting=1"
+                    f"pvesh set /nodes/{ instance.node }/lxc/{ instance.id }/config -features fuse=1,keyctl=1,nesting=1"
                 )
 
                 status = stdout.channel.recv_exit_status()
