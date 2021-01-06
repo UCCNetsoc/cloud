@@ -531,7 +531,7 @@ class Proxmox():
                 "storage": config.proxmox.dir_pool,
                 "unprivileged": 1,
                 "nameserver": "1.1.1.1",
-                "rootfs": f"{template.specs.disk_space}G"
+                "rootfs": f"size={template.specs.disk_space}G"
             })
     
             self._wait_for_instance_created(instance_type, fqdn)
