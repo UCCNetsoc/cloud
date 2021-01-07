@@ -79,18 +79,13 @@
           <span> &bull; </span>
           <a
             target="_blank"
-            href="https://github.com/UCCNetsoc/admin"
+            href="https://github.com/UCCNetsoc/cloud"
           >Open Source Software</a>
           <span> &bull; </span>
           <a
             target="_blank"
             href="https://github.com/UCCNetsoc/wiki/blob/master/services/terms-of-service.md"
           >Terms of Service</a>
-          <span> &bull; </span>
-          <a
-            target="_blank"
-            href="https://github.com/UCCNetsoc/wiki/blob/master/services/privacy-policy.md"
-          >Privacy Policy</a>
         </small>
         <v-spacer></v-spacer>
         <a href="https://discord.netsoc.co" class="ml-1">
