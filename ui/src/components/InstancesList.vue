@@ -79,7 +79,7 @@
                       <b>{{row.item[1].fqdn}}</b>
                     </p>
                   </v-row>
-                  <v-container v-for="(internal, external) in row.item[1].metadata.network.ports" :key="external" class="pa-0 ma-0 my-2">
+                  <v-container v-for="(internal, external) in row.item[1].metadata.network.ports" :key="external" class="pa-0 ma-0">
                     <v-row no-gutters justify="start" align="center">
                       <v-col sm="12" md="10">
                         <code>:{{external}}</code>
@@ -105,7 +105,7 @@
                   <v-btn
                     x-small
                     @click="openConfirmCancel(ConfirmCancelMode.AddPort, { hostname: row.item[0] })"
-                    class="purple ma-1"
+                    class="purple ma-1 my-4"
                     :disabled="row.item[1].active === false"
                   >
                     <v-icon>
