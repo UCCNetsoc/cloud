@@ -71,7 +71,7 @@ export default Vue.extend({
 
   mounted: async function () {
     try {
-      const contributors = await fetch('https://api.github.com/repos/UCCNetsoc/admin/contributors')
+      const contributors = await fetch('https://api.github.com/repos/UCCNetsoc/cloud/contributors')
       this.contributors = await contributors.json()
     } catch {
 
