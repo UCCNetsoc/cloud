@@ -530,7 +530,8 @@ class Proxmox():
                 "swap": template.specs.swap,
                 "storage": config.proxmox.dir_pool,
                 "unprivileged": 1,
-                "nameserver": "1.1.1.1"
+                "nameserver": "1.1.1.1",
+                "rootfs": f"{config.proxmox.dir_pool}:{template.specs.disk_space}"
             })
     
             self._wait_for_instance_created(instance_type, fqdn)
@@ -539,9 +540,9 @@ class Proxmox():
 
             # Enable nesting so they can use Docker
             with ClusterNodeSSH(instance.node) as con:
-                # Copy disk image
+                # Can't do this via the API, need root
                 stdin, stdout, stderr = con.ssh.exec_command(
-                    f"pvesh set /nodes/{ instance.node }/lxc/{ instance.id }/config -features keyctl=1,nesting=1"
+                    f"pvesh set /nodes/{ instance.node }/lxc/{ instance.id }/config -features fuse=1,keyctl=1,nesting=1"
                 )
 
                 status = stdout.channel.recv_exit_status()
@@ -549,13 +550,7 @@ class Proxmox():
                 if status != 0:
                     raise exceptions.resource.Unavailable(f"Couldn't enable instance nesting {status}: {stderr.read()} {stdout.read()}")
 
-            self.prox.nodes(instance.node).lxc(f"{instance.id}/resize").put(
-                disk='rootfs',
-                size=f'{template.specs.disk_space}G'
-            )
-
             self._wait_vmid_lock(instance.type, instance.node, instance.id)
-
         elif instance_type == models.proxmox.Type.VPS:
             metadata.groups = set(["vm", "cloud_vm", "cloud_instance"])
 
@@ -615,7 +610,7 @@ class Proxmox():
                 virtio0=f"{config.proxmox.dir_pool}:{vm_id}/primary.{ template.disk_format }",
                 cores=template.specs.cores,
                 memory=template.specs.memory,
-                balloon=min(template.specs.memory, 512),
+                balloon=min(template.specs.memory, 256),
                 bios='ovmf',
                 efidisk0=f"{config.proxmox.dir_pool}:{vm_id}/efi.qcow2",
                 scsihw='virtio-scsi-pci',
@@ -1271,6 +1266,7 @@ ethernets:
                 - 8.8.8.8
         gateway4: { config.proxmox.network.gateway }
         optional: true
+        link-local: []
         addresses:
             - { instance.metadata.network.nic_allocation.addresses[0] }
         mtu: 1450 

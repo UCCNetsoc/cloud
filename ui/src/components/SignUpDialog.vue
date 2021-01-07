@@ -235,7 +235,7 @@ export default Vue.extend({
       model: string;
       endpoint: string;
     }; } = {
-      'UCC student': {
+      'University College Cork student': {
         usernameLabel: 'Username',
         emailLabel: 'Student email address',
         emailSuffix: '@umail.ucc.ie',
@@ -279,7 +279,7 @@ export default Vue.extend({
         msg: ''
       },
 
-      category: 'UCC student',
+      category: 'University College Cork student',
 
       username: '',
       emailPrefix: '',

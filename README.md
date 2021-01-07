@@ -8,3 +8,10 @@ It consists of an OpenAPI compliant REST API written in FastAPI, a frontend in V
 # Configuration format
 
 See `config.sample.yaml`
+
+# Screenshots
+
+![](./screenshots/cloud1.png)
+![](./screenshots/cloud2.png)
+![](./screenshots/cloud3.png)
+![](./screenshots/cloud4.png)

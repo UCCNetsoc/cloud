@@ -27,6 +27,10 @@ api.add_route("/metrics/", metrics)
 
 hb = Gauge('netsocadmin_heartbeat', 'Unixtime Netsoc Cloud heartbeat')
 
+# dump stack traces on timeout/kill
+import faulthandler
+faulthandler.enable()
+
 utilities.yaml.use_prettier_multiline_strings()
 
 @api.on_event("startup")

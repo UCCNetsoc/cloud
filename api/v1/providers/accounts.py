@@ -35,43 +35,55 @@ class FreeIPA:
 
     @property
     def _client(self):
-        if self._client_instance is None:
-            try:
-                logger.info("FreeIPA client creating...", server=config.accounts.freeipa.server)
-                self._client_instance = freeipa.ClientMeta(
-                    config.accounts.freeipa.server,
-                    dns_discovery=True,
-                    verify_ssl=False
-                )
+        cli = freeipa.ClientMeta(
+            config.accounts.freeipa.server,
+            dns_discovery=True,
+            verify_ssl=False
+        )
+        
+        cli.login(
+            config.accounts.freeipa.username,
+            config.accounts.freeipa.password
+        )
+        
+        return cli
+#         if self._client_instance is None:
+#             try:
+#                 logger.info("FreeIPA client creating...", server=config.accounts.freeipa.server)
+#                 self._client_instance = freeipa.ClientMeta(
+#                     config.accounts.freeipa.server,
+#                     dns_discovery=True,
+#                     verify_ssl=False
+#                 )
                 
-                logger.info("FreeIPA client logging in", username=config.accounts.freeipa.username)
-                self._client_instance.login(
-                    config.accounts.freeipa.username,
-                    config.accounts.freeipa.password
-                )
-                logger.info("FreeIPA provider logged in")
-            except Exception as e:
-                logger.error(f"FreeIPA provider unavailable: {e}")
-                raise exceptions.provider.Unavailable(f"Couldn't connect to FreeIPA server: {e}")
+#                 logger.info("FreeIPA client logging in", username=config.accounts.freeipa.username)
+#                 self._client_instance.login(
+#                     config.accounts.freeipa.username,
+#                     config.accounts.freeipa.password
+#                 )
+#                 logger.info("FreeIPA provider logged in")
+#             except Exception as e:
+#                 logger.error(f"FreeIPA provider unavailable: {e}")
+#                 raise exceptions.provider.Unavailable(f"Couldn't connect to FreeIPA server: {e}")
 
-        try:
-            # The FreeIPA session can expire every 15 minutes so we need to test if we're still logged in
-            self._client_instance.ping()
-        except freeipa.exceptions.Unauthorized as e:
-            logger.info("FreeIPA provider session expired")
+#         try:
+#             # The FreeIPA session can expire every 15 minutes so we need to test if we're still logged in
+#             self._client_instance.ping()
+#         except freeipa.exceptions.Unauthorized as e:
+#             logger.info("FreeIPA provider session expired")
 
-            try:
-                logger.info("FreeIPA client logging in", username=config.accounts.freeipa.username)
-                self._client_instance.login(
-                    config.accounts.freeipa.username,
-                    config.accounts.freeipa.password
-                )
-                logger.info("FreeIPA provider logged in")
-            except Exception as e:
-                logger.error(f"FreeIPA provider unavailable: {e}")
-                raise exceptions.provider.Unavailable(f"Couldn't connect to FreeIPA server: {e}")
+#             try:
+#                 logger.info("FreeIPA client logging in", username=config.accounts.freeipa.username)
+#                 self._client_instance.login(
+#                     config.accounts.freeipa.username,
+#                     config.accounts.freeipa.password
+#                 )
+#                 logger.info("FreeIPA provider logged in")
+#             except Exception as e:
+#                 logger.error(f"FreeIPA provider unavailable: {e}")
+#                 raise exceptions.provider.Unavailable(f"Couldn't connect to FreeIPA server: {e}")
 
-        return self._client_instance
+#         return self._client_instance
 
     def change_password(
         self,
