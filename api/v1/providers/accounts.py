@@ -18,74 +18,81 @@ import warnings
 # TODO(ocanty) - write context manager for _client that toggles this
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
+class FreeIPAEnsureSession(object):
+    """
+    Context manager class that automatically logs out upon exit.
+    """
+
+    def __init__(self, client):
+        self._client = client
+
+    def __enter__(self):
+        """
+        Tries to perform a login, if necessary, using the login arguments specified at construction.
+        This method does not throw, but will store any occurring exception in ``login_exception``.
+        """
+        try:
+            # The FreeIPA session can expire every 15 minutes so we need to test if we're still logged in
+            self._client.ping()
+        except freeipa.exceptions.Unauthorized as e:
+            try:
+                self._client.login(
+                    config.accounts.freeipa.username,
+                    config.accounts.freeipa.password
+                )
+            except freeipa.exceptions.Unauthorized as e:
+                logger.info("Login failed")
+                raise exceptions.provider.Unavailable("Bad login credentials for account provider")
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Logs out of the session, if necessary.
+        """
+        try:
+            self._client.ping()
+        except freeipa.exceptions.Unauthorized as e:
+            pass
+
 class FreeIPA:    
+    _client : freeipa.ClientMeta
+
     def __init__(self):
         logger.info("FreeIPA provider created")
-        logger.info("Ensuring groups setup in FreeIPA")
-        for group in models.group.groups:
-            if not self.group_exists(group.group_name):
-                logger.info(f"Group {group.group_name} not found, adding", group=group)
-                self._client.group_add(
-                    a_cn = group.group_name,
-                    o_description = group.description,
-                    o_gidnumber = group.gid
-                )
-
-    _client_instance: freeipa.ClientMeta = None
-
-    @property
-    def _client(self):
-        cli = freeipa.ClientMeta(
-            config.accounts.freeipa.server,
+        self._client = freeipa.ClientMeta(
+            host=config.accounts.freeipa.server,
             dns_discovery=True,
             verify_ssl=False
         )
-        
-        cli.login(
+
+        self._client.login(
             config.accounts.freeipa.username,
             config.accounts.freeipa.password
         )
+
+        logger.info("Ensuring groups setup in FreeIPA")
         
-        return cli
-#         if self._client_instance is None:
-#             try:
-#                 logger.info("FreeIPA client creating...", server=config.accounts.freeipa.server)
-#                 self._client_instance = freeipa.ClientMeta(
-#                     config.accounts.freeipa.server,
-#                     dns_discovery=True,
-#                     verify_ssl=False
-#                 )
-                
-#                 logger.info("FreeIPA client logging in", username=config.accounts.freeipa.username)
-#                 self._client_instance.login(
-#                     config.accounts.freeipa.username,
-#                     config.accounts.freeipa.password
-#                 )
-#                 logger.info("FreeIPA provider logged in")
-#             except Exception as e:
-#                 logger.error(f"FreeIPA provider unavailable: {e}")
-#                 raise exceptions.provider.Unavailable(f"Couldn't connect to FreeIPA server: {e}")
+        with self._session():
+            for group in models.group.groups:
+                if not self._group_exists(group.group_name):
+                    logger.info(f"Group {group.group_name} not found, adding", group=group)
+                    self._client.group_add(
+                        a_cn = group.group_name,
+                        o_description = group.description,
+                        o_gidnumber = group.gid
+                    )
 
-#         try:
-#             # The FreeIPA session can expire every 15 minutes so we need to test if we're still logged in
-#             self._client_instance.ping()
-#         except freeipa.exceptions.Unauthorized as e:
-#             logger.info("FreeIPA provider session expired")
-
-#             try:
-#                 logger.info("FreeIPA client logging in", username=config.accounts.freeipa.username)
-#                 self._client_instance.login(
-#                     config.accounts.freeipa.username,
-#                     config.accounts.freeipa.password
-#                 )
-#                 logger.info("FreeIPA provider logged in")
-#             except Exception as e:
-#                 logger.error(f"FreeIPA provider unavailable: {e}")
-#                 raise exceptions.provider.Unavailable(f"Couldn't connect to FreeIPA server: {e}")
-
-#         return self._client_instance
+    def _session(self):
+        return FreeIPAEnsureSession(self._client)
 
     def change_password(
+        self,
+        account: models.account.Account, 
+        password: models.password.Password
+    ):
+        with self._session():
+            return self._change_password(account, password)
+
+    def _change_password(
         self,
         account: models.account.Account, 
         password: models.password.Password
@@ -136,30 +143,45 @@ class FreeIPA:
         self,
         email_or_username: str
     ) -> models.account.Account:
+        with self._session():
+            return self._find_account(email_or_username)
+
+    def _find_account(
+        self,
+        email_or_username: str
+    ) -> models.account.Account:
         account = None 
 
-        if self.username_exists(email_or_username):
-            account = self.read_account_by_username(email_or_username)
-        elif self.email_exists(email_or_username):
-            account = self.read_account_by_email(email_or_username)
+        if self._username_exists(email_or_username):
+            account = self._read_account_by_username(email_or_username)
+        elif self._email_exists(email_or_username):
+            account = self._read_account_by_email(email_or_username)
 
         if account is None:
             raise exceptions.resource.NotFound("could not find user account")
         
         return account
-
+    
     def find_verified_account(
         self,
         email_or_username: str
     ) -> models.account.Account:
-        account = self.find_account(email_or_username)
+        with self._session():
+            account = self.find_account(email_or_username)
 
-        if account.verified is False:
-            raise exceptions.resource.NotFound("An account was found but it is not verified")
-        
-        return account
+            if account.verified is False:
+                raise exceptions.resource.NotFound("An account was found but it is not verified")
+            
+            return account
 
     def username_exists(
+        self,
+        username: models.account.Username
+    ) -> bool:
+        with self._session():
+            return self._username_exists(username)
+
+    def _username_exists(
         self,
         username: models.account.Username
     ) -> bool:
@@ -171,6 +193,13 @@ class FreeIPA:
         self,
         email: EmailStr
     ) -> bool:
+        with self._session():
+            return self._email_exists(email)
+
+    def _email_exists(
+        self,
+        email: EmailStr
+    ) -> bool:
         res = self._client.user_find(o_mail=email)
         res2 = self._client.stageuser_find(o_mail=email)
         return (res['count'] > 0 or res2['count'] > 0)
@@ -178,7 +207,14 @@ class FreeIPA:
     def group_exists(
         self,
         group_name: models.group.GroupName
-    ):
+    ) -> bool:
+        with self._session():
+            return self._group_exists(group_name)
+
+    def _group_exists(
+        self,
+        group_name: models.group.GroupName
+    ) -> bool:
         res = self._client.group_find(o_cn=group_name)
         return (res['count'] > 0)
 
@@ -241,6 +277,13 @@ class FreeIPA:
         self,
         username : models.account.Username
     ) -> models.account.Account:
+        with self._session():
+            return self._read_account_by_username(username)
+
+    def _read_account_by_username(
+        self,
+        username : models.account.Username
+    ) -> models.account.Account:
         find = self._client.user_find(
             o_uid=username
         )
@@ -257,6 +300,13 @@ class FreeIPA:
             raise exceptions.resource.NotFound("could not find user account")
 
     def read_account_by_email(
+        self,
+        email : EmailStr
+    ) -> models.account.Account:
+        with self._session():
+            return self._read_account_by_email(email)
+
+    def _read_account_by_email(
         self,
         email : EmailStr
     ) -> models.account.Account:
@@ -279,51 +329,53 @@ class FreeIPA:
     def read_accounts_all(
         self
     ) -> Dict[str, models.account.Account]:
-        find = self._client.user_find()
-        find2 = self._client.stageuser_find()
+        with self._session():
+            find = self._client.user_find()
+            find2 = self._client.stageuser_find()
 
-        accounts = self._populate_accounts_from_user_find(find)
-        staged_accounts = self._populate_accounts_from_stageuser_find(find2)
+            accounts = self._populate_accounts_from_user_find(find)
+            staged_accounts = self._populate_accounts_from_stageuser_find(find2)
 
-        return {**staged_accounts, **accounts}
+            return {**staged_accounts, **accounts}
 
     def create_account(
         self,
         sign_up
     ):
-        if self.username_exists(sign_up.username):
-            raise exceptions.resource.AlreadyExists("account already exists with this username")
+        with self._session():
+            if self._username_exists(sign_up.username):
+                raise exceptions.resource.AlreadyExists("account already exists with this username")
 
-        if self.email_exists(sign_up.username):
-            raise exceptions.resource.AlreadyExists("account already exists with this email")
+            if self._email_exists(sign_up.username):
+                raise exceptions.resource.AlreadyExists("account already exists with this email")
 
-        if self.group_exists(sign_up.username):
-            raise exceptions.resource.AlreadyExists("group already exists with this username")
+            if self._group_exists(sign_up.username):
+                raise exceptions.resource.AlreadyExists("group already exists with this username")
 
-        home_dir = Path(f"{config.accounts.home_dirs.resolve()}/{sign_up.username}")
+            home_dir = Path(f"{config.accounts.home_dirs.resolve()}/{sign_up.username}")
 
-        # if home_dir.is_symlink():
-        #     raise exceptions.resource.AlreadyExists("home directory already exists as a symlink")
-        
-        # if home_dir.exists():
-        #     raise exceptions.resource.AlreadyExists("home directory already exists")
+            # if home_dir.is_symlink():
+            #     raise exceptions.resource.AlreadyExists("home directory already exists as a symlink")
+            
+            # if home_dir.exists():
+            #     raise exceptions.resource.AlreadyExists("home directory already exists")
 
-        self._client.stageuser_add(
-            a_uid=sign_up.username,
-            o_loginshell="/bin/bash",
+            self._client.stageuser_add(
+                a_uid=sign_up.username,
+                o_loginshell="/bin/bash",
 
-            # first name
-            o_givenname=sign_up.username,
+                # first name
+                o_givenname=sign_up.username,
 
-            # last name
-            o_sn="-",
+                # last name
+                o_sn="-",
 
-            # full names
-            o_cn=sign_up.username,
-            o_displayname=sign_up.username,
-            o_homedirectory=str(home_dir),
-            o_mail=sign_up.email
-        )
+                # full names
+                o_cn=sign_up.username,
+                o_displayname=sign_up.username,
+                o_homedirectory=str(home_dir),
+                o_mail=sign_up.email
+            )
         
     def verify_account(
         self,
@@ -333,47 +385,50 @@ class FreeIPA:
         """
         Activates an account
         """
-        # First lookup account to see if it's a stage account
-        find = self._client.stageuser_find(
-            o_uid=account.username
-        )
 
-        if find['count'] == 0:
-            raise exceptions.resource.NotFound(f"could not find unactivated account: {account.username}")
+        with self._session():
+            # First lookup account to see if it's a stage account
+            find = self._client.stageuser_find(
+                o_uid=account.username
+            )
 
-        # Activate the user
-        self._client.stageuser_activate(account.username)
+            if find['count'] == 0:
+                raise exceptions.resource.NotFound(f"could not find unactivated account: {account.username}")
 
-        # Add the user we just activated to account group
-        for group in [models.group.NetsocAccount]:
-            try:
-                self._client.group_add_member(
-                    a_cn=group.group_name,
-                    o_user=account.username
-                )
-            except freeipa.exceptions.FreeIPAError as e:
-                raise exceptions.provider.Failed(f"error adding newly activated user to group: {e}")
+            # Activate the user
+            self._client.stageuser_activate(account.username)
 
-        account = self.read_account_by_username(account.username)
+            # Add the user we just activated to account group
+            for group in [models.group.NetsocAccount]:
+                try:
+                    self._client.group_add_member(
+                        a_cn=group.group_name,
+                        o_user=account.username
+                    )
+                except freeipa.exceptions.FreeIPAError as e:
+                    raise exceptions.provider.Failed(f"error adding newly activated user to group: {e}")
 
-        # Set their password
-        self.change_password(account, password)
+            account = self._read_account_by_username(account.username)
+
+            # Set their password
+            self._change_password(account, password)
 
     def read_gdpr_data(
         self,
         account: models.account.Account
     ) -> dict:
-        find = self._client.user_find(
-            o_mail=account.email,
-            o_all=True
-        )
+        with self._session():
+            find = self._client.user_find(
+                o_mail=account.email,
+                o_all=True
+            )
 
-        find2 = self._client.stageuser_find(
-            o_mail=account.email,
-            o_all=True
-        )
+            find2 = self._client.stageuser_find(
+                o_mail=account.email,
+                o_all=True
+            )
 
-        if find['count'] > 0:
-            return find['result'][0]
-        elif find2['count'] > 0:
-            return find2['result'][0]
+            if find['count'] > 0:
+                return find['result'][0]
+            elif find2['count'] > 0:
+                return find2['result'][0]

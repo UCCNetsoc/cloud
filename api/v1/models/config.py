@@ -148,8 +148,8 @@ class Proxmox(BaseModel):
             port: str
             username: str = "root@pam"
             password: Optional[str]
-            token_name: str
-            token_value: str
+            token_name: Optional[str]
+            token_value: Optional[str]
 
         api: API
         ssh: SSH
@@ -157,7 +157,6 @@ class Proxmox(BaseModel):
     class VPS(BaseModel):
         base_fqdn: str = "vps.netsoc.cloud"
         templates: Dict[str, Template] = {}
-        dir_pool: str = "local"
 
         inactivity_shutdown_warning_num_days: int = 30
         inactivity_shutdown_num_days: int = 60
