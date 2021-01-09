@@ -550,7 +550,6 @@ class Proxmox():
                 if status != 0:
                     raise exceptions.resource.Unavailable(f"Couldn't enable instance nesting {status}: {stderr.read()} {stdout.read()}")
 
-            self._wait_vmid_lock(instance.type, instance.node, instance.id)
         elif instance_type == models.proxmox.Type.VPS:
             metadata.groups = set(["vm", "cloud_vm", "cloud_instance"])
 
