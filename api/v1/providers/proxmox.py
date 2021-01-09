@@ -677,7 +677,7 @@ class Proxmox():
         self,
         instance_type: models.proxmox.Type,
         fqdn: str,
-        timeout: int = 60,
+        timeout: int = 120,
         poll_interval: int = 1
     ):
         """Wait for an instance of the specified name to appear in the Proxmox cluster"""
