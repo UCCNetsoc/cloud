@@ -105,6 +105,39 @@ steps:
         - push
       branch:
         - master
+        
+  - name: clone_nac
+    image: docker:git
+    commands:
+      - git clone https://github.com/UCCNetsoc/NaC.git .ansible
+      - mkdir -p ./keys/infra/web/
+      - printf '%s\n' "$KEY_WEB" >./keys/infra/web/id_rsa
+      - chmod 0600 ./keys/infra/web/id_rsa
+      - ls -al ./keys/infra/web
+    environment:
+      KEY_WEB:
+        from_secret: key_web
+        
+  - name: ansible_deploy
+    image: uccnetsoc/drone-ansible
+    environment:
+      PM_HOST: '10.0.30.53'
+      PM_USER:
+        from_secret: proxmox_user
+      PM_PASS:
+        from_secret: proxmox_pass
+      VAULT_PASS:
+        from_secret: vault_pass
+    settings:
+      playbook: .ansible/provision-infra-web.yml
+      requirements: .ansible/requirements.txt
+      inventory: .ansible/proxmox_inventory.py
+      private_key:
+        from_secret: key_web
+      vault_password:
+        from_secret: vault_pass
+      tags:
+        - netsoc-cloud
 
   - name: discord_notif_success
     image: appleboy/drone-discord
