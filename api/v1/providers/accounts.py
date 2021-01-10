@@ -6,6 +6,7 @@ import structlog as logging
 import stat
 import python_freeipa as freeipa
 import requests
+import random
 import time
 
 from pydantic import EmailStr
@@ -27,9 +28,11 @@ class FreeIPASession(object):
 
     def __init__(self, client):
         self._client = client
-        self.t = time.time()
 
     def __enter__(self):
+        self.t = time.time()
+        self.nonce = random.randint(0,9999999)
+        logger.info(f"freeipa session opened: {self.nonce}")
         try:
             # The FreeIPA session can expire every 15 minutes so we need to test if we're still logged in
             self._client.ping()
@@ -44,7 +47,7 @@ class FreeIPASession(object):
                 raise exceptions.provider.Unavailable("Bad login credentials for account provider")
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        logger.info(f"freeipa session handle was held for: {time.time() - self.t}")
+        logger.info(f"freeipa session handle was held for {self.nonce}: {time.time() - self.t}")
 
 class FreeIPA:    
     _client : freeipa.ClientMeta
@@ -161,7 +164,7 @@ class FreeIPA:
         email_or_username: str
     ) -> models.account.Account:
         with self._session():
-            account = self.find_account(email_or_username)
+            account = self._find_account(email_or_username)
 
             if account.verified is False:
                 raise exceptions.resource.NotFound("An account was found but it is not verified")
