@@ -32,7 +32,7 @@ class FreeIPA:
             host=config.accounts.freeipa.server,
             dns_discovery=False,
             verify_ssl=False,
-            request_timeout=1
+            request_timeout=2
         )
         self._session_timer = time.time()
 
