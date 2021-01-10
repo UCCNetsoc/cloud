@@ -18,24 +18,21 @@ import warnings
 # TODO(ocanty) - write context manager for _client that toggles this
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
-class FreeIPAEnsureSession(object):
+class FreeIPASession(object):
     """
-    Context manager class that automatically logs out upon exit.
+    Context manager class that keep-alives a session
     """
+    _client: freeipa.ClientMeta
 
     def __init__(self, client):
         self._client = client
 
     def __enter__(self):
-        """
-        Tries to perform a login, if necessary, using the login arguments specified at construction.
-        This method does not throw, but will store any occurring exception in ``login_exception``.
-        """
         try:
             # The FreeIPA session can expire every 15 minutes so we need to test if we're still logged in
             self._client.ping()
         except freeipa.exceptions.Unauthorized as e:
-            try:
+            try:            
                 self._client.login(
                     config.accounts.freeipa.username,
                     config.accounts.freeipa.password
@@ -45,9 +42,6 @@ class FreeIPAEnsureSession(object):
                 raise exceptions.provider.Unavailable("Bad login credentials for account provider")
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Logs out of the session, if necessary.
-        """
         try:
             self._client.ping()
         except freeipa.exceptions.Unauthorized as e:
@@ -58,10 +52,12 @@ class FreeIPA:
 
     def __init__(self):
         logger.info("FreeIPA provider created")
+        
         self._client = freeipa.ClientMeta(
             host=config.accounts.freeipa.server,
-            dns_discovery=True,
-            verify_ssl=False
+            dns_discovery=False,
+            verify_ssl=False,
+            request_timeout=2
         )
 
         self._client.login(
@@ -70,7 +66,6 @@ class FreeIPA:
         )
 
         logger.info("Ensuring groups setup in FreeIPA")
-        
         with self._session():
             for group in models.group.groups:
                 if not self._group_exists(group.group_name):
@@ -82,7 +77,7 @@ class FreeIPA:
                     )
 
     def _session(self):
-        return FreeIPAEnsureSession(self._client)
+        return FreeIPASession(self._client)
 
     def change_password(
         self,
