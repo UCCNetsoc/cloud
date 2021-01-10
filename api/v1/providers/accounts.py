@@ -6,6 +6,7 @@ import structlog as logging
 import stat
 import python_freeipa as freeipa
 import requests
+import time
 
 from pydantic import EmailStr
 from v1 import models, exceptions
@@ -26,6 +27,7 @@ class FreeIPASession(object):
 
     def __init__(self, client):
         self._client = client
+        self.t = time.time()
 
     def __enter__(self):
         try:
@@ -42,10 +44,7 @@ class FreeIPASession(object):
                 raise exceptions.provider.Unavailable("Bad login credentials for account provider")
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        try:
-            self._client.ping()
-        except freeipa.exceptions.Unauthorized as e:
-            pass
+        logger.info(f"freeipa session handle was held for: {time.time() - self.t}")
 
 class FreeIPA:    
     _client : freeipa.ClientMeta
