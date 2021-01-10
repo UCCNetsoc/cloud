@@ -41,9 +41,9 @@ async def decode_access_token(token: str = Depends(oauth2_scheme)) -> models.jwt
 async def get_bearer_account(
     email_token = Depends(decode_access_token)
 ) -> models.account.Account:
-    if providers.accounts.email_exists(email_token.email):
+    try:
         return providers.accounts.read_account_by_email(email_token.email)
-    else:
+    except exceptions.resource.NotFound:
         raise exceptions.rest.Error(
             401, 
             models.rest.Detail(

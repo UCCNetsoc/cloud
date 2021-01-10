@@ -6,8 +6,9 @@ import structlog as logging
 import stat
 import python_freeipa as freeipa
 import requests
-import random
 import time
+import contextlib
+import inspect
 
 from pydantic import EmailStr
 from v1 import models, exceptions
@@ -20,37 +21,9 @@ import warnings
 # TODO(ocanty) - write context manager for _client that toggles this
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
-class FreeIPASession(object):
-    """
-    Context manager class that keep-alives a session
-    """
-    _client: freeipa.ClientMeta
-
-    def __init__(self, client):
-        self._client = client
-
-    def __enter__(self):
-        self.t = time.time()
-        self.nonce = random.randint(0,9999999)
-        logger.info(f"freeipa session opened: {self.nonce}")
-        try:
-            # The FreeIPA session can expire every 15 minutes so we need to test if we're still logged in
-            self._client.ping()
-        except freeipa.exceptions.Unauthorized as e:
-            try:            
-                self._client.login(
-                    config.accounts.freeipa.username,
-                    config.accounts.freeipa.password
-                )
-            except freeipa.exceptions.Unauthorized as e:
-                logger.info("Login failed")
-                raise exceptions.provider.Unavailable("Bad login credentials for account provider")
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        logger.info(f"freeipa session handle was held for {self.nonce}: {time.time() - self.t}")
-
 class FreeIPA:    
     _client : freeipa.ClientMeta
+    _session_timer: int
 
     def __init__(self):
         logger.info("FreeIPA provider created")
@@ -59,8 +32,9 @@ class FreeIPA:
             host=config.accounts.freeipa.server,
             dns_discovery=False,
             verify_ssl=False,
-            request_timeout=2
+            request_timeout=1
         )
+        self._session_timer = time.time()
 
         self._client.login(
             config.accounts.freeipa.username,
@@ -79,7 +53,24 @@ class FreeIPA:
                     )
 
     def _session(self):
-        return FreeIPASession(self._client)
+        # The FreeIPA session can expire every 15 minutes so we need to test if we're still logged in
+        try:
+            if (self._session_timer - time.time()) > (5*60):
+                # ping and see if the session has expired
+                self._session_timer = time.time()
+                self._client.ping()
+        except freeipa.exceptions.Unauthorized as e: # expired session
+            try:            
+                self._client.login(
+                    config.accounts.freeipa.username,
+                    config.accounts.freeipa.password
+                )
+            except freeipa.exceptions.Unauthorized as e:
+                logger.info("Login failed to FreeIPA")
+                raise exceptions.provider.Unavailable("Bad login credentials for account provider")
+        
+        return contextlib.nullcontext()
+        
 
     def change_password(
         self,
@@ -149,15 +140,13 @@ class FreeIPA:
     ) -> models.account.Account:
         account = None 
 
-        if self._username_exists(email_or_username):
-            account = self._read_account_by_username(email_or_username)
-        elif self._email_exists(email_or_username):
-            account = self._read_account_by_email(email_or_username)
-
-        if account is None:
-            raise exceptions.resource.NotFound("could not find user account")
-        
-        return account
+        try:
+            return self._read_account_by_email(email_or_username)
+        except exceptions.resource.NotFound:
+            try:
+                return self._read_account_by_username(email_or_username)
+            except exceptions.resource.NotFound:
+                raise exceptions.resource.NotFound("could not find user account")
     
     def find_verified_account(
         self,
