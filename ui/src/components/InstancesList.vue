@@ -404,143 +404,126 @@
                       </h4>
                     </v-col>
                   </v-row>
+                  <v-row class="mt-4 mb-0">
+                    <v-text-field
+                      label='Hostname'
+                      class="mx-4"
+                      outlined
+                      v-model='confirmCancel.action.host'
+                      :rules="requiredRules"
+                    ></v-text-field>
+                  </v-row>
+                  <v-row class="mt-0">
+                    <v-textarea
+                      label='Why do you need this instance?'
+                      class="mx-4"
+                      height=96
+                      outlined
+                      :rules="requiredRules"
+                      v-model='confirmCancel.action.reason'
+                    ></v-textarea>
+                  </v-row>
+                  <v-divider/>
+                  <v-row class="my-6 grey--text text--darken-1 text-center">
+                    <p style="margin: 0 auto" class="grey--text text--darken-1 text-center">
+                      <b>IMPORTANT:</b>
+                      Some disallowed uses found below, not an exhaustive list.<br/>
+                      Consult latest <a class="grey--text" target="_blank" href="https://wiki.netsoc.co/services/terms-of-service">Terms of Service</a> for more information.
+                    </p>
+                  </v-row>
+                  <v-row class="my-4" no-gutters justify="start" align="center">
+                    <v-col>
+                      <v-avatar
+                        size="48"
+                        tile
+                      >
+                        <v-icon large>mdi-briefcase-remove</v-icon>
+                      </v-avatar>
+                    </v-col>
+                    <v-col sm="10">
+                      <h3 class="white--text">
+                        No commercial use
+                      </h3>
+                      <span class="grey--text text--lighten-1">
+                        Netsoc Cloud is only for educational, entertainment and learning purposes
+                      </span>
+                    </v-col>
+                  </v-row>
+                  <v-row class="my-4" no-gutters justify="start" align="center">
+                    <v-col>
+                      <v-avatar
+                        size="48"
+                        tile
+                      >
+                        <v-icon large>mdi-server-off</v-icon>
+                      </v-avatar>
+                    </v-col>
+                    <v-col sm="10">
+                      <h3 class="white--text">
+                        No resource-intensive or "spammy" services
+                      </h3>
+                      <span class="grey--text text--lighten-1">
+                        No cryptocurrency mining, DNS resolvers, email servers, file-sharing software, IRC servers or VPN usage
+                      </span>
+                    </v-col>
+                  </v-row>
+                  <v-row class="my-4" no-gutters justify="start" align="center">
+                    <v-col>
+                      <v-avatar
+                        size="48"
+                        tile
+                      >
+                        <v-icon large>mdi-voice-off</v-icon>
+                      </v-avatar>
+                    </v-col>
+                    <v-col sm="10">
+                      <h3 class="white--text">
+                        No inappropiate or adult content
+                      </h3>
+                      <span class="grey--text text--lighten-1">
+                        Don't host anything your lecturers wouldn't be comfortable seeing or hearing about
+                      </span>
+                    </v-col>
+                  </v-row>
+                  <v-row class="my-4" no-gutters justify="start" align="center">
+                    <v-col>
+                      <v-avatar
+                        size="48"
+                        tile
+                      >
+                        <v-icon large>mdi-chart-line</v-icon>
+                      </v-avatar>
+                    </v-col>
+                    <v-col sm="10">
+                      <h3 class="white--text">
+                        No data integrity, support or uptime guarantees
+                      </h3>
+                      <span class="grey--text text--lighten-1">
+                        You are responsible for arranging alternative hosting during downtime, security and backup procedures for your own instances.
+                        We cannot guarantee a response or resolution to a request for support
+                      </span>
+                    </v-col>
+                  </v-row>
+                  <v-row class="my-4" no-gutters justify="start" align="center">
+                    <v-col>
+                      <v-avatar
+                        size="48"
+                        tile
+                      >
+                        <v-icon large>mdi-message</v-icon>
+                      </v-avatar>
+                    </v-col>
+                    <v-col sm="10">
+                      <h3 class="white--text">
+                        You must monitor the <code>#servers</code> channel in the <a class="white--text" target="_blank" href="https://discord.netsoc.co">UCC Netsoc Discord</a>
+                      </h3>
+                      <span class="grey--text text--lighten-1">
+                        Important announcements and discussions will be posted there from time to time
+                      </span>
+                    </v-col>
+                  </v-row>
                 </v-card-text>
               </v-card>
-              <v-divider/>
-              <v-card-text>
-                <v-card flat>
-                  <v-container>
-                    <v-row no-gutters justify="start" align="center">
-                      <v-col>
-                        <v-avatar
-                          size="48"
-                          tile
-                        >
-                          <v-icon large>mdi-briefcase-remove</v-icon>
-                        </v-avatar>
-                      </v-col>
-                      <v-col sm="10">
-                        <h3 class="white--text">
-                          No commercial use
-                        </h3>
-                        <span class="grey--text text--lighten-1">
-                          Netsoc Cloud is only for educational, entertainment and learning purposes
-                        </span>
-                      </v-col>
-                    </v-row>
-                  </v-container>
-                </v-card>
-                <v-card flat>
-                  <v-card-text>
-                    <v-row no-gutters justify="start" align="center">
-                      <v-col>
-                        <v-avatar
-                          size="48"
-                          tile
-                        >
-                          <v-icon large>mdi-server-off</v-icon>
-                        </v-avatar>
-                      </v-col>
-                      <v-col sm="10">
-                        <h3 class="white--text">
-                          No resource-intensive or "spammy" services
-                        </h3>
-                        <span class="grey--text text--lighten-1">
-                          No cryptocurrency mining, DNS resolvers, email servers, file-sharing software, IRC servers or VPN usage
-                        </span>
-                      </v-col>
-                    </v-row>
-                  </v-card-text>
-                </v-card>
-                <v-card flat>
-                  <v-card-text>
-                    <v-row no-gutters justify="start" align="center">
-                      <v-col>
-                        <v-avatar
-                          size="48"
-                          tile
-                        >
-                          <v-icon large>mdi-voice-off</v-icon>
-                        </v-avatar>
-                      </v-col>
-                      <v-col sm="10">
-                        <h3 class="white--text">
-                          No inappropiate or adult content
-                        </h3>
-                        <span class="grey--text text--lighten-1">
-                          Don't host anything your lecturers wouldn't be comfortable seeing or hearing about
-                        </span>
-                      </v-col>
-                    </v-row>
-                  </v-card-text>
-                </v-card>
-                <v-card flat>
-                  <v-card-text>
-                    <v-row no-gutters justify="start" align="center">
-                      <v-col>
-                        <v-avatar
-                          size="48"
-                          tile
-                        >
-                          <v-icon large>mdi-chart-line</v-icon>
-                        </v-avatar>
-                      </v-col>
-                      <v-col sm="10">
-                        <h3 class="white--text">
-                          No data integrity, support or uptime guarantees
-                        </h3>
-                        <span class="grey--text text--lighten-1">
-                          You are responsible for arranging alternative hosting during downtime, security and backup procedures for your own instances.
-                          We cannot guarantee a response or resolution to a request for support
-                        </span>
-                      </v-col>
-                    </v-row>
-                  </v-card-text>
-                </v-card>
-                <v-card flat>
-                  <v-card-text>
-                    <v-row no-gutters justify="start" align="center">
-                      <v-col>
-                        <v-avatar
-                          size="48"
-                          tile
-                        >
-                          <v-icon large>mdi-message</v-icon>
-                        </v-avatar>
-                      </v-col>
-                      <v-col sm="10">
-                        <h3 class="white--text">
-                          You must monitor the <code>#servers</code> channel in the <a class="white--text" target="_blank" href="https://discord.netsoc.co">UCC Netsoc Discord</a>
-                        </h3>
-                        <span class="grey--text text--lighten-1">
-                          Important announcements and discussions will be posted there from time to time
-                        </span>
-                      </v-col>
-                    </v-row>
-                  </v-card-text>
-                  <v-card-actions>
-                    <span class="grey--text text--darken-1">
-                      Not an exhaustive list. Consult latest <a class="grey--text" target="_blank" href="https://wiki.netsoc.co/services/terms-of-service">Terms of Service</a> for more information.
-                    </span>
-                  </v-card-actions>
-                </v-card>
-              </v-card-text>
-
-              <v-divider class="pt-8"/>
-              <v-text-field
-                label='Hostname'
-                class="mx-4"
-                outlined
-                v-model='confirmCancel.action.host'
-                :rules="requiredRules"
-              ></v-text-field>
-              <v-textarea
-                label='Why do you need this instance?'
-                class="mx-4"
-                outlined
-                :rules="requiredRules"
-                v-model='confirmCancel.action.reason'
-              ></v-textarea>
             </v-form>
           </v-col>
         </v-row>
