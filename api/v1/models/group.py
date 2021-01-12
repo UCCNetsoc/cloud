@@ -7,7 +7,7 @@ GroupName = Field(None, title="Group Name", description="Lowercase alphanumeric 
 class Group(BaseModel):
     group_name: str = GroupName
     description: Optional[str]
-    gid: int
+    gid: Optional[int]
 
 NetsocAccount = Group(group_name="netsoc_account", description="Netsoc Account", gid=422)
 NetsocCommittee = Group(group_name="netsoc_committee", description="Netsoc Committee", gid=421)
