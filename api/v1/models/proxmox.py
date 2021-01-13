@@ -38,10 +38,10 @@ VHost = {
     "regex": r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
 }
 
-TemplateID = {
+ImageID = {
     "default": None,
-    "title": "Template ID",
-    "description": "Template ID",
+    "title": "Image ID",
+    "description": "Image ID",
     "regex": r"^[a-z0-9-.]+$",
     "min_length": 1,
     "max_length": 32
@@ -81,7 +81,7 @@ class Specs(BaseModel):
     # swap
     swap: int = 0
 
-class Template(BaseModel):
+class Image(BaseModel):
     class DiskFormat(str, Enum):
         QCOW2: str = "qcow2"
         TarGZ: str = "tar.gz"
@@ -145,7 +145,7 @@ class Network(BaseModel):
     nic_allocation: NICAllocation 
 
 class InstanceRequestDetail(BaseModel):
-    template_id: str = Field(**TemplateID)
+    image_id: str = Field(**ImageID)
     reason: str = Field(**Reason)
 
 class InstanceRequest(Payload):

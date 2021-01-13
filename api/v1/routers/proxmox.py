@@ -60,27 +60,28 @@ async def get_traefik_config(
     return providers.proxmox.build_traefik_config("web-secure")
 
 @router.get(
-    '/{email_or_username}/{instance_type}-templates',
+    '/{email_or_username}/{instance_type}-images',
     status_code=200,
-    response_model=Dict[str,models.proxmox.Template],
+    response_model=Dict[str,models.proxmox.Image],
     responses={400: {"model": models.rest.Error}}
 )
-async def get_templates(
+async def get_images(
     instance_type: models.proxmox.Type
 ):
-    return providers.proxmox.get_templates(instance_type)
+    
+    return providers.proxmox.get_images(instance_type)
 
 @router.get(
-    '/{email_or_username}/{instance_type}-template/{template_id}',
+    '/{email_or_username}/{instance_type}-image/{image_id}',
     status_code=200,
-    response_model=models.proxmox.Template,
+    response_model=models.proxmox.Image,
     responses={400: {"model": models.rest.Error}}
 )
-async def get_template(
+async def get_image(
     instance_type: models.proxmox.Type,
-    template_id: str = Path(**models.proxmox.TemplateID)
+    image_id: str = Path(**models.proxmox.ImageID)
 ):
-    return providers.proxmox.get_template(instance_type, template_id)
+    return providers.proxmox.get_image(instance_type, image_id)
 
 
 @router.post(
@@ -98,8 +99,8 @@ async def create_instance_request(
     resource_account = providers.accounts.find_verified_account(email_or_username)
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
-    # will raise exception if template doesnt exist
-    template = providers.proxmox.get_template(instance_type, detail.template_id)
+    # will raise exception if image doesnt exist
+    image = providers.proxmox.get_image(instance_type, detail.image_id)
 
     try:
         instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
@@ -119,7 +120,7 @@ async def create_instance_request(
     utilities.webhook.info(
 f"""**{resource_account.username} ({resource_account.email}) requested an instance named `{hostname}`!**
 
-They want **{template.title} {fancy_name(instance_type)} ({fancy_specs(template.specs)})** for the following reason: ```{detail.reason}```
+They want **{image.title} {fancy_name(instance_type)} ({fancy_specs(image.specs)})** for the following reason: ```{detail.reason}```
 To approve this request, sign in as a SysAdmin and click the following link:
 {config.links.base_url}/instance-request/{resource_account.username}/{instance_type}-request/{hostname}/{serialized.token}
 """

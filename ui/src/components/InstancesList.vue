@@ -26,25 +26,25 @@
                         tile
                         class="my-2"
                       >
-                        <v-icon v-if="getTemplate(row.item[1].metadata.request_detail.template_id).logo_url===''">
+                        <v-icon v-if="getImage(row.item[1].metadata.request_detail.image_id).logo_url===''">
                           mdi-help
                         </v-icon>
                         <img
                           v-else
-                          :src="getTemplate(row.item[1].metadata.request_detail.template_id).logo_url"
+                          :src="getImage(row.item[1].metadata.request_detail.image_id).logo_url"
                         >
                       </v-avatar>
                     </v-col>
                     <v-col sm="12" md="9">
                       <h2 class="pa-0 ma-0">{{row.item[1].hostname}}</h2>
-                      <h4 class="mb-2">{{ getTemplate(row.item[1].metadata.request_detail.template_id).title }}</h4>
+                      <h4 class="mb-2">{{ getImage(row.item[1].metadata.request_detail.image_id).title }}</h4>
                       <div class="caption" v-for="spec in getSpecList(row.item[1].specs)" :key="spec">
                         {{ spec }}
                       </div>
                       <v-btn
                         x-small
                         class="mr-1 my-2 blue"
-                        @click="msg = marked(getTemplate(row.item[1].metadata.request_detail.template_id).description)"
+                        @click="msg = marked(getImage(row.item[1].metadata.request_detail.image_id).description)"
                         :disabled="row.item[1].metadata.tos.suspended === true"
                       >
                         <v-icon>
@@ -331,8 +331,8 @@
             <v-list
               three-line
             >
-              <v-list-item-group @change="idx => setConfirmCancelTemplate(idx)">
-                <template v-for="(item) in templates">
+              <v-list-item-group @change="idx => setConfirmCancelImage(idx)">
+                <template v-for="(item) in images">
                   <v-list-item
                     :key="item.title"
                   >
@@ -350,7 +350,7 @@
             </v-list>
           </v-col>
           <v-col cols="12" md="6" style="max-height: 480px; overflow-y: scroll">
-            <v-card flat v-if="confirmCancel.action.templateId === undefined">
+            <v-card flat v-if="confirmCancel.action.imageId === undefined">
               <v-card-text>
                 <v-row no-gutters justify="start" align="center">
                   <v-col>
@@ -363,10 +363,10 @@
                   </v-col>
                   <v-col sm="10">
                     <h3>
-                      Select a template to continue
+                      Select a image to continue
                     </h3>
                     <span>
-                      A template represents the base installation your instance will have
+                      A image represents the base installation your instance will have
                     </span>
                   </v-col>
                 </v-row>
@@ -387,20 +387,20 @@
                         tile
                       >
                         <img
-                          :src="confirmCancel.action.template.logo_url"
+                          :src="confirmCancel.action.image.logo_url"
                         >
                       </v-avatar>
                     </v-col>
                     <v-col sm="10">
                       <h3 class="white--text">
-                        {{ confirmCancel.action.template.title + ' ' + typeName }}
+                        {{ confirmCancel.action.image.title + ' ' + typeName }}
                       </h3>
                       <span class="grey--text text--lighten-2">
-                        {{ confirmCancel.action.template.subtitle }}<br/>
+                        {{ confirmCancel.action.image.subtitle }}<br/>
                       </span>
-                      <p v-html="marked(confirmCancel.action.template.description)"></p>
+                      <p v-html="marked(confirmCancel.action.image.description)"></p>
                       <h4 class="white--text">
-                        {{ getSpecString(confirmCancel.action.template.specs) }}
+                        {{ getSpecString(confirmCancel.action.image.specs) }}
                       </h4>
                     </v-col>
                   </v-row>
@@ -751,7 +751,7 @@ import { config } from '@/config'
 import { fetchRest } from '@/api/rest'
 // import { openApiGetSchemaProperty, openApiPropertyValidator } from '@/api/openapi'
 
-import { Instance, Template, Status, Specs, VHostRequirements } from '@/api/cloud'
+import { Instance, Image, Status, Specs, VHostRequirements } from '@/api/cloud'
 
 import Vue from 'vue'
 
@@ -774,8 +774,8 @@ enum ConfirmCancelMode {
 }
 
 export interface ConfirmCancelAction {
-  template?: Template;
-  templateId?: string;
+  image?: Image;
+  imageId?: string;
   hostname?: string;
   reason?: string;
   host?: string;
@@ -834,15 +834,15 @@ export default Vue.extend({
       window.open(url, '_blank', '')
     },
 
-    getTemplate (templateId: string): Template {
-      if (templateId in this.templates) {
-        return this.templates[templateId]
+    getImage (imageId: string): Image {
+      if (imageId in this.images) {
+        return this.images[imageId]
       }
 
       return {
-        title: 'Unknown Template',
-        subtitle: 'This template has been renamed or moved',
-        description: 'This template has been renamed or moved, contact a SysAdmin on the UCC Netsoc Discord if you are having any issues',
+        title: 'Unknown Image',
+        subtitle: 'This image has been renamed or moved',
+        description: 'This image has been renamed or moved, contact a SysAdmin on the UCC Netsoc Discord if you are having any issues',
         logo_url: '',
         disk_url: '',
         disk_sha256sum: '',
@@ -871,18 +871,18 @@ export default Vue.extend({
       this.confirmCancel.loading = false
     },
 
-    setConfirmCancelTemplate (templateIdx: number | undefined) {
-      if (templateIdx === undefined) {
+    setConfirmCancelImage (imageIdx: number | undefined) {
+      if (imageIdx === undefined) {
         this.confirmCancel.action = {
-          templateId: undefined,
-          template: undefined
+          imageId: undefined,
+          image: undefined
         }
         return
       }
 
       this.confirmCancel.action = {
-        templateId: Object.keys(this.templates)[templateIdx],
-        template: this.templates[Object.keys(this.templates)[templateIdx]]
+        imageId: Object.keys(this.images)[imageIdx],
+        image: this.images[Object.keys(this.images)[imageIdx]]
       }
     },
 
@@ -928,7 +928,7 @@ export default Vue.extend({
       }
 
       // Extract action
-      const { host, template, hostname, portMapExternal, portMapInternal, vHostDomain, vHostHttps, vHostPort, templateId, reason, respecReason } = this.confirmCancel.action
+      const { host, image, hostname, portMapExternal, portMapInternal, vHostDomain, vHostHttps, vHostPort, imageId, reason, respecReason } = this.confirmCancel.action
       this.confirmCancel.loading = true
 
       try {
@@ -939,7 +939,7 @@ export default Vue.extend({
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
-                  template_id: templateId,
+                  image_id: imageId,
                   reason
                 })
               })
@@ -1159,20 +1159,20 @@ export default Vue.extend({
       }, 30000 + (-7500 + (Math.random() * 7500)))
     },
 
-    async uiReloadTemplates () {
-      this.templates = {}
+    async uiReloadImages () {
+      this.images = {}
 
       try {
         const res = await fetchRest(
-          `${config.apiBaseUrl}/v1/proxmox/${this.$store.state.auth.user.profile.preferred_username}/${this.type}-templates`, {
+          `${config.apiBaseUrl}/v1/proxmox/${this.$store.state.auth.user.profile.preferred_username}/${this.type}-images`, {
             headers: {
               Authorization: `Bearer ${this.$store.state.auth.user.access_token}`
             }
           })
 
-        this.templates = await res.json()
+        this.images = await res.json()
       } catch (e) {
-        this.msg = `Could not fetch templates: ${e.message}`
+        this.msg = `Could not fetch images: ${e.message}`
       }
     }
   },
@@ -1185,20 +1185,20 @@ export default Vue.extend({
   data () {
     const instances: { [hostname: string]: Instance} = {}
     const action: ConfirmCancelAction = {}
-    const templates: { [template_id: string]: Template} = {}
-    const templateIdx: number | undefined = undefined
+    const images: { [image_id: string]: Image} = {}
+    const imageIdx: number | undefined = undefined
     const vhostRequirements: VHostRequirements | undefined = undefined
 
     return {
       Status,
-      ConfirmCancelMode, // Needed to use the enum in the rendered template
+      ConfirmCancelMode, // Needed to use the enum in the rendered image
       empty: '',
       msg: '',
       instances,
       loading: true,
-      templates,
+      images,
 
-      templateIdx,
+      imageIdx,
       vhostRequirements,
 
       confirmCancel: {
@@ -1221,7 +1221,7 @@ export default Vue.extend({
 
   mounted () {
     this.uiReload()
-    this.uiReloadTemplates()
+    this.uiReloadImages()
     this.uiSilentReloadLoop()
   }
 })

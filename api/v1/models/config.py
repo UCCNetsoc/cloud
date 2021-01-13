@@ -134,7 +134,7 @@ class Captcha(BaseModel):
     hcaptcha: Optional[Hcaptcha]
     enabled: bool = False
 
-from .proxmox import Template
+from .proxmox import Image
 class Proxmox(BaseModel):
     class Cluster(BaseModel):
         class SSH(BaseModel):
@@ -156,7 +156,7 @@ class Proxmox(BaseModel):
 
     class VPS(BaseModel):
         base_fqdn: str = "vps.netsoc.cloud"
-        templates: Dict[str, Template] = {}
+        images: Dict[str, Image] = {}
 
         inactivity_shutdown_warning_num_days: int = 30
         inactivity_shutdown_num_days: int = 60
@@ -165,7 +165,7 @@ class Proxmox(BaseModel):
 
     class LXC(BaseModel):
         base_fqdn: str = "container.netsoc.cloud"
-        templates: Dict[str, Template] = {}
+        images: Dict[str, Image] = {}
 
         inactivity_shutdown_warning_num_days: int = 60
         inactivity_shutdown_num_days: int = 90

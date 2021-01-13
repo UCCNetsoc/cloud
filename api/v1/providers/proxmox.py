@@ -216,30 +216,30 @@ class Proxmox():
                 verify_ssl=False
             )
 
-    def get_templates(
+    def get_images(
         self,
         instance_type: models.proxmox.Type
-    ) -> Dict[str, models.proxmox.Template]:
+    ) -> Dict[str, models.proxmox.Image]:
         if instance_type == models.proxmox.Type.LXC:
-            return config.proxmox.lxc.templates
+            return config.proxmox.lxc.images
         elif instance_type == models.proxmox.Type.VPS:
-            return config.proxmox.vps.templates
+            return config.proxmox.vps.images
 
-    def get_template(
+    def get_image(
         self,
         instance_type: models.proxmox.Type,
-        template_id: str
-    ) -> models.proxmox.Template:
-        templates = self.get_templates(instance_type)
-        if template_id not in templates:
+        image_id: str
+    ) -> models.proxmox.Image:
+        images = self.get_images(instance_type)
+        if image_id not in images:
             raise exceptions.rest.Error(
                 400,
                 models.rest.Detail(
-                    msg=f"Template {template_id} does not exist!"
+                    msg=f"Image {image_id} does not exist!"
                 )
             )
         else:
-            return templates[template_id]
+            return images[image_id]
 
     def _select_best_node(
         self,
@@ -376,17 +376,17 @@ class Proxmox():
 
         return hash_id
 
-    def _ensure_template_present(
+    def _ensure_image_present(
         self,
         node_name: str,
-        template: models.proxmox.Template,
+        image: models.proxmox.Image,
         folder_path: str
     ) -> str:
-        """Downloads the speciied template to the specified path (must be a folder) and returns the full path of the image file onto the node name specified"""
+        """Downloads the speciied image to the specified path (must be a folder) and returns the full path of the image file onto the node name specified"""
 
-        # Download the disk image/template
+        # Download the disk image/image
         
-        image_path = f"{folder_path}/{template.disk_file}"
+        image_path = f"{folder_path}/{image.disk_file}"
         # needs to be unique as this could be happening on multiple workers and we don't want them to overwrite the ile mid download
         download_path = f"{folder_path}/{socket.gethostname()}-{os.getpid()}"
 
@@ -397,44 +397,44 @@ class Proxmox():
             status = stdout.channel.recv_exit_status()
 
             if status != 0:
-                raise exceptions.resource.Unavailable(f"Could not download template: could not reserve download dir {stderr.read()}")
+                raise exceptions.resource.Unavailable(f"Could not download image: could not reserve download dir {stderr.read()}")
 
             # See if the image exists
             try:
                 logger.info(image_path)
                 con.sftp.stat(image_path)
 
-                if template.disk_sha256sum is not None:
+                if image.disk_sha256sum is not None:
                     # Checksum image    
                     stdin, stdout, stderr = con.ssh.exec_command(
                         f"sha256sum {image_path} | cut -f 1 -d' '"
                     )
 
-                    if template.disk_sha256sum not in str(stdout.read()):
-                        logger.info(f"Template does not pass SHA256 sums given, falling back to download", status=status, stderr=stderr.read(), stdout=stdout.read())
+                    if image.disk_sha256sum not in str(stdout.read()):
+                        logger.info(f"Image does not pass SHA256 sums given, falling back to download", status=status, stderr=stderr.read(), stdout=stdout.read())
                         raise exceptions.resource.Unavailable()
 
             except (exceptions.resource.Unavailable, FileNotFoundError) as e:
                 # If a fallback URL exists to download the image
-                logger.info("Could not find file, falling back to download", template=template.dict(), e=e, exc_info=True)
+                logger.info("Could not find file, falling back to download", image=image.dict(), e=e, exc_info=True)
 
-                if template.disk_file_fallback_url is not None:
+                if image.disk_file_fallback_url is not None:
                     # Original image does not exist, we gotta download it
                     stdin, stdout, stderr = con.ssh.exec_command(
-                        f"wget {template.disk_file_fallback_url} -O {download_path}"
+                        f"wget {image.disk_file_fallback_url} -O {download_path}"
                     )
                     status = stdout.channel.recv_exit_status()
 
                     if status != 0:
-                        raise exceptions.resource.Unavailable(f"Could not download template: error {status}: {stderr.read()} {stdout.read()}")
+                        raise exceptions.resource.Unavailable(f"Could not download image: error {status}: {stderr.read()} {stdout.read()}")
 
                     # Checksum image    
                     stdin, stdout, stderr = con.ssh.exec_command(
                         f"sha256sum {download_path} | cut -f 1 -d' '"
                     )
 
-                    if template.disk_sha256sum not in str(stdout.read()):
-                        raise exceptions.resource.Unavailable(f"Downloaded template does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
+                    if image.disk_sha256sum not in str(stdout.read()):
+                        raise exceptions.resource.Unavailable(f"Downloaded image does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
 
                     # Move image
                     stdin, stdout, stderr = con.ssh.exec_command(
@@ -443,9 +443,9 @@ class Proxmox():
 
                     status = stdout.channel.recv_exit_status()
                     if status != 0:
-                        raise exceptions.resource.Unavailable(f"Couldn't rename template {status}: {stderr.read()} {stdout.read()}")
+                        raise exceptions.resource.Unavailable(f"Couldn't rename image {status}: {stderr.read()} {stdout.read()}")
                 else:
-                    raise exceptions.resource.Unavailable(f"This template is currently unavailable: no fallback URL for template")
+                    raise exceptions.resource.Unavailable(f"This image is currently unavailable: no fallback URL for image")
    
         return image_path
 
@@ -457,7 +457,7 @@ class Proxmox():
         request_detail: models.proxmox.InstanceRequestDetail
     ) -> Tuple[str,str]:
 
-        template = self.get_template(instance_type, request_detail.template_id)
+        image = self.get_image(instance_type, request_detail.image_id)
 
         try:
             existing_vm = self.read_instance_by_account(instance_type, account, hostname)
@@ -465,26 +465,26 @@ class Proxmox():
         except exceptions.resource.NotFound:
             pass
 
-        node_name = self._select_best_node(template.specs)
+        node_name = self._select_best_node(image.specs)
         fqdn = self._get_instance_fqdn_for_account(instance_type, account, hostname)
 
         pool_folder_path = None
 
         if instance_type == models.proxmox.Type.LXC:
-            if template.disk_format != models.proxmox.Template.DiskFormat.TarGZ:
-                raise exceptions.resource.Unavailable(f"Templates (on Container instances) {detail.template_id} must use TarGZ of RootFS format!")
+            if image.disk_format != models.proxmox.Image.DiskFormat.TarGZ:
+                raise exceptions.resource.Unavailable(f"Images (on Container instances) {detail.image_id} must use TarGZ of RootFS format!")
 
-            pool_folder_path = f"{self.prox.storage(config.proxmox.dir_pool).get()['path']}/template/cache"
+            pool_folder_path = f"{self.prox.storage(config.proxmox.dir_pool).get()['path']}/image/cache"
         elif instance_type == models.proxmox.Type.VPS:
-            if template.disk_format != models.proxmox.Template.DiskFormat.QCOW2:
-                raise exceptions.resource.Unavailable(f"Templates (on VPS instances) {detail.template_id} must use QCOW2 disk image format!")
+            if image.disk_format != models.proxmox.Image.DiskFormat.QCOW2:
+                raise exceptions.resource.Unavailable(f"Images (on VPS instances) {detail.image_id} must use QCOW2 disk image format!")
 
-            pool_folder_path = f"{self.prox.storage(config.proxmox.dir_pool).get()['path']}/template/vps" 
+            pool_folder_path = f"{self.prox.storage(config.proxmox.dir_pool).get()['path']}/image/vps" 
 
-        # Checks that template exists & tries to download it if it doesn't
-        disk_image_path = self._ensure_template_present(
+        # Checks that image exists & tries to download it if it doesn't
+        disk_image_path = self._ensure_image_present(
             node_name,
-            template,
+            image,
             pool_folder_path
         )
 
@@ -509,7 +509,7 @@ class Proxmox():
                 vhosts=vhosts_dict
             ),
             root_user=root_user,
-            wake_on_request=template.wake_on_request
+            wake_on_request=image.wake_on_request
         )
 
         hash_id = self._hash_fqdn(fqdn)
@@ -524,14 +524,14 @@ class Proxmox():
                 "hostname": fqdn,
                 "vmid": hash_id,
                 "description": yaml_description,
-                "ostemplate": f"{config.proxmox.dir_pool}:vztmpl/{template.disk_file}",
-                "cores": template.specs.cores,
-                "memory": template.specs.memory,
-                "swap": template.specs.swap,
+                "ostemplate": f"{config.proxmox.dir_pool}:vztmpl/{image.disk_file}",
+                "cores": image.specs.cores,
+                "memory": image.specs.memory,
+                "swap": image.specs.swap,
                 "storage": config.proxmox.dir_pool,
                 "unprivileged": 1,
                 "nameserver": "1.1.1.1",
-                "rootfs": f"{config.proxmox.dir_pool}:{template.specs.disk_space}"
+                "rootfs": f"{config.proxmox.dir_pool}:{image.specs.disk_space}"
             })
     
             self._wait_for_instance_created(instance_type, fqdn)
@@ -583,7 +583,7 @@ class Proxmox():
             with ClusterNodeSSH(node_name) as con:
                 # Copy disk image
                 stdin, stdout, stderr = con.ssh.exec_command(
-                    f"cd {vms_images_path} && rm -f {vm_id} && mkdir {vm_id} && cd {vm_id} && cp {disk_image_path} ./primary.{ template.disk_format }"
+                    f"cd {vms_images_path} && rm -f {vm_id} && mkdir {vm_id} && cd {vm_id} && cp {disk_image_path} ./primary.{ image.disk_format }"
                 )
                 status = stdout.channel.recv_exit_status()
                 
@@ -606,10 +606,10 @@ class Proxmox():
                 name=fqdn,
                 agent=1,
                 description=yaml_description,
-                virtio0=f"{config.proxmox.dir_pool}:{vm_id}/primary.{ template.disk_format }",
-                cores=template.specs.cores,
-                memory=template.specs.memory,
-                balloon=min(template.specs.memory, 256),
+                virtio0=f"{config.proxmox.dir_pool}:{vm_id}/primary.{ image.disk_format }",
+                cores=image.specs.cores,
+                memory=image.specs.memory,
+                balloon=min(image.specs.memory, 256),
                 bios='ovmf',
                 efidisk0=f"{config.proxmox.dir_pool}:{vm_id}/efi.qcow2",
                 scsihw='virtio-scsi-pci',
@@ -622,7 +622,7 @@ class Proxmox():
 
             self.prox.nodes(node_name).qemu(f"{vm_id}/resize").put(
                 disk='virtio0',
-                size=f'{template.specs.disk_space}G'
+                size=f'{image.specs.disk_space}G'
             )
 
             self._wait_vmid_lock(instance_type, node_name, vm_id)

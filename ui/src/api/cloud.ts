@@ -6,7 +6,7 @@ export interface Specs {
   swap: number;
 }
 
-export interface Template {
+export interface Image {
   title: string;
   subtitle: string;
   description: string;
@@ -58,7 +58,7 @@ export interface RootUser {
 }
 
 export interface RequestDetail {
-  template_id: string;
+  image_id: string;
   reason: string;
 }
 

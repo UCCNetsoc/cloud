@@ -14,7 +14,7 @@
       <v-form
         lazy-validation
         ref="form"
-        v-if="request !== undefined || template !== undefined"
+        v-if="request !== undefined || image !== undefined"
       >
         <v-text-field
           label='Token'
@@ -39,16 +39,16 @@
                 tile
               >
                 <img
-                  :src="template.logo_url"
+                  :src="image.logo_url"
                 >
               </v-avatar>
             </v-col>
             <v-col sm="10">
               <h3 class="white--text">
-                {{ template.title + ' ' + request.type }}
+                {{ image.title + ' ' + request.type }}
               </h3>
               <span>
-                {{ getSpecString(template.specs) }}
+                {{ getSpecString(image.specs) }}
               </span><br/>
             </v-col>
           </v-row>
@@ -102,7 +102,7 @@ import MessageDialog from '@/components/MessageDialog.vue'
 import { config } from '@/config'
 import { fetchRest } from '@/api/rest'
 
-import { Specs, Request, Template } from '@/api/cloud'
+import { Specs, Request, Image } from '@/api/cloud'
 
 export default Vue.extend({
   components: {
@@ -128,11 +128,11 @@ export default Vue.extend({
   },
 
   data () {
-    let template: Template | undefined
+    let image: Image | undefined
     let request: Request | undefined
 
     return {
-      template,
+      image,
       request,
       loading: false,
       successful: false,
@@ -171,12 +171,12 @@ export default Vue.extend({
         this.request = request
 
         req = await fetchRest(
-          `${config.apiBaseUrl}/v1/proxmox/${this.emailOrUsername}/${request.type}-template/${request.detail.template_id}`, {
+          `${config.apiBaseUrl}/v1/proxmox/${this.emailOrUsername}/${request.type}-image/${request.detail.image_id}`, {
             method: 'GET',
             headers
           })
 
-        this.template = await req.json()
+        this.image = await req.json()
       } catch (e) {
         this.msg = e.message
       } finally {
