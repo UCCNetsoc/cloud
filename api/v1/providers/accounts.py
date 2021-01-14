@@ -69,7 +69,13 @@ class FreeIPA:
                 self._session_timer = time.time()
                 self._client_instance.ping()
         except freeipa.exceptions.Unauthorized as e: # expired session
-            try:            
+            try:
+                self._client_instance = freeipa.ClientMeta(
+                    host=config.accounts.freeipa.server,
+                    dns_discovery=False,
+                    verify_ssl=False
+                )
+
                 self._client_instance.login(
                     config.accounts.freeipa.username,
                     config.accounts.freeipa.password
