@@ -479,7 +479,7 @@ class Proxmox():
             if image.disk_format != models.proxmox.Image.DiskFormat.QCOW2:
                 raise exceptions.resource.Unavailable(f"Images (on VPS instances) {detail.image_id} must use QCOW2 disk image format!")
 
-            pool_folder_path = f"{self.prox.storage(config.proxmox.dir_pool).get()['path']}/image/vps" 
+            pool_folder_path = f"{self.prox.storage(config.proxmox.dir_pool).get()['path']}/template/qemu" 
 
         # Checks that image exists & tries to download it if it doesn't
         disk_image_path = self._ensure_image_present(
