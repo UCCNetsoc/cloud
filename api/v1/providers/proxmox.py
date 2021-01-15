@@ -535,6 +535,7 @@ class Proxmox():
             self._wait_for_instance_created(instance_type, fqdn)
 
             instance = self._read_instance_by_fqdn(instance_type, fqdn)
+            self._wait_vmid_lock(instance_type, instance.node, instance.id)
 
             # Enable nesting so they can use Docker
             with ClusterNodeSSH(instance.node) as con:
