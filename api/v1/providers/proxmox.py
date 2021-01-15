@@ -514,11 +514,9 @@ class Proxmox():
 
         hash_id = self._hash_fqdn(fqdn)
 
-        # Store VM metadata in the description field
-        yaml_description = self._serialize_metadata(metadata)
-
         if instance_type == models.proxmox.Type.LXC:
-            metadata.groups = set(["lxc", "cloud_lxc", "cloud_instance"])
+            metadata.groups = set(["cloud_lxc", "cloud_instance"])
+            yaml_description = self._serialize_metadata(metadata)
 
             self.prox.nodes(f"{node_name}/lxc").post(**{
                 "hostname": fqdn,
@@ -551,7 +549,8 @@ class Proxmox():
                     raise exceptions.resource.Unavailable(f"Couldn't enable instance nesting {status}: {stderr.read()} {stdout.read()}")
 
         elif instance_type == models.proxmox.Type.VPS:
-            metadata.groups = set(["vm", "cloud_vm", "cloud_instance"])
+            metadata.groups = set(["cloud_vps", "cloud_instance"])
+            yaml_description = self._serialize_metadata(metadata)
 
             stub_vm_name = f"stub-{fqdn}-{socket.gethostname()}-{os.getpid()}-{time.time()}"
 
