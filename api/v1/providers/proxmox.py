@@ -474,7 +474,7 @@ class Proxmox():
             if image.disk_format != models.proxmox.Image.DiskFormat.TarGZ:
                 raise exceptions.resource.Unavailable(f"Images (on Container instances) {detail.image_id} must use TarGZ of RootFS format!")
 
-            pool_folder_path = f"{self.prox.storage(config.proxmox.dir_pool).get()['path']}/image/cache"
+            pool_folder_path = f"{self.prox.storage(config.proxmox.dir_pool).get()['path']}/template/cache"
         elif instance_type == models.proxmox.Type.VPS:
             if image.disk_format != models.proxmox.Image.DiskFormat.QCOW2:
                 raise exceptions.resource.Unavailable(f"Images (on VPS instances) {detail.image_id} must use QCOW2 disk image format!")
