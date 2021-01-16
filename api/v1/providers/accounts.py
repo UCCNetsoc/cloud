@@ -399,7 +399,7 @@ class FreeIPA:
         account = self.read_account_by_username(account.username)
 
         # Set their password
-        self._change_password(account, password)
+        self.change_password(account, password)
 
     def read_gdpr_data(
         self,
