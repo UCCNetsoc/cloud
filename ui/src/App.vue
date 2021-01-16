@@ -95,7 +95,7 @@
         <a
           href="https://github.com/UCCNetsoc"
           class="ml-1"
-          style="padding-bottom: 7px; display:block; border-bottom: 1.5px solid white"
+          style="padding-bottom: 7px; display:block; border-bottom: 2px solid white"
         >
           <v-img
             width="24"
