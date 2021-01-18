@@ -12,6 +12,6 @@ See `config.sample.yaml`
 # Screenshots
 
 ![](./screenshots/cloud1.png)
-![](./screenshots/cloud2.png)
+![](./screenshots/tutorial-instance-list.png)
 ![](./screenshots/cloud3.png)
 ![](./screenshots/cloud4.png)
