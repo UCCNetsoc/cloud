@@ -62,9 +62,9 @@ class FreeIPA:
                 config.accounts.freeipa.password
             )
 
-        # The FreeIPA session can expire every 15 minutes so we need to test if we're still logged in
+        # The FreeIPA session can expire every 15 minutes s@propero we need to test if we're still logged in
         try:
-            if (self._session_timer - time.time()) > (5*60):
+            if (self._session_timer - time.time()) > 90:
                 # ping and see if the session has expired
                 self._session_timer = time.time()
                 self._client_instance.ping()
@@ -80,6 +80,8 @@ class FreeIPA:
                     config.accounts.freeipa.username,
                     config.accounts.freeipa.password
                 )
+                self._session_timer = time.time()
+                
             except freeipa.exceptions.Unauthorized as e:
                 logger.info("Login failed to FreeIPA")
                 raise exceptions.provider.Unavailable("Bad login credentials for account provider")
