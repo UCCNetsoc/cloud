@@ -11,7 +11,7 @@ from .account import Username
 Hostname = {
     "default": None,
     "title": "VM Hostname",
-    "description": "",
+    "description": "Alphanumeric with hyphens allowed, no spaces",
     "regex": r"^[a-z0-9-]+$",
     "max_length": 24
 }

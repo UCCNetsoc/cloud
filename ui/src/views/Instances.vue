@@ -9,58 +9,26 @@
                 Instances
               </v-card-title>
               <v-card-subtitle>
-                An instance is a remote virtualized machine that you can do with what you please
+                An instance is a remote virtualized machine built from a base image
               </v-card-subtitle>
               <v-card-text>
-                <h3>How To Guides</h3>
-                <a target="_blank" href="https://tutorial.netsoc.co">Tutorial (for Beginners!)</a>
-                <br/>
-                <a target="_blank" href="https://wiki.netsoc.co">Setup a blog using WordPress / Ghost CMS</a>
-                <br/>
-                <a target="_blank" href="https://wiki.netsoc.co">Connect to your instance over SSH</a>
-                <br/>
-                <a target="_blank" href="https://wiki.netsoc.co">Setup a static website</a>
-                <br/>
-                <a target="_blank" href="https://wiki.netsoc.co">Get started using Docker</a>
+                <h3>Help!</h3>
+                <a target="_blank" href="https://tutorial.netsoc.co">Consult the tutorial</a>
                 <br/>
               </v-card-text>
             </v-card>
             <v-divider vertical class="hidden-sm-and-down"/>
             <v-card flat>
               <v-card-title>
-                <b>Keeping your instance running</b>
+                <b>(IMPORTANT) Keeping your instance running and active</b>
               </v-card-title>
               <v-card-text>
-                <h3>Containers</h3>
                 <p>
-                  <b class="warning--text">Shutdown if you don't keep them marked active at least once every 90 days.</b><br/>
-                  <b class="red--text">Removed if you don't mark them active at least once every 180 days</b><br/>
-                </p>
-                <br/>
-                <h3>Virtual Private Servers</h3>
-                <p>
-                  <b class="warning--text">Shutdown if you don't mark them active at least once every 30 days.</b><br/>
-                  <b class="red--text">Removed if you don't mark them active at least once every 120 days</b><br/>
+                  If your instance goes inactive, it may be <b class="warning--text">shutdown</b> or <b class="error--text">deleted!</b><br/>
+                  Remember to take note of the date it goes inactive and remember to renew its activation!
                 </p>
               </v-card-text>
             </v-card>
-            <!--
-            <v-divider vertical class="hidden-sm-and-down"/>
-            <v-card flat>
-              <v-card-title>
-                <b>Installing Software</b>
-              </v-card-title>
-              <v-card-text>
-                <p>
-                  We can automate the installation of some software such as WordPress.<br/><br />
-                  To first install software your website directory must be empty except for the config file <code>netsoc.json</code> (dont delete this!).<br/>
-                  If you have just created your website, you will able to install software right away<br/>
-                </p>
-                <p>
-                  The <a v-on:click="$router.push('/tutorial')">Tutorial</a> page covers a WordPress installation
-                </p>
-              </v-card-text>
-            </v-card> -->
           </v-container>
         </v-card>
       </v-col>
