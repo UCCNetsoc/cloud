@@ -155,7 +155,6 @@ class Proxmox(BaseModel):
         ssh: SSH
 
     class VPS(BaseModel):
-        base_fqdn: str = "vps.netsoc.cloud"
         images: Dict[str, Image] = {}
 
         inactivity_shutdown_warning_num_days: int = 30
@@ -164,7 +163,6 @@ class Proxmox(BaseModel):
         inactivity_deletion_num_days: int = 120
 
     class LXC(BaseModel):
-        base_fqdn: str = "container.netsoc.cloud"
         images: Dict[str, Image] = {}
 
         inactivity_shutdown_warning_num_days: int = 60
@@ -184,15 +182,12 @@ class Proxmox(BaseModel):
             base_domain: str
             user_supplied: UserSupplied
 
-        # class VLANJumpHost(BaseModel):
-        #     server: str
-        #     port: str = 22
-        #     username: str = "jumphost"
-        #     public_key: Optional[str] = None
-        #     private_key: Optional[str] = None
-        #     password: str = None
+        class Traefik(BaseModel):
+            config_key: str
+            base_domain_cert_resolver: str
+            user_supplied_domain_cert_resolver: str
 
-        traefik_config_key: str
+        base_domain: str = "netsoc.cloud"
         bridge: str = "vmbr0"
         vlan: int = 40
         gateway: ipaddress.IPv4Address = ipaddress.IPv4Address("10.40.0.1")
@@ -202,10 +197,9 @@ class Proxmox(BaseModel):
             ipaddress.IPv4Address("10.40.0.254")
         )
 
-        #vlan_jumphost: VLANJumpHost
-
         port_forward: PortForward
         vhosts: VHostRequirements
+        traefik: Traefik
 
 
     blacklisted_nodes: List[str]
@@ -214,7 +208,8 @@ class Proxmox(BaseModel):
     vps: VPS
     network: Network
 
-    dir_pool: str = "local"
+    instance_dir_pool: str = "local"
+    image_dir_pool: str = "local"
 
 class Config(BaseModel):
     production: bool = False

@@ -275,16 +275,22 @@ class Proxmox():
         # return the node with the highest score
         return sorted(scoreboard, key=scoreboard.get, reverse=True)[0]
 
+    def _get_instance_type_base_fqdn(
+        self,
+        instance_type: models.proxmox.Type
+    ):
+        if instance_type == models.proxmox.Type.LXC:
+            return f"container.{config.proxmox.network.base_domain}"
+        elif instance_type == models.proxmox.Type.VPS:
+            return f"vps.{config.proxmox.network.base_domain}"
+
     def _get_instance_fqdn_for_username(
         self,
         instance_type: models.proxmox.Type,
         username: str,
         hostname: str
     ) -> str:
-        if instance_type == models.proxmox.Type.LXC:
-            return f"{hostname}.{username}.{config.proxmox.lxc.base_fqdn}"
-        elif instance_type == models.proxmox.Type.VPS:
-            return f"{hostname}.{username}.{config.proxmox.vps.base_fqdn}"
+        return f"{hostname}.{username}.{self._get_instance_type_base_fqdn(instance_type)}"
 
     def _get_instance_fqdn_for_account(
         self,
@@ -468,24 +474,24 @@ class Proxmox():
         node_name = self._select_best_node(image.specs)
         fqdn = self._get_instance_fqdn_for_account(instance_type, account, hostname)
 
-        pool_folder_path = None
+        images_dir = None
 
         if instance_type == models.proxmox.Type.LXC:
             if image.disk_format != models.proxmox.Image.DiskFormat.TarGZ:
                 raise exceptions.resource.Unavailable(f"Images (on Container instances) {detail.image_id} must use TarGZ of RootFS format!")
 
-            pool_folder_path = f"{self.prox.storage(config.proxmox.dir_pool).get()['path']}/template/cache"
+            images_dir = f"{self.prox.storage(config.proxmox.image_dir_pool).get()['path']}/template/cache"
         elif instance_type == models.proxmox.Type.VPS:
             if image.disk_format != models.proxmox.Image.DiskFormat.QCOW2:
                 raise exceptions.resource.Unavailable(f"Images (on VPS instances) {detail.image_id} must use QCOW2 disk image format!")
 
-            pool_folder_path = f"{self.prox.storage(config.proxmox.dir_pool).get()['path']}/template/qemu" 
+            images_dir = f"{self.prox.storage(config.proxmox.image_dir_pool).get()['path']}/template/qemu" 
 
         # Checks that image exists & tries to download it if it doesn't
         disk_image_path = self._ensure_image_present(
             node_name,
             image,
-            pool_folder_path
+            images_dir
         )
 
         # Give the host it's fqdn by default as a vhost
@@ -522,14 +528,14 @@ class Proxmox():
                 "hostname": fqdn,
                 "vmid": hash_id,
                 "description": yaml_description,
-                "ostemplate": f"{config.proxmox.dir_pool}:vztmpl/{image.disk_file}",
+                "ostemplate": f"{config.proxmox.image_dir_pool}:vztmpl/{image.disk_file}",
                 "cores": image.specs.cores,
                 "memory": image.specs.memory,
                 "swap": image.specs.swap,
-                "storage": config.proxmox.dir_pool,
+                "storage": config.proxmox.instance_dir_pool,
                 "unprivileged": 1,
                 "nameserver": "1.1.1.1",
-                "rootfs": f"{config.proxmox.dir_pool}:{image.specs.disk_space}"
+                "rootfs": f"{config.proxmox.instance_dir_pool}:{image.specs.disk_space}"
             })
     
             self._wait_for_instance_created(instance_type, fqdn)
@@ -579,7 +585,7 @@ class Proxmox():
             def cleanup_stub():
                 self.prox.nodes(instance.node).qemu(vm_id).delete()
 
-            vms_images_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/images"
+            vms_images_path = self.prox.storage(config.proxmox.instance_dir_pool).get()['path'] + "/images"
 
             with ClusterNodeSSH(node_name) as con:
                 # Copy disk image
@@ -607,12 +613,12 @@ class Proxmox():
                 name=fqdn,
                 agent=1,
                 description=yaml_description,
-                virtio0=f"{config.proxmox.dir_pool}:{vm_id}/primary.{ image.disk_format }",
+                virtio0=f"{config.proxmox.instance_dir_pool}:{vm_id}/primary.{ image.disk_format }",
                 cores=image.specs.cores,
                 memory=image.specs.memory,
                 balloon=min(image.specs.memory, 256),
                 bios='ovmf',
-                efidisk0=f"{config.proxmox.dir_pool}:{vm_id}/efi.qcow2",
+                efidisk0=f"{config.proxmox.instance_dir_pool}:{vm_id}/efi.qcow2",
                 scsihw='virtio-scsi-pci',
                 machine='q35',
                 serial0='socket',
@@ -640,7 +646,7 @@ class Proxmox():
         elif instance.type == models.proxmox.Type.VPS:
             # delete cloud-init data
             with ClusterNodeSSH(instance.node) as con:
-                snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
+                snippets_path = self.prox.storage(config.proxmox.instance_dir_pool).get()['path'] + "/snippets"
 
                 stdin, stdout, stderr = con.ssh.exec_command(
                     f"rm -f '{ snippets_path }/{instance.fqdn}.networkconfig.yml' '{ snippets_path }/{instance.fqdn}.userdata.yml' '{ snippets_path }/{instance.fqdn}.metadata.yml'"
@@ -995,26 +1001,28 @@ class Proxmox():
         lxcs_qemus = self.prox.cluster.resources.get(type="vm")
 
         for entry in lxcs_qemus:
-            if entry['type'] == 'qemu' and (instance_type == None or instance_type == models.proxmox.Type.VPS) and 'name' in entry and entry['name'].endswith(config.proxmox.vps.base_fqdn):
-                if ignore_errors == True:
-                    try:
-                        instance =  self._read_instance_on_node(models.proxmox.Type.VPS, entry['node'], entry['vmid'])
+            if entry['type'] == 'qemu' and (instance_type == None or instance_type == models.proxmox.Type.VPS):
+                if 'name' in entry and entry['name'].endswith(self._get_instance_type_base_fqdn(models.proxmox.Type.VPS)):
+                    if ignore_errors == True:
+                        try:
+                            instance =  self._read_instance_on_node(models.proxmox.Type.VPS, entry['node'], entry['vmid'])
+                            ret[instance.fqdn] = instance
+                        except Exception as e:
+                            logger.info("read_instances ignoring instance with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
+                    else:
+                        instance = self._read_instance_on_node(models.proxmox.Type.VPS, entry['node'], entry['vmid'])
                         ret[instance.fqdn] = instance
-                    except Exception as e:
-                        logger.info("read_instances ignoring instance with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
-                else:
-                    instance = self._read_instance_on_node(models.proxmox.Type.VPS, entry['node'], entry['vmid'])
-                    ret[instance.fqdn] = instance
-            elif entry['type'] == 'lxc' and (instance_type == None or instance_type == models.proxmox.Type.LXC) and 'name' in entry and entry['name'].endswith(config.proxmox.lxc.base_fqdn):
-                if ignore_errors == True:
-                    try:
+            elif entry['type'] == 'lxc' and (instance_type == None or instance_type == models.proxmox.Type.LXC):
+                if 'name' in entry and entry['name'].endswith(self._get_instance_type_base_fqdn(models.proxmox.Type.LXC)):
+                    if ignore_errors == True:
+                        try:
+                            instance = self._read_instance_on_node(models.proxmox.Type.LXC, entry['node'], entry['vmid'])
+                            ret[instance.fqdn] = instance
+                        except Exception as e:
+                            logger.info("read_instances ignoring instance with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
+                    else:
                         instance = self._read_instance_on_node(models.proxmox.Type.LXC, entry['node'], entry['vmid'])
                         ret[instance.fqdn] = instance
-                    except Exception as e:
-                        logger.info("read_instances ignoring instance with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
-                else:
-                    instance = self._read_instance_on_node(models.proxmox.Type.LXC, entry['node'], entry['vmid'])
-                    ret[instance.fqdn] = instance
             
         return ret
 
@@ -1211,7 +1219,7 @@ class Proxmox():
         elif instance.type == models.proxmox.Type.VPS:
             # delete cloud-init data
             with ClusterNodeSSH(instance.node) as con:
-                snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
+                snippets_path = self.prox.storage(config.proxmox.instance_dir_pool).get()['path'] + "/snippets"
 
                 stdin, stdout, stderr = con.ssh.exec_command(
                     f"rm -f '{ snippets_path }/{instance.fqdn}.networkconfig.yml' '{ snippets_path }/{instance.fqdn}.userdata.yml' '{ snippets_path }/{instance.fqdn}.metadata.yml'"
@@ -1224,7 +1232,7 @@ class Proxmox():
                 )
 
                 # install cloud-init data
-                snippets_path = self.prox.storage(config.proxmox.dir_pool).get()['path'] + "/snippets"
+                snippets_path = self.prox.storage(config.proxmox.instance_dir_pool).get()['path'] + "/snippets"
 
 
                 if vps_clear_cloudinit == True:
@@ -1291,11 +1299,11 @@ version: 2
             # Insert cloud-init drive
             self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
                 cicustom=build_proxmox_config_string({
-                    "user": f"{ config.proxmox.dir_pool }:snippets/{instance.fqdn}.userdata.yml",
-                    "network": f"{ config.proxmox.dir_pool }:snippets/{instance.fqdn}.networkconfig.yml",
-                    "meta": f"{ config.proxmox.dir_pool }:snippets/{instance.fqdn}.metadata.yml"
+                    "user": f"{ config.proxmox.instance_dir_pool }:snippets/{instance.fqdn}.userdata.yml",
+                    "network": f"{ config.proxmox.instance_dir_pool }:snippets/{instance.fqdn}.networkconfig.yml",
+                    "meta": f"{ config.proxmox.instance_dir_pool }:snippets/{instance.fqdn}.metadata.yml"
                 }),
-                ide2=f"{ config.proxmox.dir_pool }:cloudinit,format=qcow2"
+                ide2=f"{ config.proxmox.instance_dir_pool }:cloudinit,format=qcow2"
             )
 
             # Set network card
@@ -1449,7 +1457,7 @@ version: 2
         txt_name = config.proxmox.network.vhosts.user_supplied.verification_txt_name
         txt_content = username
 
-        base_domain = config.proxmox.network.vhosts.base_domain
+        base_domain = config.proxmox.network.base_domain
         allowed_a_aaaa = config.proxmox.network.vhosts.user_supplied.allowed_a_aaaa
 
         split = domain.split(".")
@@ -1461,10 +1469,8 @@ version: 2
             return (True, None)
 
         # Ban any domain that tries to use the base fqdn that isn't the fqdn
-        if instance.type == models.proxmox.Type.LXC and domain.endswith(config.proxmox.lxc.base_fqdn):
-            return (False, [f"Invalid domain {domain}: only {instance.fqdn} is allowed to be used when domain ends with {config.proxmox.lxc.base_fqdn}"])
-        elif instance.type == models.proxmox.Type.VPS and domain.endswith(config.proxmox.vps.base_fqdn):
-            return (False, [f"Invalid domain {domain}: only {instance.fqdn} is allowed to be used when domain ends with {config.proxmox.vps.base_fqdn}"])
+        if domain.endswith(self._get_instance_type_base_fqdn(instance.type)):
+            return (False, [f"Invalid domain {domain}: only {instance.fqdn} is allowed to be used when domain ends with {self._get_instance_type_base_fqdn(instance.type)}"])
 
         # *.netsoc.cloud etc
         if domain.endswith(f".{base_domain}"):
@@ -1564,7 +1570,7 @@ version: 2
         # Traefik does not like keys with empty values
         # so we gotta omit them by checking if the base key is already in the dict everywhere
 
-        config = {}
+        c = {}
 
         services = {}
         routers = {}
@@ -1579,27 +1585,45 @@ version: 2
                 vhost_suffix = vhost.replace('.', '-')
 
                 if valid is True:
-                    if 'http' not in config:
-                        config['http'] = {
+                    if 'http' not in c:
+                        c['http'] = {
                             'routers': {},
                             'services': {}
                         }
                     
-                    config['http']['routers'][f"{fqdn_prefix}-{vhost_suffix}"] = {
-                        "entrypoints": web_entrypoints,
-                        "rule": f"Host(`{vhost}`)",
-                        "service": f"{fqdn_prefix}-{vhost_suffix}",
-                        "tls": {
-                            "certResolver": "letsencrypt"
+                    if vhost.endswith(config.proxmox.network.base_domain):
+                        c['http']['routers'][f"{fqdn_prefix}-{vhost_suffix}"] = {
+                            "entrypoints": web_entrypoints,
+                            "rule": f"Host(`{vhost}`)",
+                            "service": f"{fqdn_prefix}-{vhost_suffix}",
+                            "tls": {
+                                "certResolver": f"{ config.proxmox.network.traefik.base_domain_cert_resolver }",
+                                "domains": [
+                                    {
+                                        "main": f"{ config.proxmox.network.base_domain }",
+                                        "sans": [
+                                            f"*.{ config.proxmox.network.base_domain }"
+                                        ]
+                                    }
+                                ]
+                            }
                         }
-                    }
+                    else:
+                        c['http']['routers'][f"{fqdn_prefix}-{vhost_suffix}"] = {
+                            "entrypoints": web_entrypoints,
+                            "rule": f"Host(`{vhost}`)",
+                            "service": f"{fqdn_prefix}-{vhost_suffix}",
+                            "tls": {
+                                "certResolver": f"{ config.proxmox.network.traefik.user_supplied_domain_cert_resolver }",
+                            }
+                        }
 
                     proto = "http"
 
                     if options.https is True:
                         proto = "https"
 
-                    config['http']['services'][f"{fqdn_prefix}-{vhost_suffix}"] = {
+                    c['http']['services'][f"{fqdn_prefix}-{vhost_suffix}"] = {
                         "loadBalancer": {
                             "servers": [{ 
                                 "url": f"{ proto }://{instance.metadata.network.nic_allocation.addresses[0].ip}:{ options.port }"
@@ -1613,24 +1637,24 @@ version: 2
             fqdn, ip, internal_port = internal_tuple
             fqdn_prefix = fqdn.replace('.', '-')
             
-            if 'tcp' not in config and 'udp' not in config:
-                config['tcp'] = {
+            if 'tcp' not in c and 'udp' not in c:
+                c['tcp'] = {
                     'routers': {},
                     'services': {}
                 }
 
-                config['udp'] = {
+                c['udp'] = {
                     'routers': {},
                     'services': {}
                 }
 
-            config['tcp']['routers'][f"{fqdn_prefix}-{external_port}-tcp"] = {
+            c['tcp']['routers'][f"{fqdn_prefix}-{external_port}-tcp"] = {
                 "entryPoints": [f"netsoc-cloud-{external_port}-tcp"],
                 "rule": "HostSNI(`*`)",
                 "service": f"{fqdn_prefix}-{external_port}-tcp"
             }
 
-            config['tcp']['services'][f"{fqdn_prefix}-{external_port}-tcp"] = {
+            c['tcp']['services'][f"{fqdn_prefix}-{external_port}-tcp"] = {
                 "loadBalancer": {
                     "servers": [{
                         "address": f"{ip}:{internal_port}"
@@ -1638,12 +1662,12 @@ version: 2
                 }
             }
 
-            config['udp']['routers'] [f"{fqdn_prefix}-{external_port}-udp"] = {
+            c['udp']['routers'] [f"{fqdn_prefix}-{external_port}-udp"] = {
                 "entryPoints": [f"netsoc-cloud-{external_port}-udp"],
                 "service": f"{fqdn_prefix}-{external_port}-udp"
             }
 
-            config['udp']['services'] [f"{fqdn_prefix}-{external_port}-udp"] = {
+            c['udp']['services'] [f"{fqdn_prefix}-{external_port}-udp"] = {
                 "loadBalancer": {
                     "servers": [{
                         "address": f"{ip}:{internal_port}"
@@ -1652,4 +1676,4 @@ version: 2
             }
             
 
-        return config
+        return c

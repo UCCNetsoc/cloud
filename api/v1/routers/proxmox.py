@@ -51,7 +51,7 @@ def ensure_not_tos_suspended(instance: models.proxmox.Instance):
 async def get_traefik_config(
     key: str = ""
 ):
-    if key != config.proxmox.network.traefik_config_key:
+    if key != config.proxmox.network.traefik.config_key:
         raise exceptions.rest.Error(status_code=403, detail=models.rest.Detail(
             msg=f"invalid config key"
         ))
