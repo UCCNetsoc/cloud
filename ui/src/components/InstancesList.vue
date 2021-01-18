@@ -19,8 +19,8 @@
             >
               <td>
                 <v-container class="pa-0 ma-0">
-                  <v-row justify="start" class="my-2" no-gutters>
-                    <v-col sm="12" md="2" align="top" justify="center">
+                  <v-row justify="start" class="ma-0 pa-0 mt-2" no-gutters>
+                    <v-col sm="12" md="2" align="center" justify="center">
                       <v-avatar
                         size="36"
                         tile
@@ -59,13 +59,13 @@
                     </v-col>
                   </v-row>
                   <v-row no-gutters class="ml-1 mb-2">
-                    <v-col sm="12" md="12" lg="4">
+                    <v-col sm="12" md="12" lg="6">
                       <h4>{{ getImage(row.item[1].metadata.request_detail.image_id).title }}</h4>
                       <div class="caption" v-for="spec in getSpecList(row.item[1].specs)" :key="spec">
                         {{ spec }}
                       </div>
                     </v-col>
-                    <v-col sm="12" md="12" lg="4" align="left">
+                    <v-col sm="12" md="12" lg="6" align="left">
                       <v-btn
                         x-small
                         class="ma-1 blue"
