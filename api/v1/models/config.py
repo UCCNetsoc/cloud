@@ -179,7 +179,6 @@ class Proxmox(BaseModel):
                 verification_txt_name: str
                 allowed_a_aaaa: Set[str]
 
-            base_domain: str
             user_supplied: UserSupplied
 
         class Traefik(BaseModel):
