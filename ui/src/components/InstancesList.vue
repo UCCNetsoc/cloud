@@ -82,7 +82,7 @@
                         x-small
                         class="ma-1 blue"
                         @click="openConfirmCancel(ConfirmCancelMode.RequestRespec, { hostname: row.item[0] })"
-                        :disabled="row.item[1].metadata.tos.suspended === true"
+                        :disabled="row.item[1].metadata.tos.suspended === true || row.item[1].active === false"
                       >
                         <v-icon>
                           mdi-server-plus
@@ -1179,6 +1179,18 @@ export default Vue.extend({
       }
     },
 
+    uiSilentReloadLoop () {
+      if (this.confirmCancel.mode === ConfirmCancelMode.Hidden) {
+        this.uiSilentReload()
+      }
+
+      setTimeout(() => {
+        // Only refresh list when they're looking at it
+        // i.e confirmcancel dialog is hidden
+        this.uiSilentReloadLoop()
+      }, 6000)
+    },
+
     async uiReloadImages () {
       this.images = {}
 
@@ -1238,6 +1250,7 @@ export default Vue.extend({
   mounted () {
     this.uiReload()
     this.uiReloadImages()
+    this.uiSilentReloadLoop()
   }
 })
 </script>
