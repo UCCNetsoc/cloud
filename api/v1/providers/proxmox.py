@@ -422,7 +422,7 @@ class Proxmox():
         password, user_ssh_private_key, root_user = self._generate_instance_root_user()
 
         vhosts = {}
-        vhosts[f"{hostname}-{''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8))}.{config.proxmox.network.vhosts.service_subdomain.base_domain}"] = models.proxmox.VHostOptions(
+        vhosts[f"{hostname}-{account.username}-{''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(4))}.{config.proxmox.network.vhosts.service_subdomain.base_domain}"] = models.proxmox.VHostOptions(
             port=80,
             https=False
         )

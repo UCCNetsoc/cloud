@@ -1111,7 +1111,7 @@ export default Vue.extend({
         this.msg = e.message
       } finally {
         this.closeConfirmCancel()
-        setTimeout(() => this.uiReload(), 100)
+        setTimeout(() => this.uiReload(), 150)
       }
     },
 
@@ -1179,18 +1179,6 @@ export default Vue.extend({
       }
     },
 
-    uiSilentReloadLoop () {
-      if (this.confirmCancel.mode === ConfirmCancelMode.Hidden) {
-        this.uiSilentReload()
-      }
-
-      setTimeout(() => {
-        // Only refresh list when they're looking at it
-        // i.e confirmcancel dialog is hidden
-        this.uiSilentReloadLoop()
-      }, 6000)
-    },
-
     async uiReloadImages () {
       this.images = {}
 
@@ -1250,7 +1238,10 @@ export default Vue.extend({
   mounted () {
     this.uiReload()
     this.uiReloadImages()
-    this.uiSilentReloadLoop()
+
+    setInterval(() => {
+      this.uiSilentReload()
+    }, 6000)
   }
 })
 </script>
