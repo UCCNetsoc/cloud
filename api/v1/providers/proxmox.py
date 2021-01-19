@@ -421,8 +421,14 @@ class Proxmox():
         # (we allow this in validate_domain)
         password, user_ssh_private_key, root_user = self._generate_instance_root_user()
 
+        fancy_name = "unknown"
+        if instance_type == models.proxmox.Type.LXC:
+            fancy_name = "container"
+        elif nstance_type == models.proxmox.Type.VPS:
+            fancy_name = "vps"
+
         vhosts = {}
-        vhosts[f"{hostname}-{account.username}-{''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(4))}.{config.proxmox.network.vhosts.service_subdomain.base_domain}"] = models.proxmox.VHostOptions(
+        vhosts[f"{hostname}-{account.username}-{fancy_name}.{config.proxmox.network.vhosts.service_subdomain.base_domain}"] = models.proxmox.VHostOptions(
             port=80,
             https=False
         )
