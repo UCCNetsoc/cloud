@@ -424,7 +424,7 @@ class Proxmox():
         fancy_name = "unknown"
         if instance_type == models.proxmox.Type.LXC:
             fancy_name = "container"
-        elif nstance_type == models.proxmox.Type.VPS:
+        elif instance_type == models.proxmox.Type.VPS:
             fancy_name = "vps"
 
         vhosts = {}
