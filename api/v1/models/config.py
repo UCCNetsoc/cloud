@@ -175,31 +175,104 @@ class Proxmox(BaseModel):
             range: Tuple[int,int] = (16384,32767)
 
         class VHostRequirements(BaseModel):
-            class UserSupplied(BaseModel):
+            class UserDomain(BaseModel):
                 verification_txt_name: str
                 allowed_a_aaaa: Set[str]
 
-            user_supplied: UserSupplied
+            class ServiceSubdomain(BaseModel):
+                base_domain: str = "netsoc.cloud"
+                blacklisted_subdomains: List[str] = [
+                    "vps",
+                    "ssh",
+                    "sftp",
+                    "container",
+                    "api",
+                    "proxy"
+                    "_apt",
+                    "admin",
+                    "apache2",
+                    "api",
+                    "backup",
+                    "bareos",
+                    "bigbertha",
+                    "bin",
+                    "bind",
+                    "blog",
+                    "boole",
+                    "ci",
+                    "cloud",
+                    "colord",
+                    "control",
+                    "cron",
+                    "daemon",
+                    "dnsmasq",
+                    "docker",
+                    "fail2ban",
+                    "feynman",
+                    "games",
+                    "gnats",
+                    "httpd",
+                    "infra",
+                    "irc",
+                    "ircd",
+                    "ldap",
+                    "leela",
+                    "libvirt-dnsmasq",
+                    "libvirt-qemu",
+                    "list",
+                    "lovelace",
+                    "lp",
+                    "lxd",
+                    "mail",
+                    "man",
+                    "messagebus",
+                    "mysql",
+                    "netsoc",
+                    "news",
+                    "nobody",
+                    "ntp",
+                    "portainer",
+                    "postfix",
+                    "postgres",
+                    "proxy",
+                    "redis",
+                    "root",
+                    "sshd",
+                    "sync",
+                    "sys",
+                    "syslog",
+                    "systemd-bus-prox",
+                    "systemd-bus-proxy",
+                    "systemd-network",
+                    "systemd-resolve",
+                    "systemd-timesync",
+                    "thief",
+                    "unf2b",
+                    "uucp",
+                    "uuidd",
+                    "wiki",
+                    "www-data"
+                ]
+
+            user_domain: UserDomain
+            service_subdomain: ServiceSubdomain
+
 
         class Traefik(BaseModel):
             config_key: str
-            base_domain_cert_resolver: str
-            user_supplied_domain_cert_resolver: str
+            service_subdomain_cert_resolver: str
+            user_domain_cert_resolver: str
 
-        base_domain: str = "netsoc.cloud"
-        bridge: str = "vmbr0"
-        vlan: int = 40
-        gateway: ipaddress.IPv4Address = ipaddress.IPv4Address("10.40.0.1")
-        network: ipaddress.IPv4Interface = ipaddress.IPv4Interface("10.40.0.0/16")
-        range: Tuple[ipaddress.IPv4Address, ipaddress.IPv4Address] = (
-            ipaddress.IPv4Address("10.40.0.3"),
-            ipaddress.IPv4Address("10.40.0.254")
-        )
+        base_fqdn: str
+        bridge: str
+        vlan: int
+        gateway: ipaddress.IPv4Address
+        network: ipaddress.IPv4Interface
+        range: Tuple[ipaddress.IPv4Address, ipaddress.IPv4Address]
 
         port_forward: PortForward
         vhosts: VHostRequirements
         traefik: Traefik
-
 
     blacklisted_nodes: List[str]
     cluster: Cluster

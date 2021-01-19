@@ -35,7 +35,14 @@ from v1.config import config
 logger = logging.getLogger(__name__)
 
 class ClusterNodeSSH:
-    """Paramiko SSH client that will first SSH into an exposed Proxmox node, then jump into any of the nodes in the Cluster"""
+    """
+        Paramiko SSH client that will first SSH into an exposed Proxmox node, then jump into any of the nodes in the Cluster
+        Expects that each cluster node is reachable by just it's short hostname,
+
+        i.e "ssh leela" should ssh into a clusternode named leela
+
+        Contains ssh and sftp objects for use within the manager
+    """
 
     jump: paramiko.SSHClient
     ssh: paramiko.SSHClient
@@ -80,118 +87,6 @@ class ClusterNodeSSH:
         self.ssh.close()
         self.jump.close()
 
-# Here for historical reasons
-# class InstanceSSH:
-#     """Paramiko SSH client that will first SSH into an exposed jump host, then jump into any of the Cloud instance"""
-
-#     jump: paramiko.SSHClient
-#     ssh: paramiko.SSHClient
-    
-#     ssh: paramiko.SSHClient
-#     sftp: paramiko.SFTPClient
-#     instance: models.proxmox.Instance
-#     _usernames: Dict[int, str]
-#     _groupnames: Dict[int, str]
-#     _uids: Dict[str, int]
-#     _gids: Dict[str, int]
-
-#     def __init__(self, instance: models.proxmox.Instance):
-#         self.jump = paramiko.SSHClient()
-#         self.ssh = paramiko.SSHClient()
-#         self.instance = instance
-#         self._uids = {}
-#         self._gids = {}
-#         self._usernames = {}
-#         self._groupnames = {}
-        
-#         if instance.status == models.proxmox.Status.Stopped:
-#             raise exceptions.resource.Unavailable("Cannot connect to instance. Instance is stopped")
-
-#     def __enter__(self):
-#         self.jump.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-#         if config.proxmox.network.vlan_jumphost.password is not None:
-#             self.jump.connect(
-#                 hostname=config.proxmox.network.vlan_jumphost.server,
-#                 username=config.proxmox.network.vlan_jumphost.username,
-#                 password=config.proxmox.cluster.ssh.password,
-#                 port=config.proxmox.network.vlan_jumphost.port
-#             )
-#         elif config.proxmox.network.vlan_jumphost.private_key is not None:
-#             self.jump.connect(
-#                 hostname=config.proxmox.network.vlan_jumphost.server,
-#                 username=config.proxmox.network.vlan_jumphost.username,
-#                 pkey=paramiko.RSAKey.from_private_key(io.StringIO(config.proxmox.network.vlan_jumphost.private_key)),
-#                 port=config.proxmox.network.vlan_jumphost.port
-#             )
-#         else:
-#             logger.error("No private key/password for cloud vlan jumphost specified")
-            
-
-#         self.jump_transport = self.jump.get_transport()
-#         ip = str(self.instance.metadata.network.nic_allocation.addresses[0].ip)
-
-#         self.jump_channel = self.jump_transport.open_channel("direct-tcpip", (ip, 22), ("0.0.0.0", 0))
-
-#         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-#         try:
-#             self.ssh.connect(
-#                 self.instance.metadata.network.nic_allocation.addresses[0], # nodes should be setup in /etc/hosts correctly
-#                 username="root",
-#                 pkey=paramiko.RSAKey.from_private_key(io.StringIO(self.instance.metadata.root_user.mgmt_ssh_private_key)),
-#                 port=22,
-#                 sock=self.jump_channel
-#             )
-#             self.sftp = self.ssh.open_sftp()
-#             # Cache usernames and groups
-
-#             with self.sftp.open("/etc/passwd") as file:
-#                 for line in file:
-#                     s = line.split(":")
-#                     self._uids[s[0]] = int(s[2])
-#                     self._usernames[int(s[2])] = s[0]
-
-#             with self.sftp.open("/etc/group") as file:
-#                 for line in file:
-#                     s = line.split(":")
-#                     self._gids[s[0]] = int(s[2])
-#                     self._groupnames[int(s[2])] = s[0]
-
-#         except ConnectionError as e:
-#             raise exceptions.resource.Unavailable("Could not connect to instance. Is SSH by root ssh key turned off")
-
-#         return self
-
-
-#     def get_uid(self, username: str) -> int:
-#         if username in self._uids:
-#             return self._uids[username]
-
-#         raise exceptions.resource.Unavailable()
-
-#     def get_username(self, uid: int) -> str:
-#         if uid in self._usernames:
-#             return self._usernames[uid]
-
-#         raise exceptions.resource.Unavailable()
-
-#     def get_group(self, gid: int) -> str:
-#         if gid in self._groupnames:
-#             return self._groupnames[gid]
-
-#         raise exceptions.resource.Unavailable()
-
-#     def get_gid(self, group: str) -> int:
-#         if group in self._gids:
-#             return self._gids[group]
-
-#         raise exceptions.resource.Unavailable()
-
-#     def __exit__(self, type, value, traceback):
-#         self.sftp.close()
-#         self.ssh.close()
-#         self.jump.close()
-
 def build_proxmox_config_string(options: dict):
     """Turns a dict into string of e.g.'key1=value1,key2=value2'"""
     return ",".join(map(lambda d: f"{d[0]}={d[1]}", options.items()))
@@ -220,6 +115,8 @@ class Proxmox():
         self,
         instance_type: models.proxmox.Type
     ) -> Dict[str, models.proxmox.Image]:
+        """Get the dict of possible images an instance type can have, dict key is image id"""
+
         if instance_type == models.proxmox.Type.LXC:
             return config.proxmox.lxc.images
         elif instance_type == models.proxmox.Type.VPS:
@@ -230,6 +127,8 @@ class Proxmox():
         instance_type: models.proxmox.Type,
         image_id: str
     ) -> models.proxmox.Image:
+        """Get image definition for instance type by image_id"""
+
         images = self.get_images(instance_type)
         if image_id not in images:
             raise exceptions.rest.Error(
@@ -279,10 +178,12 @@ class Proxmox():
         self,
         instance_type: models.proxmox.Type
     ):
+        """Returns the base fqdn for an instance type, i.e vps.netsoc.cloud"""
+
         if instance_type == models.proxmox.Type.LXC:
-            return f"container.{config.proxmox.network.base_domain}"
+            return f"container.{config.proxmox.network.base_fqdn}"
         elif instance_type == models.proxmox.Type.VPS:
-            return f"vps.{config.proxmox.network.base_domain}"
+            return f"vps.{config.proxmox.network.base_fqdn}"
 
     def _get_instance_fqdn_for_username(
         self,
@@ -290,6 +191,8 @@ class Proxmox():
         username: str,
         hostname: str
     ) -> str:
+        """Returns the base fqdn for an instance owned by a username, i.e ocanty.vps.netsoc.cloud"""
+
         return f"{hostname}.{username}.{self._get_instance_type_base_fqdn(instance_type)}"
 
     def _get_instance_fqdn_for_account(
@@ -298,12 +201,15 @@ class Proxmox():
         account: models.account.Account,
         hostname: str
     ) -> str:
+        """Returns the base fqdn for an instance owned by an account, i.e ocanty.vps.netsoc.cloud"""
+
         return self._get_instance_fqdn_for_username(instance_type, account.username, hostname)
 
     def _allocate_nic(
         self,
         instance_type: models.proxmox.Type
     ) -> models.proxmox.NICAllocation:
+        """Examine all other instances and find a new IP and NIC stuff like mac address"""
         # world's most ghetto ip allocation algorithm
         network = config.proxmox.network.network.network
         base_ip = config.proxmox.network.network.ip
@@ -353,6 +259,7 @@ class Proxmox():
         self,
         metadata: models.proxmox.Metadata
     ):
+        """Turns metadata into readable yaml so it looks pretty in the Proxmox web ui"""
         # https://github.com/samuelcolvin/pydantic/issues/1043
         return yaml.safe_dump(
             yaml.safe_load(metadata.json()),
@@ -365,6 +272,8 @@ class Proxmox():
         self,
         instance: models.proxmox.Instance
     ):
+        """Write metadata to the instances description in Proxmox"""
+
         yaml_description = self._serialize_metadata(instance.metadata)
         
         if instance.type == models.proxmox.Type.LXC:
@@ -376,6 +285,7 @@ class Proxmox():
         self,
         fqdn: str
     ) -> int:
+        """Hash a fqdn string and return an id to use in Proxmox"""
         random.seed(fqdn)
         hash_id = random.randint(1000, 5000000)
         random.seed()
@@ -388,15 +298,19 @@ class Proxmox():
         image: models.proxmox.Image,
         folder_path: str
     ) -> str:
-        """Downloads the speciied image to the specified path (must be a folder) and returns the full path of the image file onto the node name specified"""
+        """
+        Downloads the speciied image's disk to the specified path (must be a folder) and returns the full path of the image file onto the node name specified
+        """
 
         # Download the disk image/image
-        
         image_path = f"{folder_path}/{image.disk_file}"
+
         # needs to be unique as this could be happening on multiple workers and we don't want them to overwrite the ile mid download
         download_path = f"{folder_path}/{socket.gethostname()}-{os.getpid()}"
 
+        # ssh into the node the download needs to be made
         with ClusterNodeSSH(node_name) as con:
+            # ensure target folder exists
             stdin, stdout, stderr = con.ssh.exec_command(
                 f"mkdir -p {folder_path}"
             )
@@ -405,11 +319,12 @@ class Proxmox():
             if status != 0:
                 raise exceptions.resource.Unavailable(f"Could not download image: could not reserve download dir {stderr.read()}")
 
-            # See if the image exists
+            # See if the image already exists
             try:
                 logger.info(image_path)
                 con.sftp.stat(image_path)
 
+                # checksum image if it was found
                 if image.disk_sha256sum is not None:
                     # Checksum image    
                     stdin, stdout, stderr = con.ssh.exec_command(
@@ -422,8 +337,8 @@ class Proxmox():
 
             except (exceptions.resource.Unavailable, FileNotFoundError) as e:
                 # If a fallback URL exists to download the image
-                logger.info("Could not find file, falling back to download", image=image.dict(), e=e, exc_info=True)
 
+                logger.info("Could not find file, falling back to download", image=image.dict(), e=e, exc_info=True)
                 if image.disk_file_fallback_url is not None:
                     # Original image does not exist, we gotta download it
                     stdin, stdout, stderr = con.ssh.exec_command(
@@ -442,7 +357,7 @@ class Proxmox():
                     if image.disk_sha256sum not in str(stdout.read()):
                         raise exceptions.resource.Unavailable(f"Downloaded image does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
 
-                    # Move image
+                    # Move image into folder path requested
                     stdin, stdout, stderr = con.ssh.exec_command(
                         f"rm -f {image_path} && mv {download_path} {image_path}"
                     )
@@ -461,21 +376,28 @@ class Proxmox():
         account: models.account.Account,
         hostname: str,
         request_detail: models.proxmox.InstanceRequestDetail
-    ) -> Tuple[str,str]:
+    ):
+        """Create an instance of type associated with a user account with hostname and requested detail like image"""
 
+        # get image data
         image = self.get_image(instance_type, request_detail.image_id)
 
-        try:
+        # see if instance with this hostname already exists
+        try: 
             existing_vm = self.read_instance_by_account(instance_type, account, hostname)
             raise exceptions.resource.AlreadyExists(f"Instance {hostname} already exists")
         except exceptions.resource.NotFound:
             pass
 
+        # pick a node for the instance based off the required specs
         node_name = self._select_best_node(image.specs)
+
+        # get the base fqdn for this users account username
         fqdn = self._get_instance_fqdn_for_account(instance_type, account, hostname)
 
         images_dir = None
 
+        # do file format checking (promox limitation)
         if instance_type == models.proxmox.Type.LXC:
             if image.disk_format != models.proxmox.Image.DiskFormat.TarGZ:
                 raise exceptions.resource.Unavailable(f"Images (on Container instances) {detail.image_id} must use TarGZ of RootFS format!")
@@ -496,14 +418,15 @@ class Proxmox():
 
         # Give the host it's fqdn by default as a vhost
         # (we allow this in validate_domain)
-        vhosts_dict = {}
-        vhosts_dict[fqdn] = models.proxmox.VHostOptions(
-            https=False,
-            port=80
-        )
-
         password, user_ssh_private_key, root_user = self._generate_instance_root_user()
 
+        vhosts = {}
+        vhosts[f"{hostname}-{account.username}-{instance_type.lower()}.{config.proxmox.network.vhosts.service_subdomain.base_domain}"] = models.proxmox.VHostOptions(
+            port=80,
+            https=False
+        )
+
+        # set metadata for the proxmox description
         metadata = models.proxmox.Metadata(
             owner=account.username,
             request_detail=request_detail,
@@ -512,18 +435,20 @@ class Proxmox():
             ),
             network=models.proxmox.Network(
                 nic_allocation=self._allocate_nic(instance_type),
-                vhosts=vhosts_dict
+                vhosts=vhosts
             ),
             root_user=root_user,
             wake_on_request=image.wake_on_request
         )
 
+        # get hash for the vm id
         hash_id = self._hash_fqdn(fqdn)
 
         if instance_type == models.proxmox.Type.LXC:
             metadata.groups = set(["cloud_lxc", "cloud_instance"])
             yaml_description = self._serialize_metadata(metadata)
 
+            # create the container in proxmox
             self.prox.nodes(f"{node_name}/lxc").post(**{
                 "hostname": fqdn,
                 "vmid": hash_id,
@@ -541,7 +466,6 @@ class Proxmox():
             self._wait_for_instance_created(instance_type, fqdn)
 
             instance = self._read_instance_by_fqdn(instance_type, fqdn)
-            
             self._wait_vmid_lock(instance_type, instance.node, instance.id)
 
             # Enable nesting so they can use Docker
@@ -564,7 +488,6 @@ class Proxmox():
 
             # we need to create a 'stub' vm to reserve an id
             # the vm disk image is stored in a folder named as the id so we need to create the vm before we configure it to discover this id
-            logger.info("created")
             self.prox.nodes(f"{node_name}/qemu").post(
                 name=stub_vm_name,
                 vmid=hash_id
@@ -638,6 +561,8 @@ class Proxmox():
         self,
         instance: models.proxmox.Instance
     ):
+        """Delete an instance"""
+
         if instance.status != models.proxmox.Status.Stopped:
             raise exceptions.resource.Unavailable("Cannot delete instance, instance is running")
 
@@ -755,6 +680,7 @@ class Proxmox():
         vmid: int,
         expected_fqdn: Optional[str] = None
     ) -> models.proxmox.Instance:
+        """Read instance by reading the vm/container on proxmox and parsing the description metadata"""
 
         if instance_type == models.proxmox.Type.LXC:
             try:
@@ -839,7 +765,7 @@ class Proxmox():
                 active=active
             )
 
-            # Build remarks about the thing, problems, etc...
+            # Build remarks about the vhosts
             for vhost in instance.metadata.network.vhosts:
                 valid, remarks = self.validate_domain(instance, vhost)
 
@@ -945,7 +871,7 @@ class Proxmox():
         instance_type: models.proxmox.Type,
         fqdn: str
     ) -> models.proxmox.Instance:
-        lxcs_qemus = self.prox.cluster.resources.get(type="vm")
+        lxcs_qemus = self.prox.cluster.resources.get(type="vm") # also gets containers :shrug:
 
         for entry in lxcs_qemus:
             if 'name' in entry and entry['name'] == fqdn:
@@ -983,7 +909,7 @@ class Proxmox():
                         instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
                         ret[instance.hostname] = instance
                     except Exception as e:
-                        logger.info("read_instances_by_account ignoring instance with error", ignore_errors=ignore_errors, account=account)
+                        logger.info("read_instances_by_account ignoring instance with error", instance=entry['name'], ignore_errors=ignore_errors, e=e, exc_info=True)
                 else:
                     instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
                     ret[instance.hostname] = instance
@@ -995,6 +921,7 @@ class Proxmox():
         instance_type: Optional[models.proxmox.Type] = None,
         ignore_errors: bool = True
     ) -> Dict[str, models.proxmox.Instance]:
+        """Read all instances in the cluster, dict indexed by fqdn, special flag to ignore instances that cause exceptions on reading"""
 
         ret = { }
 
@@ -1030,6 +957,8 @@ class Proxmox():
     def _generate_instance_root_user(
         self
     ) -> Tuple[str, str, models.proxmox.RootUser]:
+        """Returns <password>, <private key>, <public root user info>"""
+
         ssh_public_key, ssh_private_key = utilities.ssh.generate_key_pair()
 
         password = utilities.password.generate()
@@ -1072,7 +1001,7 @@ class Proxmox():
         instance: models.proxmox.Instance,
         root_user: Optional[models.proxmox.RootUser] = None
     ) -> Tuple[str, str, models.proxmox.RootUser]:
-        """Returns a tuple of password, private_key"""
+        """Reset a running instances root user returns a tuple of password, private_key"""
 
         if instance.status == models.proxmox.Status.Stopped:
             raise exceptions.resource.Unavailable("Instance must be running to reset root user")
@@ -1194,7 +1123,10 @@ class Proxmox():
         instance: models.proxmox.Instance,
         vps_clear_cloudinit: bool = False
     ):
+        """start instance, clear cloudinit flag can clear the cloud-init provisioning data off a vps if required"""
+
         if instance.type == models.proxmox.Type.LXC:
+            # apply network adapter settings in case they changed
             self.prox.nodes(instance.node).lxc(f"{instance.id}/config").put(**{
                 "nameserver": "1.1.1.1",
                 "net0": build_proxmox_config_string({
@@ -1217,7 +1149,7 @@ class Proxmox():
 
             self.prox.nodes(instance.node).lxc(f"{instance.id}/status/start").post()
         elif instance.type == models.proxmox.Type.VPS:
-            # delete cloud-init data
+            # delete cloud-init data (from a previous run)
             with ClusterNodeSSH(instance.node) as con:
                 snippets_path = self.prox.storage(config.proxmox.instance_dir_pool).get()['path'] + "/snippets"
 
@@ -1323,6 +1255,7 @@ version: 2
                 "ipfilter": 1
             })
 
+            # add firewall rules for the ip filter, i.e only allow the vps to send out traffic with its own ip
             for i in range(len(instance.metadata.network.nic_allocation.addresses)):
                 try:
                     ret = self.prox.nodes(instance.node).qemu(instance.id).firewall.ipset(f"ipfilter-net{i}").get()
@@ -1370,7 +1303,7 @@ version: 2
         self,
         instance: models.proxmox.Instance
     ): 
-        # reset inactivity status, this resets tracking of the emails too
+        # reset inactivity status
         instance.metadata.inactivity = models.proxmox.Inactivity(
             marked_active_at = datetime.date.today()
         )
@@ -1382,6 +1315,11 @@ version: 2
         vhost: str,
         options: models.proxmox.VHostOptions
     ):
+        """Add a vhost to an instance, exception if domain is used by another instance"""
+
+        if not self.is_domain_available(vhost):
+            raise exceptions.resource.Unavailable(f"This domain/vhost is currently in use by another user or instance.")
+
         instance.metadata.network.vhosts[vhost] = options
         self.write_out_instance_metadata(instance)
 
@@ -1400,6 +1338,11 @@ version: 2
     def get_port_forward_map(
         self
     ) -> Dict[int,Tuple[str, ipaddress.IPv4Address, int]]:
+        """
+        Build a dict indexed by external port number returning a tuple of (fqdn, ip address, internal port number) of the port mappings
+        needed by the cluster
+        """
+
         instances = self.read_instances()
 
         port_map = {}
@@ -1434,6 +1377,21 @@ version: 2
         
         raise exceptions.resource.Unavailable("out of suitable external ports")
 
+    def is_domain_available(
+        self,
+        domain: str
+    ) -> bool:
+        """Returns False if the domain is in use by another instance"""
+
+        for fqdn, instance in self.read_instances(ignore_errors=True).items():
+            # first do vhosts
+            for vhost, options in instance.metadata.network.vhosts.items():
+                valid, remarks = self.validate_domain(instance, vhost)
+
+                if valid is True and domain == vhost:
+                    return False
+                
+        return True
 
     def validate_domain(
         self,
@@ -1443,48 +1401,33 @@ version: 2
         """
         Verifies a single domain, if the domain is valid, (True, None) is returned
         If the domain is invalid, (False, a list of remarks is returned)
-
-        We allow the instance fqdn as a domain, so if the FQDN == domain 
-        i.e. <hostname>.<owner_username>.<base_fqdn_for_this_instance_type> / server1.ocanty.vps.netsoc.cloud
-        You will _need_ to blacklist accounts that have the same subdomain as instance fqdn i.e 'vps' and 'container'
-
-        We also allow users to use <username>.<base_domain>, i.e ocanty.netsoc.cloud or
-        make use of a subdomain like <subdomain>.<username>.<base_domain>
-        i.e blog.ocanty.netsoc.cloud
         """
         username = instance.metadata.owner
 
-        txt_name = config.proxmox.network.vhosts.user_supplied.verification_txt_name
+        txt_name = config.proxmox.network.vhosts.user_domain.verification_txt_name
         txt_content = username
 
-        base_domain = config.proxmox.network.base_domain
-        allowed_a_aaaa = config.proxmox.network.vhosts.user_supplied.allowed_a_aaaa
+        base_domain = config.proxmox.network.vhosts.service_subdomain.base_domain
+        allowed_a_aaaa = config.proxmox.network.vhosts.user_domain.allowed_a_aaaa
 
         split = domain.split(".")
 
         remarks = []
 
-        # Allow fqdn
-        if domain == instance.fqdn:
-            return (True, None)
-
-        # Ban any domain that tries to use the base fqdn that isn't the fqdn
-        if domain.endswith(self._get_instance_type_base_fqdn(instance.type)):
-            return (False, [f"Invalid domain {domain}: only {instance.fqdn} is allowed to be used when domain ends with {self._get_instance_type_base_fqdn(instance.type)}"])
-
         # *.netsoc.cloud etc
         if domain.endswith(f".{base_domain}"):
-            # the stuff at the start, i.e if they specified blog.ocanty.netsoc.co
+            # the stuff at the start, i.e if they specified blog.ocanty.netsoc.cloud
             # prefix is blog.ocanty
+            # we only allow a single subdomain, so we gotta stop this in its tracks
             prefix = domain[:-len(f".{base_domain}")]
             split_prefix = prefix.split(".")
             
-            # extract last part, i.e blog.ocanty => ocanty
-            if split_prefix[-1] == username:
-                # Valid domain
-                return (True, None)
-            else:
-                remarks.append(f"Invalid domain {domain}: subdomain {split_prefix[-1]} is invalid, must be the same as username {username}")
+            if len(split_prefix) != 1:
+                remarks.append(f"Invalid domain {domain}: only allowed a subdomain up one level, e.g. 'example.{base_domain}'")
+
+            if split_prefix[-1] in config.proxmox.network.vhosts.service_subdomain.blacklisted_subdomains:
+                remarks.append(f"Invalid domain {domain}: the subdomain '{ split_prefix[-1] }'' is blacklisted")
+
         else: # custom domain
             try:
                 info_list = socket.getaddrinfo(domain, 80)
@@ -1525,20 +1468,6 @@ version: 2
         
         return (False, remarks)
 
-    def get_vhost_forward_map(
-        self,
-
-    ) -> Dict[str, ipaddress.IPv4Address]:
-        vhost_map = {}
-
-        for fqdn, lxc in lxcs:
-            ip = lxc.metadata.network.nic_allocation.addresses[0]
-
-            for domain in lxc.metadata.network.vhosts:
-                logger.warning(f"warning, conflicting port map: {lxc.fqdn} tried to map {external_port} but it's already taken!")
-
-        return port_map
-
     def add_instance_port(
         self,
         instance: models.proxmox.Instance,
@@ -1567,9 +1496,12 @@ version: 2
         self,
         web_entrypoints: List[str]
     ) -> dict:
+        """
+        Return a traefik config that will add rules for doing port mappings and
+        vhost reverse proxying
+        """
         # Traefik does not like keys with empty values
         # so we gotta omit them by checking if the base key is already in the dict everywhere
-
         c = {}
 
         services = {}
@@ -1591,21 +1523,13 @@ version: 2
                             'services': {}
                         }
                     
-                    if vhost.endswith(config.proxmox.network.base_domain):
+                    if vhost.endswith(config.proxmox.network.vhosts.service_subdomain.base_domain):
                         c['http']['routers'][f"{fqdn_prefix}-{vhost_suffix}"] = {
                             "entrypoints": web_entrypoints,
                             "rule": f"Host(`{vhost}`)",
                             "service": f"{fqdn_prefix}-{vhost_suffix}",
                             "tls": {
-                                "certResolver": f"{ config.proxmox.network.traefik.base_domain_cert_resolver }",
-                                "domains": [
-                                    {
-                                        "main": f"{ config.proxmox.network.base_domain }",
-                                        "sans": [
-                                            f"*.{ config.proxmox.network.base_domain }"
-                                        ]
-                                    }
-                                ]
+                                "certResolver": f"{ config.proxmox.network.traefik.service_subdomain_cert_resolver }",
                             }
                         }
                     else:
@@ -1614,7 +1538,7 @@ version: 2
                             "rule": f"Host(`{vhost}`)",
                             "service": f"{fqdn_prefix}-{vhost_suffix}",
                             "tls": {
-                                "certResolver": f"{ config.proxmox.network.traefik.user_supplied_domain_cert_resolver }",
+                                "certResolver": f"{ config.proxmox.network.traefik.user_domain_cert_resolver }",
                             }
                         }
 

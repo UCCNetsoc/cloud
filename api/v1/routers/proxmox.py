@@ -556,6 +556,7 @@ async def remove_instance_port(
 async def get_allowed_a_aaaa() -> str:
     return config.proxmox.network.vhosts
 
+
 @router.post(
     '/{email_or_username}/{instance_type}/{hostname}/vhost/{vhost}',
     status_code=200,

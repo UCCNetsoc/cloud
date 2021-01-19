@@ -11,7 +11,7 @@ Username = {
     "default": None,
     "title": "Username",
     "description": "Lowercase alphanumeric characters only, maximum 16 digits",
-    "regex": r"^[a-z0-9]([a-z0-9\-\_]{1,15}[a-z0-9])$",
+    "regex": r"^[a-z0-9]([a-z0-9\_]{1,15}[a-z0-9])$",
     "min_length": 1,
     "max_length": 16
 }
