@@ -19,6 +19,7 @@ import re
 import crypt
 import functools
 import string
+import random
 import time
 import selectors
 
@@ -421,7 +422,7 @@ class Proxmox():
         password, user_ssh_private_key, root_user = self._generate_instance_root_user()
 
         vhosts = {}
-        vhosts[f"{hostname}-{account.username}-{instance_type.lower()}.{config.proxmox.network.vhosts.service_subdomain.base_domain}"] = models.proxmox.VHostOptions(
+        vhosts[f"{hostname}-{''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8))}.{config.proxmox.network.vhosts.service_subdomain.base_domain}"] = models.proxmox.VHostOptions(
             port=80,
             https=False
         )
@@ -466,13 +467,15 @@ class Proxmox():
             self._wait_for_instance_created(instance_type, fqdn)
 
             instance = self._read_instance_by_fqdn(instance_type, fqdn)
-            self._wait_vmid_lock(instance_type, instance.node, instance.id)
+            
+            self._wait_vmid_lock(instance.type, instance.node, instance.id)
 
             # Enable nesting so they can use Docker
             with ClusterNodeSSH(instance.node) as con:
-                # Can't do this via the API, need root
+
+                # Can't do this via the API, need root, digusting unlock hack too btw
                 stdin, stdout, stderr = con.ssh.exec_command(
-                    f"sleep 2 && pvesh set /nodes/{ instance.node }/lxc/{ instance.id }/config -features fuse=1,keyctl=1,nesting=1"
+                    f"pct unlock {instance.id} || pct unlock {instance.id} || pct unlock {instance.id} || pvesh set /nodes/{ instance.node }/lxc/{ instance.id }/config -features fuse=1,keyctl=1,nesting=1"
                 )
 
                 status = stdout.channel.recv_exit_status()
@@ -545,7 +548,8 @@ class Proxmox():
                 scsihw='virtio-scsi-pci',
                 machine='q35',
                 serial0='socket',
-                bootdisk='virtio0'
+                bootdisk='virtio0',
+                rng0="source=/dev/urandom"
             )
 
             self._wait_vmid_lock(instance_type, node_name, vm_id)

@@ -157,18 +157,18 @@ class Proxmox(BaseModel):
     class VPS(BaseModel):
         images: Dict[str, Image] = {}
 
-        inactivity_shutdown_warning_num_days: int = 30
-        inactivity_shutdown_num_days: int = 60
-        inactivity_deletion_warning_num_days: int = 90
+        # inactivity_shutdown_warning_num_days: int = 30
+        inactivity_shutdown_num_days: int = 24
+        # inactivity_deletion_warning_num_days: int = 90
         inactivity_deletion_num_days: int = 120
 
     class LXC(BaseModel):
         images: Dict[str, Image] = {}
 
-        inactivity_shutdown_warning_num_days: int = 60
-        inactivity_shutdown_num_days: int = 90
-        inactivity_deletion_warning_num_days: int = 120
-        inactivity_deletion_num_days: int = 150
+        # inactivity_shutdown_warning_num_days: int = 60
+        inactivity_shutdown_num_days: int = 48
+        # inactivity_deletion_warning_num_days: int = 120
+        inactivity_deletion_num_days: int = 120
 
     class Network(BaseModel):
         class PortForward(BaseModel):

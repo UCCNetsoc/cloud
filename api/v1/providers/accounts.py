@@ -64,7 +64,7 @@ class FreeIPA:
 
         # The FreeIPA session can expire every 15 minutes s@propero we need to test if we're still logged in
         try:
-            if (self._session_timer - time.time()) > 90:
+            if (time.time() - self._session_timer) > 90:
                 # ping and see if the session has expired
                 self._session_timer = time.time()
                 self._client_instance.ping()
