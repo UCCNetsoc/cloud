@@ -59,13 +59,13 @@
                     </v-col>
                   </v-row>
                   <v-row no-gutters class="ml-1 mb-2">
-                    <v-col sm="12" md="12" lg="6">
+                    <v-col sm="12" md="12" lg="4">
                       <h4>{{ getImage(row.item[1].metadata.request_detail.image_id).title }}</h4>
                       <div class="caption" v-for="spec in getSpecList(row.item[1].specs)" :key="spec">
                         {{ spec }}
                       </div>
                     </v-col>
-                    <v-col sm="12" md="12" lg="6" align="left">
+                    <v-col sm="12" md="12" lg="4" align="left">
                       <v-btn
                         x-small
                         class="ma-1 blue"
@@ -195,9 +195,9 @@
                       </v-btn>
                     </v-col>
                   </v-row>
-                  <v-row v-if="row.item[1].remarks.length > 0">
+                  <v-row no-gutters class="ma-0 pa-0" v-if="row.item[1].remarks.length > 0">
                     <v-col style="background-color: rgba(0,0,0,0.25); overflow-x: hidden; overflow-y: scroll; max-height: 12.5vh">
-                      <p class="my-1" v-for="remark in row.item[1].remarks" :key="remark">{{ remark }}</p>
+                      <p class="ma-2" v-for="remark in row.item[1].remarks" :key="remark">{{ remark }}</p>
                     </v-col>
                   </v-row>
                 </v-container>
@@ -639,16 +639,11 @@
           Using your free Netsoc Cloud domain
         </h3>
         <p>
-          You can use any domain that match the following forms:
+          You can use any domain in the form of <code>*.{{ vhostRequirements.service_subdomain.base_domain }}</code>
           <ul>
-            <li>{{ $store.state.auth.user.profile.preferred_username }}.{{ vhostRequirements.base_domain }}</li>
             <li>
-                       *.{{ $store.state.auth.user.profile.preferred_username }}.{{ vhostRequirements.base_domain }}
-              <ul>
-                <li>e.g. blog.{{ $store.state.auth.user.profile.preferred_username }}.{{ vhostRequirements.base_domain }}</li>
-              </ul>
+              e.g. <code>{{ $store.state.auth.user.profile.preferred_username }}.{{ vhostRequirements.service_subdomain.base_domain }}</code>
             </li>
-            <li>{{ instances[confirmCancel.action.hostname].fqdn }}</li>
           </ul>
         </p>
         <h3>
@@ -660,11 +655,11 @@
             <li>
               <code>TXT</code>
               record of key
-              <code>{{ vhostRequirements.user_supplied.verification_txt_name }}</code>
+              <code>{{ vhostRequirements.user_domain.verification_txt_name }}</code>
               with value
               <code>{{ $store.state.auth.user.profile.preferred_username }}</code>
             </li>
-            <li v-for="record in vhostRequirements.user_supplied.allowed_a_aaaa" :key="record">
+            <li v-for="record in vhostRequirements.user_domain.allowed_a_aaaa" :key="record">
               <code>A</code>
               record of value
               <code>{{ record }}</code>
@@ -676,7 +671,7 @@
           label='Virtual Host'
           v-model='confirmCancel.action.vHostDomain'
           :rules='vhostRules'
-          :placeholder='$store.state.auth.user.profile.preferred_username+"."+vhostRequirements.base_domain'
+          :placeholder='$store.state.auth.user.profile.preferred_username+"."+vhostRequirements.service_subdomain.base_domain'
         ></v-text-field>
         <v-text-field
           label='HTTP(S) port to reverse proxy'
