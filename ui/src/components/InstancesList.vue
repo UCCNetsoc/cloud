@@ -1111,7 +1111,7 @@ export default Vue.extend({
         this.msg = e.message
       } finally {
         this.closeConfirmCancel()
-        setTimeout(() => this.uiReload(), 150)
+        setTimeout(() => this.uiReload(), 750)
       }
     },
 
@@ -1241,7 +1241,7 @@ export default Vue.extend({
 
     setInterval(() => {
       this.uiSilentReload()
-    }, 6000)
+    }, 10000)
   }
 })
 </script>
