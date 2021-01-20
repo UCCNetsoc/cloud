@@ -554,8 +554,7 @@ class Proxmox():
                 scsihw='virtio-scsi-pci',
                 machine='q35',
                 serial0='socket',
-                bootdisk='virtio0',
-                rng0="source=/dev/urandom"
+                bootdisk='virtio0'
             )
 
             self._wait_vmid_lock(instance_type, node_name, vm_id)
@@ -566,6 +565,17 @@ class Proxmox():
             )
 
             self._wait_vmid_lock(instance_type, node_name, vm_id)
+
+            with ClusterNodeSSH(node_name) as con:
+                # Can't do this via the API, need root, digusting unlock hack too btw
+                stdin, stdout, stderr = con.ssh.exec_command(
+                    f"pvesh set /nodes/{ node_name }/qemu/{ vm_id }/config -rng0 source=/dev/urandom"
+                )
+
+                status = stdout.channel.recv_exit_status()
+                
+                if status != 0:
+                    raise exceptions.resource.Unavailable(f"Couldn't enable instance random driver {status}: {stderr.read()} {stdout.read()}")
 
     def delete_instance(
         self,
