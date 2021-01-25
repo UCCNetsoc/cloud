@@ -94,52 +94,14 @@ def build_proxmox_config_string(options: dict):
 
 class Proxmox():
     def __init__(self):
-        if config.proxmox.cluster.api.password:
-            self.prox = ProxmoxAPI(
-                host=config.proxmox.cluster.api.server,
-                user=config.proxmox.cluster.api.username,
-                password=config.proxmox.cluster.api.password,
-                port=config.proxmox.cluster.api.port,
-                verify_ssl=False
-            )
-        else:
-            self.prox = ProxmoxAPI(
-                host=config.proxmox.cluster.api.server,
-                user=config.proxmox.cluster.api.username,
-                token_name=config.proxmox.cluster.api.token_name,
-                token_value=config.proxmox.cluster.api.token_value,
-                port=config.proxmox.cluster.api.port,
-                verify_ssl=False
-            )
-
-    def get_images(
-        self,
-        instance_type: models.proxmox.Type
-    ) -> Dict[str, models.proxmox.Image]:
-        """Get the dict of possible images an instance type can have, dict key is image id"""
-
-        if instance_type == models.proxmox.Type.LXC:
-            return config.proxmox.lxc.images
-        elif instance_type == models.proxmox.Type.VPS:
-            return config.proxmox.vps.images
-
-    def get_image(
-        self,
-        instance_type: models.proxmox.Type,
-        image_id: str
-    ) -> models.proxmox.Image:
-        """Get image definition for instance type by image_id"""
-
-        images = self.get_images(instance_type)
-        if image_id not in images:
-            raise exceptions.rest.Error(
-                400,
-                models.rest.Detail(
-                    msg=f"Image {image_id} does not exist!"
-                )
-            )
-        else:
-            return images[image_id]
+        self.prox = ProxmoxAPI(
+            host=config.proxmox.cluster.api.server,
+            user=config.proxmox.cluster.api.username,
+            token_name=config.proxmox.cluster.api.token_name,
+            token_value=config.proxmox.cluster.api.token_value,
+            port=config.proxmox.cluster.api.port,
+            verify_ssl=False
+        )
 
     def _select_best_node(
         self,
@@ -237,7 +199,7 @@ class Proxmox():
             ips.remove(gateway)
 
         # remove any addresses assigned to any of the other instances
-        for fqdn, instance in self.read_instances().items():
+        for fqdn, instance in self.read_all_instances(ignore_errors=True).items():
             for address in instance.metadata.network.nic_allocation.addresses:
                 if address.ip in ips:
                     ips.remove(address.ip)
@@ -293,84 +255,6 @@ class Proxmox():
 
         return hash_id
 
-    def _ensure_image_present(
-        self,
-        node_name: str,
-        image: models.proxmox.Image,
-        folder_path: str
-    ) -> str:
-        """
-        Downloads the speciied image's disk to the specified path (must be a folder) and returns the full path of the image file onto the node name specified
-        """
-
-        # Download the disk image/image
-        image_path = f"{folder_path}/{image.disk_file}"
-
-        # needs to be unique as this could be happening on multiple workers and we don't want them to overwrite the ile mid download
-        download_path = f"{folder_path}/{socket.gethostname()}-{os.getpid()}"
-
-        # ssh into the node the download needs to be made
-        with ClusterNodeSSH(node_name) as con:
-            # ensure target folder exists
-            stdin, stdout, stderr = con.ssh.exec_command(
-                f"mkdir -p {folder_path}"
-            )
-            status = stdout.channel.recv_exit_status()
-
-            if status != 0:
-                raise exceptions.resource.Unavailable(f"Could not download image: could not reserve download dir {stderr.read()}")
-
-            # See if the image already exists
-            try:
-                logger.info(image_path)
-                con.sftp.stat(image_path)
-
-                # checksum image if it was found
-                if image.disk_sha256sum is not None:
-                    # Checksum image    
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"sha256sum {image_path} | cut -f 1 -d' '"
-                    )
-
-                    if image.disk_sha256sum not in str(stdout.read()):
-                        logger.info(f"Image does not pass SHA256 sums given, falling back to download", status=status, stderr=stderr.read(), stdout=stdout.read())
-                        raise exceptions.resource.Unavailable()
-
-            except (exceptions.resource.Unavailable, FileNotFoundError) as e:
-                # If a fallback URL exists to download the image
-
-                logger.info("Could not find file, falling back to download", image=image.dict(), e=e, exc_info=True)
-                if image.disk_file_fallback_url is not None:
-                    # Original image does not exist, we gotta download it
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"wget {image.disk_file_fallback_url} -O {download_path}"
-                    )
-                    status = stdout.channel.recv_exit_status()
-
-                    if status != 0:
-                        raise exceptions.resource.Unavailable(f"Could not download image: error {status}: {stderr.read()} {stdout.read()}")
-
-                    # Checksum image    
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"sha256sum {download_path} | cut -f 1 -d' '"
-                    )
-
-                    if image.disk_sha256sum not in str(stdout.read()):
-                        raise exceptions.resource.Unavailable(f"Downloaded image does not pass SHA256SUM given {status}: {stderr.read()} {stdout.read()}")
-
-                    # Move image into folder path requested
-                    stdin, stdout, stderr = con.ssh.exec_command(
-                        f"rm -f {image_path} && mv {download_path} {image_path}"
-                    )
-
-                    status = stdout.channel.recv_exit_status()
-                    if status != 0:
-                        raise exceptions.resource.Unavailable(f"Couldn't rename image {status}: {stderr.read()} {stdout.read()}")
-                else:
-                    raise exceptions.resource.Unavailable(f"This image is currently unavailable: no fallback URL for image")
-   
-        return image_path
-
     def create_instance(
         self,
         instance_type: models.proxmox.Type,
@@ -378,10 +262,10 @@ class Proxmox():
         hostname: str,
         request_detail: models.proxmox.InstanceRequestDetail
     ):
-        """Create an instance of type associated with a user account with hostname and requested detail like image"""
+        """Create an instance of type associated with a user account with hostname and requested detail like template"""
 
-        # get image data
-        image = self.get_image(instance_type, request_detail.image_id)
+        # get template data
+        template = self.read_template(instance_type, request_detail.template_id)
 
         # see if instance with this hostname already exists
         try: 
@@ -390,32 +274,8 @@ class Proxmox():
         except exceptions.resource.NotFound:
             pass
 
-        # pick a node for the instance based off the required specs
-        node_name = self._select_best_node(image.specs)
-
         # get the base fqdn for this users account username
         fqdn = self._get_instance_fqdn_for_account(instance_type, account, hostname)
-
-        images_dir = None
-
-        # do file format checking (promox limitation)
-        if instance_type == models.proxmox.Type.LXC:
-            if image.disk_format != models.proxmox.Image.DiskFormat.TarGZ:
-                raise exceptions.resource.Unavailable(f"Images (on Container instances) {detail.image_id} must use TarGZ of RootFS format!")
-
-            images_dir = f"{self.prox.storage(config.proxmox.image_dir_pool).get()['path']}/template/cache"
-        elif instance_type == models.proxmox.Type.VPS:
-            if image.disk_format != models.proxmox.Image.DiskFormat.QCOW2:
-                raise exceptions.resource.Unavailable(f"Images (on VPS instances) {detail.image_id} must use QCOW2 disk image format!")
-
-            images_dir = f"{self.prox.storage(config.proxmox.image_dir_pool).get()['path']}/template/qemu" 
-
-        # Checks that image exists & tries to download it if it doesn't
-        disk_image_path = self._ensure_image_present(
-            node_name,
-            image,
-            images_dir
-        )
 
         # Give the host it's fqdn by default as a vhost
         # (we allow this in validate_domain)
@@ -436,7 +296,8 @@ class Proxmox():
         # set metadata for the proxmox description
         metadata = models.proxmox.Metadata(
             owner=account.username,
-            request_detail=request_detail,
+            template_metadata=template.metadata,
+            reason=request_detail.reason,
             inactivity=models.proxmox.Inactivity(
                 marked_active_at=datetime.date.today()
             ),
@@ -445,137 +306,63 @@ class Proxmox():
                 vhosts=vhosts
             ),
             root_user=root_user,
-            wake_on_request=image.wake_on_request
+            wake_on_request=template.metadata.wake_on_request
         )
 
         # get hash for the vm id
         hash_id = self._hash_fqdn(fqdn)
 
         if instance_type == models.proxmox.Type.LXC:
-            metadata.groups = set(["cloud_lxc", "cloud_instance"])
-            yaml_description = self._serialize_metadata(metadata)
+            metadata.groups = set(["netsoc_cloud_container", "netsoc_cloud_instance"])
+        elif instance_type == models.proxmox.Type.VPS:
+            metadata.groups = set(["netsoc_cloud_vps", "netsoc_cloud_instance"])
 
-            # create the container in proxmox
-            self.prox.nodes(f"{node_name}/lxc").post(**{
-                "hostname": fqdn,
-                "vmid": hash_id,
-                "description": yaml_description,
-                "ostemplate": f"{config.proxmox.image_dir_pool}:vztmpl/{image.disk_file}",
-                "cores": image.specs.cores,
-                "memory": image.specs.memory,
-                "swap": image.specs.swap,
-                "storage": config.proxmox.instance_dir_pool,
-                "unprivileged": 1,
-                "nameserver": "1.1.1.1",
-                "rootfs": f"{config.proxmox.instance_dir_pool}:{image.specs.disk_space}"
-            })
-    
-            self._wait_for_instance_created(instance_type, fqdn)
-
-            instance = self._read_instance_by_fqdn(instance_type, fqdn)
             
-            self._wait_vmid_lock(instance.type, instance.node, instance.id)
+        yaml_description = self._serialize_metadata(metadata)
 
-            # Enable nesting so they can use Docker
-            with ClusterNodeSSH(instance.node) as con:
+        # pick a node for the instance based off the required specs
+        target_node_name = self._select_best_node(template.specs)
 
-                # Can't do this via the API, need root, digusting unlock hack too btw
-                stdin, stdout, stderr = con.ssh.exec_command(
-                    f"pct unlock {instance.id} || pct unlock {instance.id} || pct unlock {instance.id} || pvesh set /nodes/{ instance.node }/lxc/{ instance.id }/config -features fuse=1,keyctl=1,nesting=1"
-                )
+        # we need to clone the template to the node its stored on and then migrate it to the target node
+        # (this lets us use templates without shared storage)
 
-                status = stdout.channel.recv_exit_status()
-                
-                if status != 0:
-                    raise exceptions.resource.Unavailable(f"Couldn't enable instance nesting {status}: {stderr.read()} {stdout.read()}")
+        if instance_type == models.proxmox.Type.LXC:
+            self.prox.nodes(f"{template.node}/lxc/{template.id}/clone").post(**{
+                "hostname": fqdn,
+                "newid": hash_id,
+                "description": yaml_description,
+                "storage": config.proxmox.instance_dir_pool,
+                "full": 1
+            })
+
+            self._wait_for_instance_created(instance_type, fqdn)
+            instance = self._read_instance_by_fqdn(instance_type, fqdn)
+
+            if instance.node != target_node_name:
+                self.prox.nodes(f"{instance.node}/lxc/{instance.id}/migrate").post(**{
+                    "target": target_node_name,
+                    "restart": 1
+                })
 
         elif instance_type == models.proxmox.Type.VPS:
-            metadata.groups = set(["cloud_vps", "cloud_instance"])
-            yaml_description = self._serialize_metadata(metadata)
+            self.prox.nodes(f"{template.node}/qemu/{template.id}/clone").post(**{
+                "name": fqdn,
+                "newid": hash_id,
+                "description": yaml_description,
+                "storage": config.proxmox.instance_dir_pool,
+                "full": 1
+            })
 
-            stub_vm_name = f"stub-{fqdn}-{socket.gethostname()}-{os.getpid()}-{time.time()}"
+            self._wait_for_instance_created(instance_type, fqdn)
+            instance = self._read_instance_by_fqdn(instance_type, fqdn)
 
-            # we need to create a 'stub' vm to reserve an id
-            # the vm disk image is stored in a folder named as the id so we need to create the vm before we configure it to discover this id
-            self.prox.nodes(f"{node_name}/qemu").post(
-                name=stub_vm_name,
-                vmid=hash_id
-            )
+            if instance.node != target_node_name:
+                self.prox.nodes(f"{instance.node}/qemu/{instance.id}/migrate").post(**{
+                    "target": target_node_name
+                })
 
-            # now find the vm by its name, we can't trust the hash_id because if there's a collision it'l be + 1
-            vm_id = None
-
-            for vm in self.prox.nodes(node_name).qemu.get():
-                if vm['name'] == stub_vm_name:
-                    vm_id = vm['vmid']
-                    break
-
-            if vm_id is None:
-                raise exceptions.resource.Unavailable(f"Unable to find created stub vm")
-
-            # if theres an error anywhere in the process, we will call this function to nuke the stub vm
-            def cleanup_stub():
-                self.prox.nodes(instance.node).qemu(vm_id).delete()
-
-            vms_images_path = self.prox.storage(config.proxmox.instance_dir_pool).get()['path'] + "/images"
-
-            with ClusterNodeSSH(node_name) as con:
-                # Copy disk image
-                stdin, stdout, stderr = con.ssh.exec_command(
-                    f"cd {vms_images_path} && rm -f {vm_id} && mkdir {vm_id} && cd {vm_id} && cp {disk_image_path} ./primary.{ image.disk_format }"
-                )
-                status = stdout.channel.recv_exit_status()
-                
-                if status != 0:
-                    cleanup_stub()
-                    raise exceptions.resource.Unavailable(f"Couldn't create instance disk image {status}: {stderr.read()} {stdout.read()}")
-
-                # Create disk for EFI
-                stdin, stdout, stderr = con.ssh.exec_command(
-                    f"cd {vms_images_path}/{vm_id} && qemu-img create -f qcow2 efi.qcow2 128K"
-                )
-                status = stdout.channel.recv_exit_status()
-                
-                if status != 0:
-                    cleanup_stub()
-                    raise exceptions.resource.Unavailable(f"Couldn't create instance EFI image {status}: {stderr.read()} {stdout.read()}")
-
-            # Reconfigure stub
-            self.prox.nodes(f"{node_name}/qemu/{vm_id}/config").put(
-                name=fqdn,
-                agent=1,
-                description=yaml_description,
-                virtio0=f"{config.proxmox.instance_dir_pool}:{vm_id}/primary.{ image.disk_format }",
-                cores=image.specs.cores,
-                memory=image.specs.memory,
-                balloon=min(image.specs.memory, 256),
-                bios='ovmf',
-                efidisk0=f"{config.proxmox.instance_dir_pool}:{vm_id}/efi.qcow2",
-                scsihw='virtio-scsi-pci',
-                machine='q35',
-                serial0='socket',
-                bootdisk='virtio0'
-            )
-
-            self._wait_vmid_lock(instance_type, node_name, vm_id)
-
-            self.prox.nodes(node_name).qemu(f"{vm_id}/resize").put(
-                disk='virtio0',
-                size=f'{image.specs.disk_space}G'
-            )
-
-            self._wait_vmid_lock(instance_type, node_name, vm_id)
-
-            with ClusterNodeSSH(node_name) as con:
-                # Can't do this via the API, need root, digusting unlock hack too btw
-                stdin, stdout, stderr = con.ssh.exec_command(
-                    f"pvesh set /nodes/{ node_name }/qemu/{ vm_id }/config -rng0 source=/dev/urandom"
-                )
-
-                status = stdout.channel.recv_exit_status()
-                
-                if status != 0:
-                    raise exceptions.resource.Unavailable(f"Couldn't enable instance random driver {status}: {stderr.read()} {stdout.read()}")
+        self._wait_for_instance_migrated(instance.type, instance.fqdn, target_node_name)
+        
 
     def delete_instance(
         self,
@@ -629,14 +416,13 @@ class Proxmox():
         self,
         instance_type: models.proxmox.Type,
         fqdn: str,
-        timeout: int = 120,
+        timeout: int = 300,
         poll_interval: int = 1
     ):
         """Wait for an instance of the specified name to appear in the Proxmox cluster"""
 
-        created = False
         start = time.time()
-        while not created:
+        while True:
             now = time.time()
 
             lxcs_qemus = self.prox.cluster.resources.get(type="vm")
@@ -661,37 +447,246 @@ class Proxmox():
 
             time.sleep(poll_interval)
 
-
-    def _wait_for_instance_status(
+    def _wait_for_instance_migrated(
         self,
-        instance: models.proxmox.Instance,
-        wait_for_status: models.proxmox.Status = models.proxmox.Status.Running,
-        timeout: int = 25,
+        instance_type: models.proxmox.Type,
+        fqdn: str,
+        target_node: str,
+        timeout: int = 300,
         poll_interval: int = 1
     ):
-        """Waits for Proxmox to unlock the VM, it typically locks it when it's resizing a disk/creating a vm/etc..."""
+        """Wait for an instance of the specified name to be migrated in the Proxmox cluster"""
+
         start = time.time()
         while True:
             now = time.time()
 
-            if instance.type == models.proxmox.Type.LXC:
-                current = self.prox.nodes(instance.node).lxc(f"{instance.id}/status/current").get()
-            elif instance.type == models.proxmox.Type.VPS:
-                current = self.prox.nodes(instance.node).qemu(f"{instance.id}/status/current").get()
+            lxcs_qemus = self.prox.cluster.resources.get(type="vm")
 
-            logger.info("wait_for_instance_status", current=current['status'], wait_for_status=wait_for_status)
+            for entry in lxcs_qemus:
+                if 'name' in entry and entry['name'] == fqdn and entry['node'] == target_node: 
+                    if instance_type == models.proxmox.Type.LXC:
+                        config = self.prox.nodes(f"{entry['node']}/lxc/{entry['vmid']}/config").get()
 
-            if current['status'] == 'running' and wait_for_status == models.proxmox.Status.Running:
-                break
-            
-            if current['status'] == 'stopped' and wait_for_status == models.proxmox.Status.Stopped:
-                break
+                        if 'lock' not in config and 'hostname' in config and config['hostname'] == fqdn:
+                            return
 
+                    elif instance_type == models.proxmox.Type.VPS:
+                        config = self.prox.nodes(f"{entry['node']}/qemu/{entry['vmid']}/config").get()
+
+                        if 'name' in config and config['name'] == fqdn and 'lock' not in config:
+                            return
 
             if (now-start) > timeout:
-                raise exceptions.resource.Unavailable(f"Timeout occured waiting for instance to change from {current['status']} status")
+                raise exceptions.resource.Unavailable(f"Timeout occured waiting for instance to be migrated")
 
             time.sleep(poll_interval)
+
+    def _get_template_base_fqdn(
+        self
+    ):
+        return f"template.{config.proxmox.network.base_fqdn}"
+
+    def _get_template_type_base_fqdn(
+        self,
+        instance_type: models.proxmox.Type
+    ):
+        if instance_type == models.proxmox.Type.VPS:
+            return f"vps.{self._get_template_base_fqdn()}"
+        elif instance_type == models.proxmox.Type.LXC:
+            return f"container.{self._get_template_base_fqdn()}"
+
+    def _get_template_fqdn(
+        self,
+        instance_type: models.proxmox.Type,
+        hostname: str,
+    ) -> str:
+        return f"{hostname}.{self._get_template_type_base_fqdn(instance_type)}"
+
+    def _read_template_on_node(
+        self,
+        instance_type: models.proxmox.Type,
+        node: str,
+        vmid: int,
+        expected_fqdn: Optional[str] = None
+    ) -> models.proxmox.Template:
+        """Read instance by reading the vm/container on proxmox and parsing the description metadata"""
+
+        if instance_type == models.proxmox.Type.LXC:
+            try:
+                lxc_config = self.prox.nodes(f"{node}/lxc/{vmid}/config").get()
+            except Exception as e:
+                raise exceptions.resource.NotFound("The template does not exist")
+
+            logger.info(lxc_config)
+            if not 'template' in lxc_config or lxc_config['template'] != 1:
+                raise exceptions.resource.NotFound("The specified VMID is not a template")
+
+            fqdn = lxc_config['hostname']
+
+            if expected_fqdn is not None and fqdn != expected_fqdn:
+                raise exceptions.resource.NotFound("The template at the specified VM ID does not have the expected FQDN")
+
+            # decode description
+            try:
+                metadata = models.proxmox.TemplateMetadata.parse_obj(
+                    yaml.safe_load(lxc_config['description'])
+                )
+            except Exception as e:
+                raise exceptions.resource.Unavailable(
+                    f"Template is unavailable, malformed metadata description: {e}"
+                )
+
+
+            hostname = fqdn.split(".")[0]
+
+            # config str looks like this: whatever,size=30G
+            # extract the size str
+            size_str = dict(map(lambda x: (x.split('=') + [""])[:2], lxc_config['rootfs'].split(',')))['size']
+
+            disk_space = int(size_str[:-1])
+
+            specs = models.proxmox.Specs(
+                cores=lxc_config['cores'],
+                memory=lxc_config['memory'],
+                swap=lxc_config['swap'],
+                disk_space=disk_space
+            )
+
+            template = models.proxmox.Template(
+                type=instance_type,
+                id=vmid,
+                fqdn=fqdn,
+                node=node,
+                hostname=hostname,
+                metadata=metadata,
+                specs=specs
+            )
+
+            return template
+        elif instance_type == models.proxmox.Type.VPS:
+            try:
+                vm_config = self.prox.nodes(f"{node}/qemu/{vmid}/config").get()
+            except Exception as e:
+                raise exceptions.resource.NotFound("The instance does not exist")
+
+            if not 'template' in vm_config or vm_config['template'] != 1:
+                raise exceptions.resource.NotFound("The specified VMID is not a template")
+
+            fqdn = vm_config['name']
+
+            if expected_fqdn is not None and fqdn != expected_fqdn:
+                raise exceptions.resource.NotFound("The instance at the specified VM ID does not have the expected FQDN")
+            
+            # decode description
+            try:
+                metadata = models.proxmox.TemplateMetadata.parse_obj(
+                    yaml.safe_load(vm_config['description'])
+                )
+            except Exception as e:
+                raise exceptions.resource.Unavailable(
+                    f"Instance is unavailable, malformed metadata description: {e}"
+                )
+
+            hostname = fqdn.split(".")[0]
+
+            # config str looks like this: whatever,size=30G
+            # extract the size str
+            size_str = dict(map(lambda x: (x.split('=') + [""])[:2], vm_config['virtio0'].split(',')))['size']
+
+            disk_space = int(size_str[:-1])
+
+            specs = models.proxmox.Specs(
+                cores=vm_config['cores'],
+                memory=vm_config['memory'],
+                swap=vm_config['swap'] if 'swap' in vm_config else 0,
+                disk_space=disk_space
+            )
+
+            template = models.proxmox.Template(
+                type=instance_type,
+                id=vmid,
+                fqdn=fqdn,
+                node=node,
+                hostname=hostname,
+                metadata=metadata,
+                specs=specs
+            )
+
+            return template
+
+        raise exceptions.resource.NotFound("The template does not exist")
+
+    def _read_template_by_fqdn(
+        self,
+        instance_type: models.proxmox.Type,
+        fqdn: str
+    ) -> models.proxmox.Template:
+        lxcs_qemus = self.prox.cluster.resources.get(type="vm") # also gets containers :shrug:
+
+        for entry in lxcs_qemus:
+            if 'name' in entry and entry['name'] == fqdn:
+                instance = self._read_template_on_node(instance_type, entry['node'], entry['vmid'])
+                return instance
+
+        raise exceptions.resource.NotFound("The template does not exist")
+
+    def read_template(
+        self,
+        instance_type: models.proxmox.Type,
+        hostname: str
+    ):
+        return self._read_template_by_fqdn(instance_type, self._get_template_fqdn(instance_type, hostname))
+        
+    def read_templates(
+        self,
+        instance_type: models.proxmox.Type,
+        ignore_errors: bool = True
+    ) -> Dict[str, models.proxmox.Template]:
+        ret = { }
+
+        # query multiple types
+
+        lxcs_qemus = self.prox.cluster.resources.get(type="vm")
+
+        def found_template(typ: models.proxmox.Type, entry: dict):
+            try:
+                template = self._read_template_on_node(typ, entry['node'], entry['vmid'])
+                ret[template.hostname] = template
+            except Exception as e:
+                if ignore_errors == False:
+                    raise e
+
+                logger.info("read_templates ignoring template with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
+
+        for entry in lxcs_qemus:
+            if instance_type == models.proxmox.Type.VPS:
+                if entry['type'] == 'qemu' and 'name' in entry and entry['name'].endswith(self._get_template_type_base_fqdn(models.proxmox.Type.VPS)):
+                    found_template(models.proxmox.Type.VPS, entry)
+
+            
+            if instance_type == models.proxmox.Type.LXC:
+                if entry['type'] == 'lxc' and 'name' in entry and entry['name'].endswith(self._get_template_type_base_fqdn(models.proxmox.Type.LXC)):
+                    found_template(models.proxmox.Type.LXC, entry)
+
+        return ret
+
+    # def read_all_templates(
+    #     self,
+    #     ignore_errors: bool = True:
+    # ) -> Dict[str, models.proxmox.Template]:
+    #     lxcs = self.read_templates(models.proxmox.Type.LXC)
+    #     vpses = self.read_templates(models.proxmox.Type.VPS)
+
+    #     ret = {}
+    #     for hostname, instance in lxcs:
+    #         ret[instance.fqdn] = instance
+
+    #     for hostname, instance in vpses:
+    #         ret[instance.fqdn] = instance
+
+    #     return ret
+        
 
     def _read_instance_on_node(
         self,
@@ -938,39 +933,53 @@ class Proxmox():
 
     def read_instances(
         self,
-        instance_type: Optional[models.proxmox.Type] = None,
+        instance_type: models.proxmox.Type,
         ignore_errors: bool = True
     ) -> Dict[str, models.proxmox.Instance]:
         """Read all instances in the cluster, dict indexed by fqdn, special flag to ignore instances that cause exceptions on reading"""
 
-        ret = { }
+        # query multiple types
+        ret = {}
 
         lxcs_qemus = self.prox.cluster.resources.get(type="vm")
 
+        def found_instance(typ: models.proxmox.Type, entry: dict):
+            try:
+                instance = self._read_instance_on_node(typ, entry['node'], entry['vmid'])
+                ret[instance.hostname] = instance
+            except Exception as e:
+                if ignore_errors == False:
+                    raise e
+
+                logger.info("read_templates ignoring template with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
+
         for entry in lxcs_qemus:
-            if entry['type'] == 'qemu' and (instance_type == None or instance_type == models.proxmox.Type.VPS):
-                if 'name' in entry and entry['name'].endswith(self._get_instance_type_base_fqdn(models.proxmox.Type.VPS)):
-                    if ignore_errors == True:
-                        try:
-                            instance =  self._read_instance_on_node(models.proxmox.Type.VPS, entry['node'], entry['vmid'])
-                            ret[instance.fqdn] = instance
-                        except Exception as e:
-                            logger.info("read_instances ignoring instance with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
-                    else:
-                        instance = self._read_instance_on_node(models.proxmox.Type.VPS, entry['node'], entry['vmid'])
-                        ret[instance.fqdn] = instance
-            elif entry['type'] == 'lxc' and (instance_type == None or instance_type == models.proxmox.Type.LXC):
-                if 'name' in entry and entry['name'].endswith(self._get_instance_type_base_fqdn(models.proxmox.Type.LXC)):
-                    if ignore_errors == True:
-                        try:
-                            instance = self._read_instance_on_node(models.proxmox.Type.LXC, entry['node'], entry['vmid'])
-                            ret[instance.fqdn] = instance
-                        except Exception as e:
-                            logger.info("read_instances ignoring instance with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
-                    else:
-                        instance = self._read_instance_on_node(models.proxmox.Type.LXC, entry['node'], entry['vmid'])
-                        ret[instance.fqdn] = instance
+            if instance_type == models.proxmox.Type.VPS:
+                if entry['type'] == 'qemu' and 'name' in entry and entry['name'].endswith(self._get_instance_type_base_fqdn(models.proxmox.Type.VPS)):
+                    found_instance(models.proxmox.Type.VPS, entry)
+
             
+            if instance_type == models.proxmox.Type.LXC:
+                if entry['type'] == 'lxc' and 'name' in entry and entry['name'].endswith(self._get_instance_type_base_fqdn(models.proxmox.Type.LXC)):
+                    found_instance(models.proxmox.Type.LXC, entry)
+
+        return ret
+
+
+    def read_all_instances(
+        self,
+        ignore_errors: bool = True
+    ) -> Dict[str, models.proxmox.Instance]:
+        lxcs = self.read_instances(models.proxmox.Type.LXC, ignore_errors=ignore_errors)
+        vpses = self.read_instances(models.proxmox.Type.VPS, ignore_errors=ignore_errors)
+
+        ret = {}
+        for hostname, instance in lxcs.items():
+            ret[instance.fqdn] = instance
+
+        for hostname, instance in vpses.items():
+            ret[instance.fqdn] = instance
+
         return ret
 
 
@@ -1147,18 +1156,22 @@ class Proxmox():
 
         if instance.type == models.proxmox.Type.LXC:
             # apply network adapter settings in case they changed
+            netconf = {
+                "rate": "12.5", # 12.5MB/s
+                "name": "eth0",
+                "bridge": config.proxmox.network.bridge,
+                "hwaddr": instance.metadata.network.nic_allocation.macaddress,
+                "ip": instance.metadata.network.nic_allocation.addresses[0],
+                "gw": instance.metadata.network.nic_allocation.gateway4,
+                "mtu": 1450 # if we ever decide to move to vxlan
+            }
+
+            if instance.metadata.network.nic_allocation.vlan is not None:
+                netconf["tag"] = instance.metadata.network.nic_allocation.vlan 
+
             self.prox.nodes(instance.node).lxc(f"{instance.id}/config").put(**{
                 "nameserver": "1.1.1.1",
-                "net0": build_proxmox_config_string({
-                    "rate": "12.5", # 12.5MB/s
-                    "name": "eth0",
-                    "bridge": config.proxmox.network.bridge,
-                    "tag": instance.metadata.network.nic_allocation.vlan,
-                    "hwaddr": instance.metadata.network.nic_allocation.macaddress,
-                    "ip": instance.metadata.network.nic_allocation.addresses[0],
-                    "gw": instance.metadata.network.nic_allocation.gateway4,
-                    "mtu": 1450 # if we ever decide to move to vxlan
-                })
+                "net0": build_proxmox_config_string(netconf)
             })
 
             self.prox.nodes(instance.node).lxc(f"{instance.id}/firewall/options").put(**{
@@ -1258,14 +1271,18 @@ version: 2
                 ide2=f"{ config.proxmox.instance_dir_pool }:cloudinit,format=qcow2"
             )
 
+            netconf = {
+                "virtio": instance.metadata.network.nic_allocation.macaddress,
+                "bridge": config.proxmox.network.bridge,
+                "rate": "12.5" # 12.5MBps
+            }
+
+            if instance.metadata.network.nic_allocation.vlan is not None:
+                netconf["tag"] = instance.metadata.network.nic_allocation.vlan 
+
             # Set network card
             self.prox.nodes(instance.node).qemu(f"{instance.id}/config").put(
-                net0=build_proxmox_config_string({
-                    "virtio": instance.metadata.network.nic_allocation.macaddress,
-                    "bridge": config.proxmox.network.bridge,
-                    "tag": instance.metadata.network.nic_allocation.vlan,
-                    "rate": "12.5" # 12.5MBps
-                })
+                net0=build_proxmox_config_string(netconf)
             )
 
             
@@ -1363,11 +1380,9 @@ version: 2
         needed by the cluster
         """
 
-        instances = self.read_instances()
-
         port_map = {}
 
-        for fqdn, instance in instances.items():
+        for fqdn, instance in self.read_all_instances(ignore_errors=True).items():
 
             for external_port, internal_port in instance.metadata.network.ports.items():
                 if external_port in port_map:
@@ -1403,7 +1418,7 @@ version: 2
     ) -> bool:
         """Returns False if the domain is in use by another instance"""
 
-        for fqdn, instance in self.read_instances(ignore_errors=True).items():
+        for fqdn, instance in self.read_all_instances(ignore_errors=True).items():
             # first do vhosts
             for vhost, options in instance.metadata.network.vhosts.items():
                 valid, remarks = self.validate_domain(instance, vhost)
@@ -1527,8 +1542,8 @@ version: 2
         services = {}
         routers = {}
 
-        for fqdn, instance in self.read_instances(ignore_errors=True).items():
-            fqdn_prefix = fqdn.replace('.', '-')
+        for fqdn, instance in self.read_all_instances(ignore_errors=True).items():
+            fqdn_prefix = instance.fqdn.replace('.', '-')
 
             # first do vhosts
             for vhost, options in instance.metadata.network.vhosts.items():
