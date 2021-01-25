@@ -6,14 +6,15 @@ export interface Specs {
   swap: number;
 }
 
-export interface Image {
+export interface TemplateMetadata {
   title: string;
   subtitle: string;
   description: string;
   logo_url: string;
-  disk_url: string;
-  disk_sha256sum?: string;
-  disk_format: string;
+}
+
+export interface Template {
+  metadata: TemplateMetadata;
   specs: Specs;
 }
 
@@ -58,7 +59,7 @@ export interface RootUser {
 }
 
 export interface RequestDetail {
-  image_id: string;
+  template_id: string;
   reason: string;
 }
 

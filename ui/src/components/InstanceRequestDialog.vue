@@ -14,7 +14,7 @@
       <v-form
         lazy-validation
         ref="form"
-        v-if="request !== undefined || image !== undefined"
+        v-if="request !== undefined || template !== undefined"
       >
         <v-text-field
           label='Token'
@@ -39,16 +39,16 @@
                 tile
               >
                 <img
-                  :src="image.logo_url"
+                  :src="template.metadata.logo_url"
                 >
               </v-avatar>
             </v-col>
             <v-col sm="10">
               <h3 class="white--text">
-                {{ image.title + ' ' + request.type }}
+                {{ template.metadata.title + ' ' + request.type }}
               </h3>
               <span>
-                {{ getSpecString(image.specs) }}
+                {{ getSpecString(template.specs) }}
               </span><br/>
             </v-col>
           </v-row>
@@ -102,7 +102,7 @@ import MessageDialog from '@/components/MessageDialog.vue'
 import { config } from '@/config'
 import { fetchRest } from '@/api/rest'
 
-import { Specs, Request, Image } from '@/api/cloud'
+import { Specs, Request, Template } from '@/api/cloud'
 
 export default Vue.extend({
   components: {
@@ -128,11 +128,11 @@ export default Vue.extend({
   },
 
   data () {
-    let image: Image | undefined
+    let template: Template | undefined
     let request: Request | undefined
 
     return {
-      image,
+      template,
       request,
       loading: false,
       successful: false,
@@ -171,12 +171,12 @@ export default Vue.extend({
         this.request = request
 
         req = await fetchRest(
-          `${config.apiBaseUrl}/v1/proxmox/${this.emailOrUsername}/${request.type}-image/${request.detail.image_id}`, {
+          `${config.apiBaseUrl}/v1/proxmox/${this.emailOrUsername}/${request.type}-template/${request.detail.template_id}`, {
             method: 'GET',
             headers
           })
 
-        this.image = await req.json()
+        this.template = await req.json()
       } catch (e) {
         this.msg = e.message
       } finally {
@@ -202,7 +202,7 @@ export default Vue.extend({
             headers
           })
 
-          this.msg = 'Instance request approved'
+          this.msg = 'Instance request job is now running, check Discord for results'
           this.successful = true
         } else {
           await fetchRest(`${config.apiBaseUrl}/v1/proxmox/${this.emailOrUsername}/${this.instanceRequestType}/${this.hostname}/denial?token=${this.token}`, {
