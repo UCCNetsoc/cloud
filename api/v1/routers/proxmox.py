@@ -3,7 +3,7 @@ import time
 import structlog as logging
 
 
-from fastapi import APIRouter, HTTPException, Depends, Path, Query, Response, UploadFile, File
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Path, Query, Response, UploadFile, File
 from fastapi.responses import StreamingResponse
 
 from pydantic import BaseModel, Field
@@ -48,7 +48,7 @@ def ensure_not_tos_suspended(instance: models.proxmox.Instance):
     response_model=dict,
     responses={400: {"model": models.rest.Error}}
 )
-async def get_traefik_config(
+def get_traefik_config(
     key: str = ""
 ):
     if key != config.proxmox.network.traefik.config_key:
@@ -60,28 +60,27 @@ async def get_traefik_config(
     return providers.proxmox.build_traefik_config("web-secure")
 
 @router.get(
-    '/{email_or_username}/{instance_type}-images',
+    '/{email_or_username}/{instance_type}-templates',
     status_code=200,
-    response_model=Dict[str,models.proxmox.Image],
+    response_model=Dict[str,models.proxmox.Template],
     responses={400: {"model": models.rest.Error}}
 )
-async def get_images(
+def get_templates(
     instance_type: models.proxmox.Type
 ):
-    
-    return providers.proxmox.get_images(instance_type)
+    return providers.proxmox.read_templates(instance_type)
 
 @router.get(
-    '/{email_or_username}/{instance_type}-image/{image_id}',
+    '/{email_or_username}/{instance_type}-template/{template_id}',
     status_code=200,
-    response_model=models.proxmox.Image,
+    response_model=models.proxmox.Template,
     responses={400: {"model": models.rest.Error}}
 )
-async def get_image(
+def get_template(
     instance_type: models.proxmox.Type,
-    image_id: str = Path(**models.proxmox.ImageID)
+    template_id: str = Path(**models.proxmox.TemplateID)
 ):
-    return providers.proxmox.get_image(instance_type, image_id)
+    return providers.proxmox.read_template(instance_type, template_id)
 
 
 @router.post(
@@ -89,7 +88,7 @@ async def get_image(
     status_code=201,
     responses={400: {"model": models.rest.Error}}
 )
-async def create_instance_request(
+def create_instance_request(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     detail: models.proxmox.InstanceRequestDetail,
@@ -99,8 +98,8 @@ async def create_instance_request(
     resource_account = providers.accounts.find_verified_account(email_or_username)
     utilities.auth.ensure_sysadmin_or_acting_on_self(bearer_account, resource_account)
 
-    # will raise exception if image doesnt exist
-    image = providers.proxmox.get_image(instance_type, detail.image_id)
+    # will raise exception if template doesnt exist
+    template = providers.proxmox.read_template(instance_type, detail.template_id)
 
     try:
         instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
@@ -120,7 +119,7 @@ async def create_instance_request(
     utilities.webhook.info(
 f"""**{resource_account.username} ({resource_account.email}) requested an instance named `{hostname}`!**
 
-They want **{image.title} {fancy_name(instance_type)} ({fancy_specs(image.specs)})** for the following reason: ```{detail.reason}```
+They want **{template.metadata.title} {fancy_name(instance_type)} ({fancy_specs(template.specs)})** for the following reason: ```{detail.reason}```
 To approve this request, sign in as a SysAdmin and click the following link:
 {config.links.base_url}/instance-request/{resource_account.username}/{instance_type}-request/{hostname}/{serialized.token}
 """
@@ -157,7 +156,7 @@ To approve this request, sign in as a SysAdmin and click the following link:
     status_code=200,
     response_model=models.proxmox.InstanceRequest
 )
-async def get_instance_request(
+def get_instance_request(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     token: str,
@@ -197,12 +196,13 @@ async def get_instance_request(
     status_code=201,
     responses={400: {"model": models.rest.Error}}
 )
-async def approve_instance_request(
+def approve_instance_request(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     token: str,
+    background_tasks: BackgroundTasks,
     hostname: str = Path(**models.proxmox.Hostname),
-    bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
+    bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account),
 ):
     resource_account = providers.accounts.find_verified_account(email_or_username)
     utilities.auth.ensure_sysadmin(bearer_account)
@@ -235,41 +235,49 @@ async def approve_instance_request(
             msg=f"Token is for a hostname other than {hostname}"
         ))
 
+    def creation_task():
+        try:
+            providers.proxmox.create_instance(
+                instance_type,
+                resource_account,
+                hostname,
+                request.detail
+            )
+
+            providers.email.send(
+                [resource_account.email],
+                f"{fancy_name(instance_type)} request '{hostname}' accepted!",
+                templates.email.netsoc.render(
+                    heading=f"{fancy_name(instance_type)} request '{hostname}' accepted",
+                    paragraph=
+                    f"""Hi {resource_account.username}!<br/><br/>
+                        We received your request for a {fancy_name(instance_type)} named '{hostname}'<br/>
+                        We're delighted to inform you that your instance request has been granted!<br/>
+                        For guides on how to SSH into your instance, please consult the <a style="color: white" href='https://tutorial.netsoc.co'>tutorial</a>
+                        <br/>
+                    """
+                ),
+                "text/html"
+            )
+
+            utilities.webhook.info(
+                f"""**{resource_account.username} ({resource_account.email})'s instance `{hostname}` was emailed about installation!**"""
+            )
+
+        except Exception as e:
+            utilities.webhook.info(
+                f"""**{resource_account.username} ({resource_account.email})'s instance `{hostname}` install task failed: ```{e}```!**"""
+            )
+            raise e
+
+        utilities.webhook.info(
+            f"""**{resource_account.username} ({resource_account.email})'s instance `{hostname}` was installed!**"""
+        )
 
     utilities.webhook.info(
-        f"""**{resource_account.username} ({resource_account.email}) request for an instance named `{hostname}` was granted! Installing...**"""
+        f"""**{resource_account.username} ({resource_account.email}) request for an instance named `{hostname}` was granted! Install job started...**"""
     )
-
-    providers.proxmox.create_instance(
-        instance_type,
-        resource_account,
-        hostname,
-        request.detail
-    )
-
-    utilities.webhook.info(
-        f"""**{resource_account.username} ({resource_account.email})'s instance `{hostname}` was installed!**"""
-    )
-
-    providers.email.send(
-        [resource_account.email],
-        f"{fancy_name(instance_type)} request '{hostname}' accepted!",
-        templates.email.netsoc.render(
-            heading=f"{fancy_name(instance_type)} request '{hostname}' accepted",
-            paragraph=
-            f"""Hi {resource_account.username}!<br/><br/>
-                We received your request for a {fancy_name(instance_type)} named '{hostname}'<br/>
-                We're delighted to inform you that your instance request has been granted!<br/>
-                For guides on how to SSH into your instance, please consult the <a style="color: white" href='https://tutorial.netsoc.co'>tutorial</a>
-                <br/>
-            """
-        ),
-        "text/html"
-    )
-
-    utilities.webhook.info(
-        f"""**{resource_account.username} ({resource_account.email})'s instance `{hostname}` was emailed about installation!**"""
-    )
+    background_tasks.add_task(creation_task)
     
 
 @router.post(
@@ -277,7 +285,7 @@ async def approve_instance_request(
     status_code=201,
     responses={400: {"model": models.rest.Error}}
 )
-async def deny_instance_request(
+def deny_instance_request(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     token: str,
@@ -313,7 +321,7 @@ async def deny_instance_request(
 
     utilities.webhook.info(
         f"""**{resource_account.username} ({resource_account.email}) request for a instance named `{hostname}` was denied!**
-The reason given was: ```{request_denial.reason}```
+            The reason given was: ```{request_denial.reason}```
         """
     )
 
@@ -345,7 +353,7 @@ The reason given was: ```{request_denial.reason}```
     '/{email_or_username}/{instance_type}',
     status_code=200,
 )
-async def get_instances(
+def get_instances(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
@@ -359,7 +367,7 @@ async def get_instances(
     '/{email_or_username}/{instance_type}/{hostname}/start',
     status_code=201,
 )
-async def start_instance(
+def start_instance(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     hostname: str = Path(**models.proxmox.Hostname),
@@ -381,7 +389,7 @@ async def start_instance(
     '/{email_or_username}/{instance_type}/{hostname}/stop',
     status_code=200,
 )
-async def stop_instance(
+def stop_instance(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     hostname: str = Path(**models.proxmox.Hostname),
@@ -403,7 +411,7 @@ async def stop_instance(
     '/{email_or_username}/{instance_type}/{hostname}/shutdown',
     status_code=200,
 )
-async def shutdown_instance(
+def shutdown_instance(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     hostname: str = Path(**models.proxmox.Hostname),
@@ -425,7 +433,7 @@ async def shutdown_instance(
     '/{email_or_username}/{instance_type}/{hostname}/respec-request',
     status_code=201,
 )
-async def request_instance_respec(
+def request_instance_respec(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     respec: models.proxmox.RespecRequest,
@@ -447,7 +455,7 @@ async def request_instance_respec(
     '/{email_or_username}/{instance_type}/{hostname}/active',
     status_code=201,
 )
-async def mark_instance_active(
+def mark_instance_active(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     hostname: str = Path(**models.proxmox.Hostname),
@@ -468,7 +476,7 @@ async def mark_instance_active(
     '/{email_or_username}/{instance_type}/{hostname}',
     status_code=200,
 )
-async def delete_instance(
+def delete_instance(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     hostname: str = Path(**models.proxmox.Hostname),
@@ -493,7 +501,7 @@ ranged_port = models.proxmox.generate_ranged_port_field_args(config.proxmox.netw
     '/{email_or_username}/{instance_type}/{hostname}/port/{external_port}/{internal_port}',
     status_code=200,
 )
-async def add_instance_port(
+def add_instance_port(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     hostname: str = Path(**models.proxmox.Hostname),
@@ -518,7 +526,7 @@ async def add_instance_port(
     status_code=200,
     response_model=int
 )
-async def get_random_available_external_port(
+def get_random_available_external_port(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     hostname: str = Path(**models.proxmox.Hostname)
@@ -529,7 +537,7 @@ async def get_random_available_external_port(
     '/{email_or_username}/{instance_type}/{hostname}/port/{external_port}',
     status_code=200,
 )
-async def remove_instance_port(
+def remove_instance_port(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     hostname: str = Path(**models.proxmox.Hostname),
@@ -553,7 +561,7 @@ async def remove_instance_port(
     status_code=200,
     response_model=models.config.Proxmox.Network.VHostRequirements
 )
-async def get_allowed_a_aaaa() -> str:
+def get_allowed_a_aaaa() -> str:
     return config.proxmox.network.vhosts
 
 
@@ -561,7 +569,7 @@ async def get_allowed_a_aaaa() -> str:
     '/{email_or_username}/{instance_type}/{hostname}/vhost/{vhost}',
     status_code=200,
 )
-async def add_instance_vhost(
+def add_instance_vhost(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     options: models.proxmox.VHostOptions,
@@ -585,7 +593,7 @@ async def add_instance_vhost(
     '/{email_or_username}/{instance_type}/{hostname}/vhost/{vhost}',
     status_code=200,
 )
-async def remove_instance_vhost(
+def remove_instance_vhost(
     email_or_username: str,
     instance_type: models.proxmox.Type,
     hostname: str = Path(**models.proxmox.Hostname),
@@ -610,9 +618,10 @@ async def remove_instance_vhost(
     status_code=200,
     response_model=models.rest.Info
 )
-async def reset_instance_root_user(
+def reset_instance_root_user(
     email_or_username: str,
     instance_type: models.proxmox.Type,
+    background_tasks: BackgroundTasks,
     hostname: str = Path(**models.proxmox.Hostname),
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 ) -> models.rest.Info:
@@ -622,31 +631,44 @@ async def reset_instance_root_user(
     instance = providers.proxmox.read_instance_by_account(instance_type, resource_account, hostname)
     ensure_active(instance)
 
-    password, private_key, root_user = providers.proxmox.reset_instance_root_user(instance)
+    def reset_password_task():
+        try:
+            password, private_key, root_user = providers.proxmox.reset_instance_root_user(instance)
+        
+            providers.email.send(
+                [resource_account.email],
+                f"{fancy_name(instance_type)} '{hostname}' root user information",
+                templates.email.netsoc.render(
+                    heading=f"{fancy_name(instance_type)} '{hostname}' root user information",
+                    paragraph=f"""Hi {resource_account.username}!<br/><br/>
+                        We successfully set the password and SSH identity for the root user on your {fancy_name(instance_type)} named '{hostname}'<br/><br/>
+                        You will find the password followed by the SSH private key for the user <code>root</code> below:<br/>
+                    """,
+                    embeds=[
+                        { "text": f"<code>{password}</code>" },
+                        { "text": f"<pre>{private_key}</pre>" }
+                    ]
+                ),
+                "text/html"
+            )
 
-    providers.email.send(
-        [resource_account.email],
-        f"{fancy_name(instance_type)} '{hostname}' root user information",
-        templates.email.netsoc.render(
-            heading=f"{fancy_name(instance_type)} '{hostname}' root user information",
-            paragraph=f"""Hi {resource_account.username}!<br/><br/>
-                We successfully set the password and SSH identity for the root user on your {fancy_name(instance_type)} named '{hostname}'<br/><br/>
-                You will find the password followed by the SSH private key for the user <code>root</code> below:<br/>
-            """,
-            embeds=[
-                { "text": f"<code>{password}</code>" },
-                { "text": f"<pre>{private_key}</pre>" }
-            ]
-        ),
-        "text/html"
-    )
+        except Exception as e:
+            utilities.webhook.info(
+                f"""**{resource_account.username} ({resource_account.email})'s instance `{hostname}` reset password task failed: ```{e}```!**"""
+            )
+            raise e
+
+        utilities.webhook.info(
+            f"""**{resource_account.username} ({resource_account.email}) reset instance `{instance.hostname}` root user**"""
+        )
 
     utilities.webhook.info(
-        f"""**{resource_account.username} ({resource_account.email}) reset instance `{instance.hostname}` root user**"""
+        f"""**{resource_account.username} ({resource_account.email}) reset instance `{instance.hostname}` root user task started...**"""
     )
+    background_tasks.add_task(reset_password_task)
 
     return models.rest.Info(
         detail=models.rest.Detail(
-            msg="A new password and private key have been sent to the email associated with the account"
+            msg="A new root password and private key will be sent to the email associated with this account. If you do not receive it, contact the SysAdmins"
         )
     )
