@@ -16,7 +16,7 @@ router = APIRouter()
     status_code=200,
     response_model=models.account.Account
 )
-async def get_bearer_account(
+def get_bearer_account(
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 ):
     return bearer_account
@@ -27,7 +27,7 @@ async def get_bearer_account(
     status_code=201,
     response_model=models.rest.Info,
 )
-async def send_verification_email(email_or_username : str, body : models.captcha.Captcha):
+def send_verification_email(email_or_username : str, body : models.captcha.Captcha):
     if not utilities.captcha.verify_captcha(body.captcha):
         return models.rest.Error(
             detail=models.rest.Detail(
@@ -87,7 +87,7 @@ async def send_verification_email(email_or_username : str, body : models.captcha
     response_model=models.rest.Info,
     responses={400: {"model": models.rest.Error}, 500: {"model": models.rest.Error}}
 )
-async def verification(
+def verification(
     email_or_username: str,
     complete: models.sign_up.CompleteVerification
 ):
@@ -126,7 +126,7 @@ async def verification(
     response_model=models.rest.Info,
     responses={400: {"model": models.rest.Error}}
 )
-async def send_password_reset_email(
+def send_password_reset_email(
     email_or_username : str,
     body : models.captcha.Captcha
 ):
@@ -188,7 +188,7 @@ async def send_password_reset_email(
     response_model=models.rest.Info,
     responses={400: {"model": models.rest.Error}, 500: {"model": models.rest.Error}}
 )
-async def set_password(
+def set_password(
     email_or_username : str,
     new: models.password.CompleteReset
 ):
@@ -223,7 +223,7 @@ async def set_password(
     '/{email_or_username}/gdpr-data',
     status_code=200
 )
-async def get_gpdr_data(
+def get_gpdr_data(
     email_or_username : str,
     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 ):
@@ -240,7 +240,7 @@ async def get_gpdr_data(
 #     status_code=200,
 #     response_model=models.rest.Info
 # )
-# async def get_home_directory(
+# def get_home_directory(
 #     email_or_username : str,
 #     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 # ):
@@ -273,7 +273,7 @@ async def get_gpdr_data(
 #     '/{email_or_username}/home-directory',
 #     status_code=201
 # )
-# async def create_home_directory(
+# def create_home_directory(
 #     email_or_username : str,
 #     bearer_account: models.account.Account = Depends(utilities.auth.get_bearer_account)
 # ):

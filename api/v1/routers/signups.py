@@ -59,7 +59,7 @@ def handle_sign_up(
     response_model=models.rest.Info,
     responses={409: {"model": models.rest.Error}, 500: {"model": models.rest.Error}}
 )
-async def sign_up_UCC_student(
+def sign_up_UCC_student(
     sign_up    : models.sign_up.UCCStudent
 ):  
     return handle_sign_up(sign_up)
@@ -70,7 +70,7 @@ async def sign_up_UCC_student(
 #     response_model=models.rest.Info,
 #     responses={409: {"model": models.rest.Error}}
 # )
-# async def sign_up_UCC_staff(
+# def sign_up_UCC_staff(
 #     sign_up    : models.sign_up.UCCStaff
 # ):  
 #     return handle_sign_up(sign_up)
@@ -81,7 +81,7 @@ async def sign_up_UCC_student(
 #     response_model=models.rest.Info,
 #     responses={409: {"model": models.rest.Error}}
 # )
-# async def sign_up_UCC_society(
+# def sign_up_UCC_society(
 #     sign_up    : models.sign_up.UCCSociety
 # ):  
 #     return handle_sign_up(sign_up)
