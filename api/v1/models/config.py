@@ -134,7 +134,7 @@ class Captcha(BaseModel):
     hcaptcha: Optional[Hcaptcha]
     enabled: bool = False
 
-from .proxmox import Image
+from .proxmox import Template
 class Proxmox(BaseModel):
     class Cluster(BaseModel):
         class SSH(BaseModel):
@@ -147,15 +147,14 @@ class Proxmox(BaseModel):
             server: str
             port: str
             username: str = "root@pam"
-            password: Optional[str]
-            token_name: Optional[str]
-            token_value: Optional[str]
+            token_name: str
+            token_value: str
 
         api: API
         ssh: SSH
 
     class VPS(BaseModel):
-        images: Dict[str, Image] = {}
+        # templates: Dict[str, Template] = {}
 
         # inactivity_shutdown_warning_num_days: int = 30
         inactivity_shutdown_num_days: int = 24
@@ -163,7 +162,7 @@ class Proxmox(BaseModel):
         inactivity_deletion_num_days: int = 120
 
     class LXC(BaseModel):
-        images: Dict[str, Image] = {}
+        # templates: Dict[str, Template] = {}
 
         # inactivity_shutdown_warning_num_days: int = 60
         inactivity_shutdown_num_days: int = 48
@@ -265,7 +264,7 @@ class Proxmox(BaseModel):
 
         base_fqdn: str
         bridge: str
-        vlan: int
+        vlan: Optional[int]
         gateway: ipaddress.IPv4Address
         network: ipaddress.IPv4Interface
         range: Tuple[ipaddress.IPv4Address, ipaddress.IPv4Address]
@@ -281,7 +280,7 @@ class Proxmox(BaseModel):
     network: Network
 
     instance_dir_pool: str = "local"
-    image_dir_pool: str = "local"
+    template_dir_pool: str = "local"
 
 class Config(BaseModel):
     production: bool = False
