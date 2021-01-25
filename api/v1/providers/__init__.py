@@ -8,7 +8,7 @@ import random
 from pathlib import Path
 
 from v1 import exceptions
-from . import accounts, email, mkhomedir, proxmox
+from . import accounts, email, proxmox
 
 from v1.config import config
 
@@ -23,8 +23,6 @@ try:
     email = email.SendGrid()
   else:
     email = email.Debug()
-
-  # mkhomedir = mkhomedir.MkDir()
 
   proxmox = proxmox.Proxmox()
 
