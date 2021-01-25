@@ -727,7 +727,7 @@
           <li>Password of the account</li>
         </ul><br>
         <b class="warning--text">If you have not already reset the <code>root</code> user password, you will need to do so before you can make use of this feature</b>
-      </p>
+      </p>https://netsoc.cloud/instances
       <p v-else-if="confirmCancel.mode == ConfirmCancelMode.OpenFilesystem">
         You are about to open an SFTP browser for this instance.<br><br>
 
@@ -1245,7 +1245,7 @@ export default Vue.extend({
 
     setInterval(() => {
       this.uiSilentReload()
-    }, 10000)
+    }, 15000 + (Math.random()*10000))
   }
 })
 </script>
