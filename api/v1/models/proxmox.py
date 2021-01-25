@@ -38,10 +38,10 @@ VHost = {
     "regex": r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$"
 }
 
-ImageID = {
+TemplateID = {
     "default": None,
-    "title": "Image ID",
-    "description": "Image ID",
+    "title": "Template ID",
+    "description": "Template ID",
     "regex": r"^[a-z0-9-.]+$",
     "min_length": 1,
     "max_length": 32
@@ -81,20 +81,20 @@ class Specs(BaseModel):
     # swap
     swap: int = 0
 
-class Image(BaseModel):
-    class DiskFormat(str, Enum):
-        QCOW2: str = "qcow2"
-        TarGZ: str = "tar.gz"
-    
+class TemplateMetadata(BaseModel):
     title: str
     subtitle: str
     description: str
     logo_url: str
-    disk_file: str
-    disk_file_fallback_url: Optional[str]
-    disk_sha256sum: Optional[str]
-    disk_format: DiskFormat
     wake_on_request: bool
+
+class Template(BaseModel):
+    type: Type
+    id: int
+    fqdn: str
+    node: str
+    hostname: str
+    metadata: TemplateMetadata
     specs: Specs
 
 from .account import Username
@@ -133,7 +133,7 @@ class NICAllocation(BaseModel):
     addresses: List[ipaddress.IPv4Interface] = []
     gateway4: ipaddress.IPv4Address
     macaddress: str
-    vlan: int
+    vlan: Optional[int]
 
 class VHostOptions(BaseModel):
     port: int = Field(**Port)
@@ -145,7 +145,7 @@ class Network(BaseModel):
     nic_allocation: NICAllocation 
 
 class InstanceRequestDetail(BaseModel):
-    image_id: str = Field(**ImageID)
+    template_id: str = Field(**TemplateID)
     reason: str = Field(**Reason)
 
 class InstanceRequest(Payload):
@@ -185,8 +185,8 @@ class Metadata(BaseModel):
     # Root user info
     root_user: RootUser
 
-    # Details about the original request
-    request_detail: InstanceRequestDetail
+    template_metadata: Optional[TemplateMetadata]
+    reason: Optional[str]
 
 class Status(str, Enum):
     NotApplicable = 'N/A'
