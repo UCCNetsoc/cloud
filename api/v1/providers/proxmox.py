@@ -933,7 +933,7 @@ class Proxmox():
 
     def read_instances(
         self,
-        instance_type: models.proxmox.Type,
+        instance_type: models.proxmox.Type = None,
         ignore_errors: bool = True
     ) -> Dict[str, models.proxmox.Instance]:
         """Read all instances in the cluster, dict indexed by fqdn, special flag to ignore instances that cause exceptions on reading"""
@@ -946,20 +946,23 @@ class Proxmox():
         def found_instance(typ: models.proxmox.Type, entry: dict):
             try:
                 instance = self._read_instance_on_node(typ, entry['node'], entry['vmid'])
-                ret[instance.hostname] = instance
+                ret[instance.fqdn] = instance
+
             except Exception as e:
                 if ignore_errors == False:
                     raise e
 
-                logger.info("read_templates ignoring template with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
+                logger.info("read_instances ignoring template with error", ignore_errors=ignore_errors, entry=entry, exc_info=True, e=e)
 
-        for entry in lxcs_qemus:
-            if instance_type == models.proxmox.Type.VPS:
+
+        if instance_type == models.proxmox.Type.VPS or instance_type == None:
+            for entry in lxcs_qemus:
                 if entry['type'] == 'qemu' and 'name' in entry and entry['name'].endswith(self._get_instance_type_base_fqdn(models.proxmox.Type.VPS)):
                     found_instance(models.proxmox.Type.VPS, entry)
-
-            
-            if instance_type == models.proxmox.Type.LXC:
+        
+        
+        if instance_type == models.proxmox.Type.LXC or instance_type == None:
+            for entry in lxcs_qemus:
                 if entry['type'] == 'lxc' and 'name' in entry and entry['name'].endswith(self._get_instance_type_base_fqdn(models.proxmox.Type.LXC)):
                     found_instance(models.proxmox.Type.LXC, entry)
 
@@ -970,17 +973,7 @@ class Proxmox():
         self,
         ignore_errors: bool = True
     ) -> Dict[str, models.proxmox.Instance]:
-        lxcs = self.read_instances(models.proxmox.Type.LXC, ignore_errors=ignore_errors)
-        vpses = self.read_instances(models.proxmox.Type.VPS, ignore_errors=ignore_errors)
-
-        ret = {}
-        for hostname, instance in lxcs.items():
-            ret[instance.fqdn] = instance
-
-        for hostname, instance in vpses.items():
-            ret[instance.fqdn] = instance
-
-        return ret
+        return self.read_instances(ignore_errors=ignore_errors)
 
 
     def _generate_instance_root_user(
@@ -1373,34 +1366,45 @@ version: 2
             raise exceptions.resource.NotFound(f"Could not find {vhost} vhost on instance")
 
     def get_port_forward_map(
-        self
+        self,
+        instances: Dict[str, models.proxmox.Instance] = None
     ) -> Dict[int,Tuple[str, ipaddress.IPv4Address, int]]:
         """
         Build a dict indexed by external port number returning a tuple of (fqdn, ip address, internal port number) of the port mappings
         needed by the cluster
         """
 
+        all_instances = None
+
+        if instances == None:
+            all_instances = self.read_all_instances(ignore_errors=True)
+        else:
+            all_instances = instances
+
         port_map = {}
 
-        for fqdn, instance in self.read_all_instances(ignore_errors=True).items():
-
+        for fqdn, instance in all_instances.items():
+            
+ 
             for external_port, internal_port in instance.metadata.network.ports.items():
+  
                 if external_port in port_map:
-                    logger.warning(f"warning, conflicting port map: {instance.fqdn} tried to map {external_port} but it's already taken!")
+                    logger.info(f"warning, conflicting port map: {instance.fqdn} tried to map {external_port} but it's already taken!")
                     continue
 
                 if config.proxmox.network.port_forward.range[0] > external_port or external_port > config.proxmox.network.port_forward.range[1]:
-                    logger.warning(f"warning, port out of range: {instance.fqdn} tried to map {external_port} but it's out of range!")
+                    logger.info(f"warning, port out of range: {instance.fqdn} tried to map {external_port} but it's out of range!")
                     continue
-                
+
                 port_map[external_port] = (instance.fqdn, instance.metadata.network.nic_allocation.addresses[0].ip, internal_port)
         
         return port_map
 
     def get_random_available_external_port(
-        self
+        self,
+        instances: Dict[str, models.proxmox.Instance] = None
     ) -> Optional[int]:
-        port_map = self.get_port_forward_map()
+        port_map = self.get_port_forward_map(instances)
 
         occupied_set = set(port_map.keys())
         full_range_set = set(range(config.proxmox.network.port_forward.range[0],config.proxmox.network.port_forward.range[1]+1))
@@ -1542,7 +1546,9 @@ version: 2
         services = {}
         routers = {}
 
-        for fqdn, instance in self.read_all_instances(ignore_errors=True).items():
+        instances = self.read_all_instances(ignore_errors=True)
+
+        for fqdn, instance in instances.items():
             fqdn_prefix = instance.fqdn.replace('.', '-')
 
             # first do vhosts
@@ -1592,7 +1598,7 @@ version: 2
 
 
         # then do tcp/udp port mappings
-        for external_port, internal_tuple in self.get_port_forward_map().items():
+        for external_port, internal_tuple in self.get_port_forward_map(instances).items():
             fqdn, ip, internal_port = internal_tuple
             fqdn_prefix = fqdn.replace('.', '-')
             
