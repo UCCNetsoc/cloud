@@ -99,7 +99,7 @@ def inject_request_id(api: FastAPI):
 
         bind_contextvars(request_id=request_id)
 
-        response = await call_next(request)
+        response = call_next(request)
         clear_contextvars()
 
         response.headers["X-Request-ID"] = request_id
