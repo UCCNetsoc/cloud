@@ -62,7 +62,7 @@ api.include_router(
 Return a Rest error model whenever our API throws exceptions.rest.Error
 """
 @api.exception_handler(exceptions.rest.Error)
-async def resterror_exception_handler(request: Request, e: exceptions.rest.Error):
+def resterror_exception_handler(request: Request, e: exceptions.rest.Error):
     return JSONResponse(
         status_code=e.status_code,
         content=e.error_model.dict(),
@@ -72,7 +72,7 @@ async def resterror_exception_handler(request: Request, e: exceptions.rest.Error
 Return a Rest error model whenever our API throws 
 """
 @api.exception_handler(exceptions.exception.APIException)
-async def resterror_exception_handler(request: Request, e: Exception):
+def resterror_exception_handler(request: Request, e: Exception):
     logger.exception(f"API exception (500)", e=e, exc_info=True)
 
     return JSONResponse(
@@ -88,7 +88,7 @@ async def resterror_exception_handler(request: Request, e: Exception):
 Mask general exceptions
 """
 @api.exception_handler(Exception)
-async def exception_handler(request: Request, e: Exception):
+def exception_handler(request: Request, e: Exception):
     logger.error(f"Unhandled exception", e=e, exc_info=True)
 
     if config.production:

@@ -20,7 +20,7 @@ oauth2_scheme = OAuth2PasswordBearer(
     }
 )
 
-async def decode_access_token(token: str = Depends(oauth2_scheme)) -> models.jwt.EmailToken:
+def decode_access_token(token: str = Depends(oauth2_scheme)) -> models.jwt.EmailToken:
     try:
         return models.jwt.Serialized(token=token).deserialize_verify(models.jwt.EmailToken, config.auth.jwt.public_key)
     except ValidationError as v:
@@ -38,7 +38,7 @@ async def decode_access_token(token: str = Depends(oauth2_scheme)) -> models.jwt
             )
         )
 
-async def get_bearer_account(
+def get_bearer_account(
     email_token = Depends(decode_access_token)
 ) -> models.account.Account:
     try:
