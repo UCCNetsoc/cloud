@@ -92,14 +92,14 @@ def inject_request_id(api: FastAPI):
     # )
 
     @api.middleware("http")
-    def add_context_logging(request: Request, call_next):
+    async def add_context_logging(request: Request, call_next):
         clear_contextvars()
 
         request_id = str(uuid.uuid4())
 
         bind_contextvars(request_id=request_id)
 
-        response = call_next(request)
+        response = await call_next(request)
         clear_contextvars()
 
         response.headers["X-Request-ID"] = request_id
