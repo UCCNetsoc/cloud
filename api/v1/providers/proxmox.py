@@ -169,8 +169,7 @@ class Proxmox():
         return self._get_instance_fqdn_for_username(instance_type, account.username, hostname)
 
     def _allocate_nic(
-        self,
-        instance_type: models.proxmox.Type
+        self
     ) -> models.proxmox.NICAllocation:
         """Examine all other instances and find a new IP and NIC stuff like mac address"""
         # world's most ghetto ip allocation algorithm
@@ -205,7 +204,7 @@ class Proxmox():
                     ips.remove(address.ip)
     
         if len(ips) > 0:
-            ip_addr = next(iter(ips))
+            ip_addr = random.sample(list(ips),1)[0]
 
             return models.proxmox.NICAllocation(
                 addresses=[
@@ -302,7 +301,7 @@ class Proxmox():
                 marked_active_at=datetime.date.today()
             ),
             network=models.proxmox.Network(
-                nic_allocation=self._allocate_nic(instance_type),
+                nic_allocation=self._allocate_nic(),
                 vhosts=vhosts
             ),
             root_user=root_user,
