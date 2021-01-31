@@ -1155,7 +1155,7 @@ class Proxmox():
                 "hwaddr": instance.metadata.network.nic_allocation.macaddress,
                 "ip": instance.metadata.network.nic_allocation.addresses[0],
                 "gw": instance.metadata.network.nic_allocation.gateway4,
-                "mtu": 1450 # if we ever decide to move to vxlan
+                "mtu": 1500
             }
 
             if instance.metadata.network.nic_allocation.vlan is not None:
@@ -1234,7 +1234,7 @@ ethernets:
         link-local: []
         addresses:
             - { instance.metadata.network.nic_allocation.addresses[0] }
-        mtu: 1450 
+        mtu: 1500
 version: 2
 """
 
