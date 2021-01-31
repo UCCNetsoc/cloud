@@ -1,7 +1,7 @@
 <template>
   <v-app id="inspire">
     <bg-video :playbackRate="bgRate" :additionalStyle="bgStyle" />
-    <!-- <v-navigation-drawer
+    <v-navigation-drawer
       v-model="drawer"
       app
       clipped
@@ -28,15 +28,15 @@
           </v-list-item>
         </v-list-item-group>
       </v-list>
-    </v-navigation-drawer> -->
+    </v-navigation-drawer>
 
     <v-app-bar app color="primary" dark clipped-left v-if="this.$store.state.auth.user !== null">
-      <!-- <v-app-bar-nav-icon @click.stop="drawer = !drawer" v-if="drawer == true">
+      <v-app-bar-nav-icon @click.stop="drawer = !drawer" v-if="drawer == true">
         <v-icon>mdi-close</v-icon>
       </v-app-bar-nav-icon>
       <v-app-bar-nav-icon @click.stop="drawer = !drawer" v-else>
         <v-icon>mdi-menu</v-icon>
-      </v-app-bar-nav-icon> -->
+      </v-app-bar-nav-icon>
       <v-toolbar-title class="ma-0">
         <div>
           <v-img
@@ -147,23 +147,15 @@ export default Vue.extend({
     msg: '',
     drawer: false,
     selectedMenu: 0,
-    menu: []
-    // menu: [
-    //   { icon: 'mdi-account-circle', name: 'Account & User Server', route: '/account' },
-    //   { icon: 'mdi-backup-restore', name: 'Backups', route: '/backups' },
-    //   { icon: 'mdi-web', name: 'Blogs & Websites', route: '/websites' },
-    //   { icon: 'mdi-database', name: 'Databases', route: '/databases' },
-    //   { icon: 'mdi-gamepad-square', name: 'Games', route: '/games' },
-    //   { icon: 'mdi-teach', name: 'Mentorships', route: '/mentorships' },
-    //   { icon: 'mdi-console-line', name: 'Terminal', route: '/terminal' },
-    //   { icon: 'mdi-lifebuoy', name: 'Tutorial', route: '/tutorial' },
-    //   { icon: 'mdi-book', name: 'Wiki', route: '/wiki' },
-    //   {
-    //     icon: 'mdi-information',
-    //     name: 'About & Contributors',
-    //     route: '/about'
-    //   }
-    // ]
+    menu: [
+      { icon: 'mdi-home', name: 'Home', route: '/' },
+      { icon: 'mdi-information', name: 'About', route: '/about' },
+      { icon: 'mdi-account-circle', name: 'Account', route: '/account' },
+      { icon: 'mdi-server', name: 'Instances', route: '/instances' },
+      // { icon: 'mdi-console-line', name: 'Terminal', route: '/terminal' },
+      { icon: 'mdi-lifebuoy', name: 'Tutorial', route: '/tutorial' },
+      { icon: 'mdi-book', name: 'Wiki', route: '/wiki' }
+    ]
   }),
 
   methods: {
@@ -200,18 +192,21 @@ export default Vue.extend({
   },
 
   updated () {
-    // let i = 0
-    // for (const item of this.menu) {
-    //   if (this.$route.path === item.route) {
-    //     this.selectedMenu = i
-    //     return
-    //   }
+    let i = 0
+    for (const item of this.menu) {
+      if (this.$route.path === item.route) {
+        this.selectedMenu = i
+      }
 
-    //   i++
-    // }
+      i++
+    }
 
-    // Hide drawer if we're on a non-menu page
-    // this.drawer = false
+    if (this.selectedMenu !== 0) {
+      this.drawer = true
+    } else {
+      // Hide drawer if we're on a non-menu page
+      this.drawer = false
+    }
   }
 })
 </script>
