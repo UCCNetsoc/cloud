@@ -1116,6 +1116,7 @@ export default Vue.extend({
       } finally {
         this.closeConfirmCancel()
         setTimeout(() => this.uiReload(), 750)
+        setTimeout(() => this.uiReload(), 1500)
       }
     },
 
