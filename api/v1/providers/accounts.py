@@ -293,7 +293,6 @@ class FreeIPA:
         if email in self._account_cache:
            return self._account_cache[email]
 
-        logger.info(f"cache miss {email}")
         find = self._client.user_find(
             o_mail=email
         )
