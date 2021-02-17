@@ -124,15 +124,10 @@ class FreeIPA:
         self,
         email_or_username: str
     ) -> models.account.Account:
-        account = None 
-
-        try:
+        if '@' in email_or_username:
             return self.read_account_by_email(email_or_username)
-        except exceptions.resource.NotFound:
-            try:    
-                return self.read_account_by_username(email_or_username)
-            except exceptions.resource.NotFound:
-                raise exceptions.resource.NotFound("could not find user account")
+        else:
+            return self.read_account_by_username(email_or_username)
     
     def find_verified_account(
         self,
@@ -295,13 +290,13 @@ class FreeIPA:
         self,
         email : EmailStr
     ) -> models.account.Account:
-        #if email in self._account_cache:
-        #    return self._account_cache[email]
+        if email in self._account_cache:
+           return self._account_cache[email]
 
+        logger.info(f"cache miss {email}")
         find = self._client.user_find(
             o_mail=email
         )
-
 
         if find['count'] > 0:
             account = list(self._populate_accounts_from_user_find(find).items())[0][1]
