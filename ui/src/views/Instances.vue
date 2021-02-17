@@ -20,20 +20,28 @@
             <v-divider vertical class="hidden-sm-and-down"/>
             <v-card flat>
               <v-card-title>
-                <b>IMPORTANT - Instance inactivity and resource usage</b>
+                <b>Important information about backups, inactivity, resource usage, reliability and uptime</b>
               </v-card-title>
               <v-card-text>
                 <p>
                   If your instance goes inactive, it may be <b class="warning--text">shutdown</b> or <b class="error--text">deleted!</b><br/>
-                  Remember to take note of the date it goes inactive and remember to renew its activation!
+                  Remember to take note of the date it goes inactive and remember to renew its activation.
                 </p>
                 <p>
                   In the interests of server stability, we may change the resource limits on your instance at <b>any</b> time<br/>
                   This could you mean your allocated resources being raised or lowered depending on your use of available resources<br/>
-                  In extreme cases, your instance could be <b>shut down</b> (with longest running instances being the priority in that case)
+                  In extreme cases, your instance could be <b>shutdown</b> (with longest running instances being the priority in that case)
                 </p>
                 <p>
                   Instances come by default with a minimal set of resources, you can request more resources via the <b>Upgrade</b> button
+                </p>
+                <p>
+                  <b>We do not typically take backups of instance data nor provide any guarantees of instance uptime, user data integrity or system reliablity</b>
+                  <br/>
+                  Users should be aware that keeping off-site backups of their data on a personal storage device or making use of an alternative backup solution is recommended
+                </p>
+                <p>
+                  For more information refer to the <a target="_blank" href="https://github.com/UCCNetsoc/wiki/blob/master/services/terms-of-service.md">Terms of Service</a>
                 </p>
               </v-card-text>
             </v-card>
