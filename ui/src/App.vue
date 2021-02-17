@@ -3,6 +3,7 @@
     <bg-video :playbackRate="bgRate" :additionalStyle="bgStyle" />
     <v-navigation-drawer
       v-model="drawer"
+      hide-overlay
       app
       clipped
       style="background-color: rgba(37,37,37,0.8);"
