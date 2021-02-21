@@ -334,13 +334,13 @@ def deny_instance_request(
             f"""Hi {resource_account.username}!<br/><br/>
                 We received your request for a {fancy_name(instance_type)} named '{hostname}'<br/>
                 Unfortunately we've had to deny the request for now.<br/><br/>
-                Requests for {fancy_name(instance_type)}s are typically denied where we believe a Terms of Service violation may occur, or that a {fancy_name(instance_type)} may not be suitable for the reason you specified<br/>
-                There may be information below related to this particular instance<br/>
+                Requests for {fancy_name(instance_type)}s are typically denied where we believe a ToS violation may occur, or that a {fancy_name(instance_type)} may not be suitable for the reason you specified<br/><br/>
+                The reason your request was denied is available below<br/><br/>
                 If you have any questions, contact the SysAdmins on the UCC Netsoc Discord<br/>
             """,
             embeds=[
                 { "text": request_denial.reason }
-            ]
+            ]   
         ),
         "text/html"
     )
