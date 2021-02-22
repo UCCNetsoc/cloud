@@ -156,15 +156,15 @@ class Proxmox(BaseModel):
 
     class VPS(BaseModel):
         # inactivity_shutdown_warning_num_days: int = 30
-        inactivity_shutdown_num_days: int = 24
+        inactivity_shutdown_num_days: int
         # inactivity_deletion_warning_num_days: int = 90
-        inactivity_deletion_num_days: int = 48
+        inactivity_deletion_num_days: int
 
     class LXC(BaseModel):
         # inactivity_shutdown_warning_num_days: int = 60
-        inactivity_shutdown_num_days: int = 48
+        inactivity_shutdown_num_days: int
         # inactivity_deletion_warning_num_days: int = 120
-        inactivity_deletion_num_days: int = 120
+        inactivity_deletion_num_days: int
 
     class Network(BaseModel):
         class PortForward(BaseModel):
