@@ -23,15 +23,32 @@ proxmox:
       password: "password"
       token_name: "NetsocCloud"
       token_value: "-"
+  lxc:
+    inactivity_shutdown_num_days: 48
+    inactivity_deletion_num_days: 120
+  vps:
+    inactivity_shutdown_num_days: 24
+    inactivity_deletion_num_days: 48
   network:
-    traefik_config_key: "77826907276100902243245529368278"
+    traefik:
+      config_key: "77826907276100902243245529368278"
+      service_subdomain_cert_resolver: "letsencrypt-dns"
+      user_domain_cert_resolver: "letsencrypt-tls"
     port_forward:
       range: [16384, 17384]
+    network: "10.10.10.0/24"
+    bridge: vmbr1
+    vlan: 40
+    gateway: "10.10.10.1"
+    range: ["10.10.10.3", "10.10.10.60"]
     vhosts:
-      base_domain: "netsoc.cloud"
-      user_supplied:
+      user_domain:
         verification_txt_name: "_netsoc"
-        allowed_a_aaaa: [84.39.234.54]
+        allowed_a_aaaa: [84.39.234.51]
+      service_subdomain:
+        # base domain
+        base_domain: "netsoc.local"
+    base_fqdn: "netsoc.cloud"
   dir_pool: "local"
   vps:
     templates:
