@@ -38,7 +38,7 @@ proxmox:
       range: [16384, 17384]
     network: "10.10.10.0/24"
     bridge: vmbr1
-    vlan: 40
+    vlan: 0
     gateway: "10.10.10.1"
     range: ["10.10.10.3", "10.10.10.60"]
     vhosts:
