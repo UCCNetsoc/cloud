@@ -1479,7 +1479,8 @@ version: 2
             try:
                 info_list = socket.getaddrinfo(domain, 80)
             except Exception as e:
-                remarks.append("Could not verify custom domain: {e}")
+                remarks.append("Could not verify custom domain: {e}, is the domain registered? (can take a 20-30 mins to update)")
+                return (False, remarks)
 
             a_aaaa = set(map(lambda info: info[4][0], filter(lambda x: x[0] in [socket.AddressFamily.AF_INET, socket.AddressFamily.AF_INET6], info_list)))
             
