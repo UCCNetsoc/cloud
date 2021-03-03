@@ -36,7 +36,9 @@
                   Instances come by default with a minimal set of resources, you can request more resources via the <b>Upgrade</b> button
                 </p>
                 <p>
-                  <b>We do not typically take backups of instance data nor provide any guarantees of instance uptime, user data integrity or system reliablity</b>
+                  <b class="warning--text">
+                    We do not typically take backups of instance data nor provide any guarantees of instance uptime, user data integrity or system reliablity
+                  </b>
                   <br/>
                   Users should be aware that keeping off-site backups of their data on a personal storage device or making use of an alternative backup solution is recommended
                 </p>
