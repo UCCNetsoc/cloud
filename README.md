@@ -1,4 +1,5 @@
 <img src="ui/src/assets/cloud-logo-inverted.svg" width="360"/>
+
 [![Build Status](https://ci.netsoc.co/api/badges/UCCNetsoc/cloud/status.svg)](https://ci.netsoc.co/UCCNetsoc/cloud)
 
 
