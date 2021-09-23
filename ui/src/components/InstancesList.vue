@@ -528,7 +528,7 @@
                     </v-col>
                     <v-col sm="10">
                       <h3 class="white--text">
-                        You must monitor the <code>#servers</code> channel in the <a class="white--text" target="_blank" href="https://discord.netsoc.co">UCC Netsoc Discord</a>
+                        You must monitor the <code>#netsoc-cloud</code> channel in the <a class="white--text" target="_blank" href="https://discord.netsoc.co">UCC Netsoc Discord</a>
                       </h3>
                       <span class="grey--text text--lighten-1">
                         Important announcements and discussions will be posted there from time to time
