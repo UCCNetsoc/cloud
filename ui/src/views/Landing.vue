@@ -14,7 +14,7 @@
       <v-col cols="12" sm="12">
         <h2 class="font-weight-light display-5" style="position: relative; z-index: 2">
           New to UCC Netsoc or Linux? Try out our <router-link to='/tutorial'>Tutorial</router-link> to get started<br/>
-          Need help? Check out <code>#servers</code> on our <a target="_blank" href="https://discord.netsoc.co">Discord</a><br/>
+          Need help? Check out <code>#netsoc-cloud</code> on our <a target="_blank" href="https://discord.netsoc.co">Discord</a><br/>
           Already experienced? View our <a target="_blank" href="https://github.com/UCCNetsoc">GitHub</a>!
         </h2>
       </v-col>
