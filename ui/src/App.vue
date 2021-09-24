@@ -76,7 +76,7 @@
         v-if="this.$store.state.auth.user !== null"
       >
         <small>
-          &copy; 2020 UCC Networking Society
+          &copy; 2021 UCC Networking Society
           <span> &bull; </span>
           <a
             target="_blank"
