@@ -340,6 +340,7 @@ class Proxmox():
                 "newid": hash_id,
                 "description": yaml_description,
                 "storage": config.proxmox.instance_dir_pool,
+                "pool": "netsoc_cloud",
                 "full": 1
             })
 
@@ -358,6 +359,7 @@ class Proxmox():
                 "newid": hash_id,
                 "description": yaml_description,
                 "storage": config.proxmox.instance_dir_pool,
+                "pool": "netsoc_cloud",
                 "full": 1
             })
 
