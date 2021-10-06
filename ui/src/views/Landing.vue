@@ -21,7 +21,7 @@
     </v-row>
     <v-row v-if="!visible" class="justify-center ma-0 pa-0" fill-height style="width: 100%">
       <v-col v-for="item in menu" cols="12" xl="1" md="2" sm="2" xs="12" class="ma-2 pa-0" v-bind:key="item.name" @click="$router.push(item.route, ()=>{})">
-        <v-card class="text-center service" flat>
+        <v-card class="text-center service" text>
           <v-card-text class="justify-center" style="padding-left: 0; padding-right: 0">
             <v-icon class="align-center" size="48">{{ item.icon }}</v-icon>
           </v-card-text>
