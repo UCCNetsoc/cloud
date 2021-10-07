@@ -687,7 +687,7 @@
         <v-switch
           v-model='confirmCancel.action.vHostHttps'
           class="ma-0 pa-0"
-          label="Is the internal service using HTTPS (typically not)?"
+          label="Have you set up HTTPS yourself (typically not)?"
         ></v-switch>
       </v-form>
       <p v-else-if="confirmCancel.mode == ConfirmCancelMode.RemoveVirtualHost">
