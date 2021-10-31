@@ -678,20 +678,34 @@
           :rules='vhostRules'
           :placeholder='$store.state.auth.user.profile.preferred_username+"."+vhostRequirements.service_subdomain.base_domain'
         ></v-text-field>
-        <v-text-field
-          label='HTTP(S) port to reverse proxy'
-          v-model='confirmCancel.action.vHostPort'
-          :rules='portRules'
-          :placeholder='"80"'
-        ></v-text-field>
-        <v-switch
-          v-model='confirmCancel.action.vHostHttps'
-          class="ma-0 pa-0"
-          label="Have you set up HTTPS yourself (typically not)?"
-        ></v-switch>
+        <v-expansion-panels
+          v-model="panel"
+          :disabled="disabled"
+          multiple
+        >
+        <v-expansion-panel>
+          <v-expansion-panel-header>Advanced Options</v-expansion-panel-header>
+          <v-expansion-panel-content>
+
+            <v-text-field
+              label='HTTP(S) port to reverse proxy'
+              type="number"
+              v-model='confirmCancel.action.vHostPort'
+              :rules='portRules'
+              :placeholder='"80"'
+            ></v-text-field>
+            <v-switch
+              v-model='confirmCancel.action.vHostHttps'
+              class="ma-0 pa-0"
+              style="display: inline-block"
+              label="Use internal SSL? (if unsure, leave unselected)"
+          ></v-switch>
+          </v-expansion-panel-content>
+        </v-expansion-panel>
+        </v-expansion-panels>
       </v-form>
       <p v-else-if="confirmCancel.mode == ConfirmCancelMode.RemoveVirtualHost">
-        Are you sure you want to remove the virtual host?<br/>
+        Are you sure you want to remove the virtual host<br/>
       </p>
       <p v-else-if="confirmCancel.mode == ConfirmCancelMode.RenewActivation">
         Are you sure you want to renew the instance activation?<br>
@@ -1222,6 +1236,7 @@ export default Vue.extend({
       instances,
       loading: true,
       templates,
+      panel: false,
 
       templateIdx,
       vhostRequirements,
