@@ -3,7 +3,7 @@
     <v-row>
       <v-col cols="12" sm="12">
         <v-card>
-          <v-container fluid class="d-flex flex-xs-wrap flex-sm-wrap flex-md-nowrap py-2">
+          <v-container fluid :class=" this.$vuetify.breakpoint.smAndDown ? '' : 'd-flex flex-xs-wrap flex-sm-wrap flex-md-nowrap py-2'">
             <v-card flat>
               <v-card-title>
                 Instances

@@ -582,7 +582,7 @@
           <code>{{ instances[confirmCancel.action.hostname].fqdn }}:42069</code><br/>
           to be sent to port <code>8080</code> inside your instance<br/><br/>
 
-          <b class="warning--text">You should not create mappings to the following internal ports:</b>
+          <b class="warning--text">You are forbidden to create mappings to the following internal ports:</b>
           <ul>
             <li>21 (FTP, use SFTP)</li>
             <li>23 (Telnet, use SSH)</li>
@@ -590,7 +590,10 @@
             <li>53 (DNS, we forbid hosting DNS servers)</li>
             <li>143 (IMAP, we forbid hosting mail servers)</li>
           </ul>
-          <br/>
+
+          <small>As per our <a href='https://wiki.netsoc.co/en/services/terms-of-service'>TOS</a></small>
+
+          <br/><br/>
           Port forwarding rules may take a few minutes to apply
         </p>
         <v-container class="ma-0 pa-0">
@@ -617,12 +620,25 @@
             </v-col>
           </v-row>
         </v-container>
-        <v-btn small @click="confirmCancelRandomizeExternalPort()">
-          <v-icon>
-            mdi-dice-multiple
-          </v-icon>
-          random external port
-        </v-btn>
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          "
+        >
+          <v-btn small @click="confirmCancelRandomizeExternalPort()">
+            <v-icon>
+              mdi-dice-multiple
+            </v-icon>
+            random external port
+          </v-btn>
+          <p
+            style="
+              color: #fffa;
+            "
+          >The port your instance will listen for (e.g. port <code>22</code> for SSH</p>
+        </div>
       </v-form>
       <p v-else-if="confirmCancel.mode == ConfirmCancelMode.RemovePort">
         Are you sure you want to remove the port mapping?
@@ -678,20 +694,34 @@
           :rules='vhostRules'
           :placeholder='$store.state.auth.user.profile.preferred_username+"."+vhostRequirements.service_subdomain.base_domain'
         ></v-text-field>
-        <v-text-field
-          label='HTTP(S) port to reverse proxy'
-          v-model='confirmCancel.action.vHostPort'
-          :rules='portRules'
-          :placeholder='"80"'
-        ></v-text-field>
-        <v-switch
-          v-model='confirmCancel.action.vHostHttps'
-          class="ma-0 pa-0"
-          label="Is the internal service using HTTPS (typically not)?"
-        ></v-switch>
+        <v-expansion-panels
+          v-model="panel"
+          :disabled="disabled"
+          multiple
+        >
+        <v-expansion-panel>
+          <v-expansion-panel-header>Advanced Options</v-expansion-panel-header>
+          <v-expansion-panel-content>
+
+            <v-text-field
+              label='HTTP(S) port to reverse proxy'
+              type="number"
+              v-model='confirmCancel.action.vHostPort'
+              :rules='portRules'
+              :placeholder='"80"'
+            ></v-text-field>
+            <v-switch
+              v-model='confirmCancel.action.vHostHttps'
+              class="ma-0 pa-0"
+              style="display: inline-block"
+              label="Use internal SSL? (if unsure, leave unselected)"
+          ></v-switch>
+          </v-expansion-panel-content>
+        </v-expansion-panel>
+        </v-expansion-panels>
       </v-form>
       <p v-else-if="confirmCancel.mode == ConfirmCancelMode.RemoveVirtualHost">
-        Are you sure you want to remove the virtual host?<br/>
+        Are you sure you want to remove the virtual host<br/>
       </p>
       <p v-else-if="confirmCancel.mode == ConfirmCancelMode.RenewActivation">
         Are you sure you want to renew the instance activation?<br>
@@ -1222,6 +1252,7 @@ export default Vue.extend({
       instances,
       loading: true,
       templates,
+      panel: false,
 
       templateIdx,
       vhostRequirements,
