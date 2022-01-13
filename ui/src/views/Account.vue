@@ -3,7 +3,7 @@
     <!-- <v-row>
       <v-col cols="12" sm="6"> -->
         <v-card :style="this.$vuetify.smAndDown ? 'width: 100%' : 'width: 60%; padding: 2em;'">
-          <div :style="this.$vuetify.smAndDown ? 'width: 100%' : 'width: 60%; margin: auto; color: red'">
+          <div :style="this.$vuetify.smAndDown ? 'width: 100%' : 'width: 60%; margin: auto'">
             <v-card-title>
               Hi {{ $store.state.auth.user.profile.preferred_username }}!
             </v-card-title>
