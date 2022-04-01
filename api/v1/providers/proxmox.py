@@ -1524,10 +1524,13 @@ version: 2
         external: int,
         internal: int
     ):
+        forbidden_ports = [21, 23, 25, 53, 143]
         port_map = self.get_port_forward_map()
 
         if external in port_map:
             raise exceptions.resource.Unavailable(f"Cannot map port {external} to {internal}, this port is currently taken by another user/another one of your instances")
+        if internal in forbidden_ports:
+            raise exceptions.resource.Unavailable(f"Cannot map port {external} to {internal}, internal port forbidden")
             
         instance.metadata.network.ports[external] = internal
         self.write_out_instance_metadata(instance)
