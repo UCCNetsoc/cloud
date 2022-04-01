@@ -809,6 +809,10 @@ export interface ConfirmCancelAction {
 
 const VHostValidation = new RegExp('^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$')
 const PortValidation = new RegExp('^([0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$')
+const portAllowed = (p: string) => {
+  const forbiddenPorts = ['21', '23', '25', '53', '143']
+  return !forbiddenPorts.includes((p))
+}
 
 export default Vue.extend({
   components: {
@@ -847,7 +851,8 @@ export default Vue.extend({
     portRules (): ((v: string) => (string | boolean))[] {
       return [
         (v: string) => !!v || 'Port required',
-        (v: string) => PortValidation.test(v) || 'Port must be between 0 and 65355'
+        (v: string) => PortValidation.test(v) || 'Port must be between 0 and 65355',
+        (v: string) => portAllowed(v) || 'You should not create mappings to port ' + v
       ]
     },
 
