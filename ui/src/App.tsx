@@ -91,7 +91,6 @@ export default function App() {
 
   useHotkeys([['mod+J', () => toggleColorScheme()]]);
 
-
   return (
     <>
       <ColorSchemeProvider colorScheme={colorScheme} toggleColorScheme={toggleColorScheme}>

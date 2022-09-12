@@ -99,7 +99,7 @@ const InstanceTable = () => {
     <div>
       <h1>Instances</h1>
       {initialLoading ? (
-        <>
+        <div style={{ minWidth: "800px" }}>
           <Table verticalSpacing="sm">
             <thead>
               <tr>
@@ -128,7 +128,7 @@ const InstanceTable = () => {
               ))}
             </tbody>
           </Table>
-        </>
+        </div>
       ) : (<div>
         <Table verticalSpacing="sm" highlightOnHover>
           <thead>
