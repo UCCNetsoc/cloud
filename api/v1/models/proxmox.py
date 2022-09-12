@@ -75,6 +75,7 @@ class Specs(BaseModel):
     # number of gb of disk
     disk_space: int
 
+
     # number of mb of ram
     memory: int
 
@@ -225,3 +226,7 @@ class Instance(BaseModel):
     remarks: List[str] = []
 
     status: Status
+
+    disk: int
+    mem: int
+    uptime: int

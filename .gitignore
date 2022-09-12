@@ -1,6 +1,8 @@
 backing-services/freeipa/
 home/
 ui/node_modules
+ui/package-lock.json
+ui/yarn.lock
 
 .vscode
 bin/
