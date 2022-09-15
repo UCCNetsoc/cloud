@@ -1,5 +1,6 @@
 import { ActionIcon, Drawer, Skeleton, Table, ThemeIcon, Tooltip, useMantineTheme } from "@mantine/core";
-import { IconBrandDocker, IconPlayerPlay, IconPlayerStop, IconServer } from "@tabler/icons";
+import { IconBrandDocker, IconPlayerPlay, IconPlayerStop, IconRefresh, IconServer } from "@tabler/icons";
+import { time } from "console";
 import { useEffect, useState } from "react";
 import { GetInstances } from "../api";
 import { Cloud } from "../types";
@@ -10,12 +11,16 @@ const InstanceTable = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [opened, setOpened] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
-  const [vpsInstances, setVpsInstances] = useState<Cloud.Instance[]>([]);
-  const [lxcInstances, setLxcInstances] = useState<Cloud.Instance[]>([]);
 
   const [instances, setInstances] = useState<Cloud.Instance[]>([]);
+  const [deactivations, setDeactivations] = useState<Deactivation[]>([])
 
   const theme = useMantineTheme();
+
+  interface Deactivation {
+    str: string,
+    past: boolean,
+  }
 
   useEffect(() => {
     (async () => {
@@ -30,6 +35,23 @@ const InstanceTable = () => {
   }, [])
 
   useEffect(() => {
+    const deltas: Deactivation[] = [];
+    for (var i = 0; i<instances.length; i++) {
+      console.log(instances[i].inactivity_shutdown_date)
+      const date = new Date(instances[i].inactivity_shutdown_date);
+      const formatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
+
+      const dateDelta = (date.getTime() - Date.now()) / (1000 * 3600 * 24)
+      deltas.push({
+        str: formatter.format(Math.round(dateDelta), 'day'),
+        past: dateDelta < 0
+      })
+    }
+
+    setDeactivations(deltas)
+  }, [instances])
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.has("q")) {
       if (params.get("q") !== null && parseInt(params.get("q") as string)) {
@@ -37,10 +59,6 @@ const InstanceTable = () => {
       }
     }
   }, [])
-
-  // useEffect(() => {
-  //   setInstances([...lxcInstances, ...vpsInstances]);
-  // }, [lxcInstances, vpsInstances])
 
   useEffect(() => {
     if (selected !== null) {
@@ -54,44 +72,55 @@ const InstanceTable = () => {
         const disk_available = instance.disk > 0
         const mem_available = instance.mem > 0
 
-        return (<tr onClick={
-          () => {
-            setSelected(index);
-            setOpened(true);
-          }
-        } key={instance.id} style={{ borderLeft: "1px solid", borderColor: instance.status === "Running" ? '#0000' : theme.colors.red[7], cursor: "pointer", padding: "4em" }}
-        >
-          <td>
-            <span style={{ display: 'flex', alignItems: 'center' }}>
-              {instance.type.toUpperCase()}
-              <ThemeIcon style={{ margin: "0 1em" }} color={instance.status === "Running" ? "green" : "red"}>
-                {instance.type === Cloud.Type.LXC ? <IconBrandDocker /> : <IconServer />}
-              </ThemeIcon>
-            </span>
-          </td>
-          <td>{instance.hostname}</td>
-          <td>{
-            (instance.uptime ? (instance.uptime / 60 / 60 + 1).toFixed(0).toString() + " hours" : "N/A")
-          }</td>
-          <td>{instance.specs.cores}</td>
+        return (
+          <tr onClick={ instance.active ?
+            () => {
+              setSelected(index);
+              setOpened(true);
+            } : () => {}
+          } key={instance.id} style={{ borderLeft: "1px solid", borderColor: instance.status === "Running" ? '#0000' : theme.colors.red[7], cursor: instance.active ? "pointer" : "default", padding: "4em", color: !instance.active ? theme.colorScheme == "dark" ? theme.colors.gray[7] : theme.colors.gray[4] : "unset"}}
+          >
+            <td>
+              <span style={{ display: 'flex', alignItems: 'center' }}>
+                {instance.type.toUpperCase()}
+                <ThemeIcon style={{ margin: "0 1em" }} color={instance.status === "Running" ? "green" : "red"}>
+                  {instance.type === Cloud.Type.LXC ? <IconBrandDocker /> : <IconServer />}
+                </ThemeIcon>
+              </span>
+            </td>
+            <td>{instance.hostname}</td>
+            <td>{
+              (instance.uptime ? (instance.uptime / 60 / 60 + 1).toFixed(0).toString() + " hours" : "N/A")
+            }</td>
+            <td>{instance.specs.cores}</td>
 
-          <td>{!mem_available ? "N/A" : <span style={{ display: "flex", alignItems: "center" }}>{<ResourceRing label="" current={instance.mem} max={instance.specs.memory * 10000} size={32} outsidelabel={(instance.specs.memory / 1024).toString()} decimals={0} />}</span>}</td>
-          <td>{!disk_available ? "N/A" : <span style={{ display: "flex", alignItems: "center" }}>{<ResourceRing label="" current={instance.disk} max={instance.specs.disk_space * 10000000} size={32} outsidelabel={(instance.specs.disk_space).toString()} decimals={0} />}</span>}</td>
-          <td>{instance.status}</td>
-          <td>
-            <Tooltip label={instance.status === "Running" ? "Stop" : "Start"}>
-              <ActionIcon onClick={(event: any) => {
-                alert("bruh")
-                event?.stopPropagation();
-              }}>
-                {instance.status === "Stopped" ? <IconPlayerPlay color="#1f4" /> :
-                  <IconPlayerStop color="#f33" />}
-              </ActionIcon>
-            </Tooltip>
-          </td>
-        </tr>
-        )
-      })}
+            <td>{!mem_available ? "N/A" : <span style={{ display: "flex", alignItems: "center" }}>{<ResourceRing label="" current={instance.mem} max={instance.specs.memory * 10000} size={32} outsidelabel={(instance.specs.memory / 1024).toString()} decimals={0} />}</span>}</td>
+            <td>{!disk_available ? "N/A" : <span style={{ display: "flex", alignItems: "center" }}>{<ResourceRing label="" current={instance.disk} max={instance.specs.disk_space * 10000000} size={32} outsidelabel={(instance.specs.disk_space).toString()} decimals={0} />}</span>}</td>
+            <td>{instance.status}</td>
+            <td style={{ color: theme.colorScheme === "dark" ? "white" : "black" }}>{
+              instance.metadata.permanent ? 
+              <>
+                Permanent
+              </> : 
+              <>
+                {deactivations[index]?.past ? "Deactivated" : "Deactivation"} {deactivations[index]?.str}
+              </>
+            }</td>
+            <td>
+              <Tooltip label={!instance.active ? "Reactivate" :  instance.status === "Running" ? "Stop" : "Start"}>
+                <ActionIcon>
+                  { !instance.active ? 
+                    <IconRefresh color={theme.colors.blue[4]} />
+                    : instance.status === "Running" ?
+                      <IconPlayerStop color={theme.colors.red[6]} /> : <IconPlayerPlay color={theme.colors.green[6]} />
+                  }
+                </ActionIcon>
+              </Tooltip>
+            </td>
+          </tr>
+          )
+        })
+      }
     </>
   )
 
@@ -140,6 +169,7 @@ const InstanceTable = () => {
               <th>Memory</th>
               <th>Disk Usage</th>
               <th>Status</th>
+              <th>Activation</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -155,7 +185,10 @@ const InstanceTable = () => {
         position="right"
         size="800px"
         opened={opened}
-        onClose={() => setOpened(false)}
+        onClose={() => {
+          setOpened(false); 
+          setSelected(null)
+        }}
         padding="xs"
       >
         <InstanceEdit instance={instances[selected!]} />

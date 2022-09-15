@@ -12,6 +12,7 @@ import Home from './Views/Home';
 import Instances from './Views/Instances';
 import CallbackSilent from './Components/CallbackSilent';
 import { useHotkeys, useLocalStorage } from '@mantine/hooks';
+import Account from './Views/Account';
 
 export default function App() {
 
@@ -115,6 +116,7 @@ export default function App() {
                     <Route path="/" element={<Home />} />
                     <Route path="/instances" element={<Instances />} />
                     <Route path="/about" element={<About />} />
+                    <Route path="/account" element={<Account />} />
                   </Routes>
                 </BrowserRouter>
               </Layout>

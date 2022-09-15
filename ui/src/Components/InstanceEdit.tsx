@@ -1,4 +1,5 @@
-import { ActionIcon, Anchor, Button, Loader, Modal, Table, Text, Tooltip, useMantineTheme } from "@mantine/core";
+import styled from "@emotion/styled";
+import { ActionIcon, Anchor, Button, Loader, Modal, ScrollArea, Table, Text, Tooltip, useMantineTheme } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
 import { IconAlertCircle, IconAlertTriangle, IconExternalLink, IconInfoCircle, IconPlus, IconTrash } from "@tabler/icons";
 import { useState } from "react";
@@ -6,8 +7,22 @@ import { MarkInstanceActive, StartInstance, StopInstance } from "../api";
 import { Cloud } from "../types";
 import ResourceRing from "./ResourceRing";
 
+const TableRow = styled.tr`
+  & > td {
+    border: none !important;
+  }
+  & h1,h2,h3 {
+    margin: 0.1em 0;
+    padding: 0;
+  }
+`
+
 const InstanceEdit = (props: { instance: Cloud.Instance }) => {
   const [remarks, setRemarks] = useState<string[] | null>(null);
+
+  if (props.instance) {
+    console.log(props.instance)
+  }
 
   const theme = useMantineTheme();
 
@@ -46,7 +61,7 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
       color: "yellow.7"
     },
     {
-      label: "Stop",
+      label: "Shutdown",
       onClick: async () => {
         const resp = await StopInstance(props.instance.hostname, props.instance.type)
         if (resp) {
@@ -62,14 +77,14 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
       },
       color: "orange"
     },
+    // {
+    //   label: "Reactivate",
+    //   onClick: () => {
+    //     MarkInstanceActive(props.instance.hostname, props.instance.type);
+    //   }
+    // },
     {
-      label: "Reactivate",
-      onClick: () => {
-        MarkInstanceActive(props.instance.hostname, props.instance.type);
-      }
-    },
-    {
-      label: "Reset Password",
+      label: "Reset Root Password",
       onClick: () => {
         // ResetPassword()
       },
@@ -84,16 +99,17 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
     }
   ]
 
-  const possible_remarks = Object.keys(props.instance.remarks);
-
-  return (
+  const possible_remarks = props.instance ? Object.keys(props.instance?.remarks) : null;
+  if (possible_remarks !== null) {
+    return (
     <>
+      <ScrollArea >
       <div style={{
         position: "absolute",
         top: "0",
         right: "0",
         padding: "2em 1em",
-        height: "100vh",
+        minHeight: "100vh",
         width: "100%",
         display: "flex",
         flexDirection: "column",
@@ -112,30 +128,46 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
           </nav>
           <>
             <h1 style={{ fontSize: "1.4em", margin: "0.6em 0 0.2em 0" }}>Details</h1>
-            <Table verticalSpacing="md">
+            <Table verticalSpacing="xs" >
               <tbody>
-                <tr
+                <TableRow
                   style={{
                     height: "2em",
                   }}
                 >
-                  <td>Hostname</td>
                   <td>
-                    {props.instance.hostname}
+                    <h1>Hostname</h1>
                   </td>
-                </tr>
-                <tr>
-                  <td>CPU Cores</td>
+                  <td>
+                    <h1>{props.instance.hostname}</h1>
+                  </td>
+                </TableRow>
+                <TableRow>
+                  <td>
+                    <h2>Template</h2>
+                  </td>
+                  <td>
+                    <h2>{
+                    props.instance.metadata?.template_metadata ? props.instance.metadata?.template_metadata?.title : "N/A"
+                    }</h2>
+                  </td>
+                </TableRow>
+                <TableRow>
+                  <td>
+                    <h2>Memory</h2>
+                  </td>
+                  <td>
+                    <h2>{props.instance.specs.memory / 1024}G</h2>
+                  </td>
+                </TableRow>
+                <TableRow>
+                  <td>
+                    <h3>CPU Cores</h3>  
+                  </td>
                   <td>
                     {props.instance.specs.cores}
                   </td>
-                </tr>
-                <tr>
-                  <td>Memory</td>
-                  <td>
-                    {props.instance.specs.memory / 1024}G
-                  </td>
-                </tr>
+                </TableRow>
               </tbody>
             </Table>
           </>
@@ -151,7 +183,7 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
                     </Tooltip>
                   </th>
                   <th style={{ whiteSpace: "nowrap" }}>
-                    <Tooltip multiline label="Managed SSL means we will handle all SSL cert requirements for you. Then, you can access your service using https.">
+                    <Tooltip multiline label="Managed SSL: we will handle all SSL cert requirements.">
                       <span>Managed SSL <IconInfoCircle size={14} /></span>
                     </Tooltip>
                   </th>
@@ -173,15 +205,15 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
                   Object.values(props.instance.metadata.network.vhosts).map((vhost, index) => {
                     const vhost_link = Object.keys(props.instance.metadata.network.vhosts)[index]
 
-                    const relevant_remarks = props.instance.remarks.filter((remark) => { return remark.includes(vhost_link) })
+                    const relevant_remarks = possible_remarks.filter((remark) => { return remark.includes(vhost_link) })
                     return (
                       <tr key={index}>
                         {relevant_remarks.length > 0 ? (
                           <td>
-                            <ActionIcon color="red.7" onClick={() => { setRemarks(props.instance.remarks) }}>
+                            <ActionIcon color="red.7" onClick={() => { setRemarks(possible_remarks) }}>
                               <IconAlertTriangle size={22} />
                             </ActionIcon>
-                          </td>) : (<td></td>)
+                          </td>) : (<td></td>) 
                         }
                         <td><Anchor target="_blank" href={vhost_link}>{vhost_link}</Anchor> <IconExternalLink size={16} /> </td>
                         <td>{vhost.https ? 'No' : 'Yes'}</td>
@@ -252,7 +284,7 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
             </div>
           )}
         </div>
-      </div >
+      </div>
       <Modal
         opened={remarks !== null}
         onClose={() => setRemarks(null)}
@@ -266,11 +298,13 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
             <IconAlertCircle style={{ margin: "0.6em" }}></IconAlertCircle><Text>{remark}</Text>
           </div>
         ))}
-
         <Text style={{ margin: "2.4em 1em 1em 1em" }} >DNS records can take some time to propagate, but if issues persist or you are confused, please ask the sysadmins in the <pre style={{ display: "inline" }}>#netsoc-cloud</pre> channel on the <Anchor>Discord</Anchor></Text>
       </Modal>
+      </ScrollArea>
     </>
-  )
+    )
+  }
+  else return (<></>)
 }
 
 export default InstanceEdit;

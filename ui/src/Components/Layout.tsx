@@ -40,7 +40,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       padding="md"
       navbarOffsetBreakpoint="sm"
       navbar={
-        <Navbar hiddenBreakpoint="sm" hidden={!opened} width={{ base: 200 }} p="xs">
+        <Navbar hiddenBreakpoint="sm" hidden={true} width={{ base: 200 }} p="xs">
           <Group py="md">
             {routes.map((route) => (
               <Anchor

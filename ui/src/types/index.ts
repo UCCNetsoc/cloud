@@ -44,6 +44,7 @@ export module Cloud {
     network: Network;
     root_user: RootUser;
     request_detail: RequestDetail;
+    template_metadata?: TemplateMetadata;
   }
 
   export interface RootUser {
