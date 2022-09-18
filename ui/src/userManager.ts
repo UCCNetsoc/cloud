@@ -8,15 +8,13 @@ export const userManager = new UserManager({
   client_id: 'netsoc-cloud',
   response_type: 'code',
   redirect_uri: `${locSplit[0]}//${locSplit[2]}/callback`,
-
   silent_redirect_uri: `${locSplit[0]}//${locSplit[2]}/login/silent`,
   post_logout_redirect_uri: `${locSplit[0]}//${locSplit[2]}/callback/silent`,
   scope: 'openid profile email roles',
-  revokeTokensOnSignout: true,
+  revokeTokensOnSignout: false,
   automaticSilentRenew: true,
   filterProtocolClaims: true,
   checkSessionIntervalInSeconds: 2000,
   loadUserInfo: true,
   userStore: new WebStorageStateStore({ store: window.localStorage }),
 });
-

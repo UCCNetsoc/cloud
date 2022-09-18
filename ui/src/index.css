@@ -11,3 +11,11 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+.mantine-Drawer-root {
+  max-height: unset;
+}
+
+.mantine-Modal-modal {
+  padding: 0;
+}

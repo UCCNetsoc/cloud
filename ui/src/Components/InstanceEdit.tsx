@@ -1,30 +1,61 @@
 import styled from "@emotion/styled";
-import { ActionIcon, Anchor, Button, Loader, Modal, ScrollArea, Table, Text, Tooltip, useMantineTheme } from "@mantine/core";
+import { ActionIcon, Anchor, Button, Code, createStyles, Divider, Loader, Modal, ScrollArea, Select, Switch, Table, Text, TextInput, Tooltip, useMantineTheme } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
-import { IconAlertCircle, IconAlertTriangle, IconExternalLink, IconInfoCircle, IconPlus, IconTrash } from "@tabler/icons";
-import { useState } from "react";
-import { MarkInstanceActive, StartInstance, StopInstance } from "../api";
+import { IconAlertCircle, IconAlertTriangle, IconExternalLink, IconInfoCircle, IconPlus, IconServer, IconTrash, IconWorld } from "@tabler/icons";
+import { useContext, useEffect, useState } from "react";
+import { DeleteVhost, MarkInstanceActive, StartInstance, StopInstance } from "../api";
+import { DesktopContext, UserContext } from "../App";
 import { Cloud } from "../types";
+import PortModal from "./PortModal";
 import ResourceRing from "./ResourceRing";
+import VhostModal from "./VhostModal";
 
-const TableRow = styled.tr`
-  & > td {
-    border: none !important;
-  }
-  & h1,h2,h3 {
-    margin: 0.1em 0;
-    padding: 0;
-  }
-`
+const useStyles = createStyles((theme) => ({
+  header: {
+    position: 'sticky',
+    top: 0,
+    backgroundColor: theme.colorScheme === 'dark' ? theme.colors.dark[7] : theme.white,
+    transition: 'box-shadow 150ms ease',
+    zIndex: 100,
+
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      borderBottom: `1px solid ${theme.colorScheme === 'dark' ? theme.colors.dark[3] : theme.colors.gray[2]
+        }`,
+    },
+  },
+
+  scrolled: {
+    boxShadow: theme.shadows.sm,
+  },
+}));
 
 const InstanceEdit = (props: { instance: Cloud.Instance }) => {
   const [remarks, setRemarks] = useState<string[] | null>(null);
+  const [vhostScrolled, setVhostScrolled] = useState(false);
+  const [portScrolled, setPortScrolled] = useState(false);
 
-  if (props.instance) {
-    console.log(props.instance)
-  }
+  const [vhostOpen, setVhostOpen] = useState(false);
+  const [vhostRequirements, setVhostRequirements] = useState<Cloud.VHostRequirements | null>(null);
+
+  const [portOpen, setPortOpen] = useState(false);
+
+  const { classes, cx } = useStyles();
 
   const theme = useMantineTheme();
+  const { user } = useContext(UserContext);
+
+  const desktop = useContext(DesktopContext);
+
+  // useEffect(() => {
+  //   (async () => {
+  //     setVhostRequirements(await GetVhostRequirements());
+  //   })();
+  // }, []);
 
   const actions = [
     {
@@ -54,11 +85,17 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
       color: "green.9",
     },
     {
+      label: "Terminal",
+      onClick: () => {
+        window.open(`https://ssh.netsoc.cloud/ssh/host/${props.instance?.metadata.network.nic_allocation.addresses[0].split("/")[0]}`, "_blank");
+      }
+    },
+    {
       label: "Reboot",
       onClick: () => {
         // RebootInstance()
       },
-      color: "yellow.7"
+      color: "cyan.8"
     },
     {
       label: "Shutdown",
@@ -99,209 +136,243 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
     }
   ]
 
-  const possible_remarks = props.instance ? Object.keys(props.instance?.remarks) : null;
+  const possible_remarks = props.instance ? Object.values(props.instance?.remarks) : null;
   if (possible_remarks !== null) {
     return (
-    <>
-      <ScrollArea >
-      <div style={{
-        position: "absolute",
-        top: "0",
-        right: "0",
-        padding: "2em 1em",
-        minHeight: "100vh",
-        width: "100%",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "space-between",
-        border: "1px solid",
-        borderColor: props.instance.status === "Running" ? "green" : "red",
-      }}>
-        <div style={{ minHeight: "40vh", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-          <nav>
-            {actions.map((action, index) => (
-              <Button size="xs" color={action.color} onClick={action.onClick} style={{ margin: "0.4em 0.6em" }} key={index}>
-                {action.label}
-              </Button>
-            ))}
-          </nav>
-          <>
-            <h1 style={{ fontSize: "1.4em", margin: "0.6em 0 0.2em 0" }}>Details</h1>
-            <Table verticalSpacing="xs" >
-              <tbody>
-                <TableRow
-                  style={{
-                    height: "2em",
-                  }}
-                >
-                  <td>
-                    <h1>Hostname</h1>
-                  </td>
-                  <td>
-                    <h1>{props.instance.hostname}</h1>
-                  </td>
-                </TableRow>
-                <TableRow>
-                  <td>
-                    <h2>Template</h2>
-                  </td>
-                  <td>
-                    <h2>{
-                    props.instance.metadata?.template_metadata ? props.instance.metadata?.template_metadata?.title : "N/A"
-                    }</h2>
-                  </td>
-                </TableRow>
-                <TableRow>
-                  <td>
-                    <h2>Memory</h2>
-                  </td>
-                  <td>
-                    <h2>{props.instance.specs.memory / 1024}G</h2>
-                  </td>
-                </TableRow>
-                <TableRow>
-                  <td>
-                    <h3>CPU Cores</h3>  
-                  </td>
-                  <td>
-                    {props.instance.specs.cores}
-                  </td>
-                </TableRow>
-              </tbody>
-            </Table>
-          </>
-          <>
-            <h1 style={{ fontSize: "1.4em", margin: "0.6em 0 0.2em 0" }}>VHosts</h1>
-            <Table verticalSpacing="xs">
-              <thead>
-                <tr>
-                  <th></th>
-                  <th style={{ whiteSpace: "nowrap" }}>
-                    <Tooltip label="Domain name. You can choose a domain like *.netsoc.cloud or your own custom domain.">
-                      <span>Domain <IconInfoCircle size={14} /></span>
-                    </Tooltip>
-                  </th>
-                  <th style={{ whiteSpace: "nowrap" }}>
-                    <Tooltip multiline label="Managed SSL: we will handle all SSL cert requirements.">
-                      <span>Managed SSL <IconInfoCircle size={14} /></span>
-                    </Tooltip>
-                  </th>
-                  <th style={{ whiteSpace: "nowrap" }}>
-                    <Tooltip multiline label="Port that your service is running on in the instance (generally 80 or 8080).">
-                      <span>Internal Port <IconInfoCircle size={14} /></span>
-                    </Tooltip>
-                  </th>
-                  <th>
-                    <span>
-                      <ActionIcon>
-                        <IconPlus />
-                      </ActionIcon> Add new </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {
-                  Object.values(props.instance.metadata.network.vhosts).map((vhost, index) => {
-                    const vhost_link = Object.keys(props.instance.metadata.network.vhosts)[index]
-
-                    const relevant_remarks = possible_remarks.filter((remark) => { return remark.includes(vhost_link) })
-                    return (
-                      <tr key={index}>
-                        {relevant_remarks.length > 0 ? (
-                          <td>
-                            <ActionIcon color="red.7" onClick={() => { setRemarks(possible_remarks) }}>
-                              <IconAlertTriangle size={22} />
-                            </ActionIcon>
-                          </td>) : (<td></td>) 
-                        }
-                        <td><Anchor target="_blank" href={vhost_link}>{vhost_link}</Anchor> <IconExternalLink size={16} /> </td>
-                        <td>{vhost.https ? 'No' : 'Yes'}</td>
-                        <td>{vhost.port}</td>
-                        <td>
-                          <ActionIcon variant="subtle" color="red.6">
-                            <IconTrash size={18} />
-                          </ActionIcon>
-                        </td>
-                      </tr>
-                    )
-                  })}
-              </tbody>
-            </Table>
-          </>
-          <>
-            <h1 style={{ fontSize: "1.4em", margin: "0.6em 0 0.2em 0" }}>TCP Ports</h1>
-            <Table verticalSpacing="xs" title="TCP Ports">
-              <thead>
-                <tr>
-                  <th style={{ whiteSpace: "nowrap" }}>
-                    <Tooltip label="Port accessible by internet.">
-                      <span>External Port <IconInfoCircle size={14} /></span>
-                    </Tooltip>
-                  </th>
-                  <th style={{ whiteSpace: "nowrap" }}>
-                    <Tooltip multiline label="Port that your service is running on in the instance (example 22 for SSH).">
-                      <span>Internal Port <IconInfoCircle size={14} /></span>
-                    </Tooltip>
-                  </th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.keys(props.instance.metadata.network.ports).map((port, index) => (
-                  <tr key={index}>
-                    <td>{port}</td>
-                    <td>{props.instance.metadata.network.ports[parseInt(port)]}</td>
+      <>
+        <div style={{
+          padding: "0 1em",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}>
+          <div style={{ minHeight: "30vh", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <nav style={{ height: "5vh" }}>
+              {actions.map((action, index) => (
+                <Button size="xs" color={action.color} onClick={action.onClick} style={{ margin: "0.4em 0.6em" }} key={index}>
+                  {action.label}
+                </Button>
+              ))}
+            </nav>
+            <section style={{ height: "20vh", fontSize: "0.8em" }}>
+              <h1 style={{ fontSize: "1em", margin: "0.6em 0 0.2em 0" }}>Details</h1>
+              <Table verticalSpacing="xs">
+                <tbody>
+                  <tr
+                    style={{
+                      height: "2em",
+                    }}
+                  >
                     <td>
-                      <ActionIcon variant="subtle" color="red.6">
-                        <IconTrash size={18} />
-                      </ActionIcon>
+                      Hostname
+                    </td>
+                    <td>
+                      {props.instance.hostname}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </Table>
-          </>
-        </div>
-        <div style={{ display: "flex" }}>
-          <div style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}>
-            <ResourceRing current={props.instance.mem} max={props.instance.specs.memory * 10000} size={120} longlabel={(props.instance.specs.memory / 1000).toString() + 'G'} />
-            <Text>Memory</Text>
+                  <tr>
+                    <td>
+                      Template
+                    </td>
+                    <td>{
+                      props.instance.metadata?.template_metadata ? props.instance.metadata?.template_metadata?.title : "N/A"
+                    }
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Memory
+                    </td>
+                    <td>
+                      {props.instance.specs.memory / 1024}G
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      CPU Cores
+                    </td>
+                    <td>
+                      {props.instance.specs.cores}
+                    </td>
+                  </tr>
+                </tbody>
+              </Table>
+            </section>
+            <div style={{ height: "30vh" }}>
+              <h1 style={{ fontSize: "1em", margin: "1.4em 0 0 0" }}>VHosts</h1>
+
+              <ScrollArea sx={{ height: 200 }} onScrollPositionChange={({ y }) => setVhostScrolled(y !== 0)}>
+                <Table verticalSpacing="xs">
+                  <thead className={cx(classes.header, { [classes.scrolled]: vhostScrolled })}>
+                    <tr>
+                      <th></th>
+                      <th style={{ whiteSpace: "nowrap" }}>
+                        <Tooltip label="Domain name. You can choose a domain like *.netsoc.cloud or your own custom domain.">
+                          <span>Domain <IconInfoCircle size={14} /></span>
+                        </Tooltip>
+                      </th>
+                      <th style={{ whiteSpace: "nowrap" }}>
+                        <Tooltip multiline label="Managed SSL: we will handle all SSL cert requirements.">
+                          <span>Managed SSL <IconInfoCircle size={14} /></span>
+                        </Tooltip>
+                      </th>
+                      <th style={{ whiteSpace: "nowrap" }}>
+                        <Tooltip multiline label="Port that your service is running on in the instance (generally 80 or 8080).">
+                          <span>Internal Port <IconInfoCircle size={14} /></span>
+                        </Tooltip>
+                      </th>
+                      <th>
+                        <Button leftIcon={<IconPlus />} onClick={() => { setVhostOpen(true) }}>
+                          Add New
+                        </Button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {
+                      Object.values(props.instance.metadata.network.vhosts).length > 0 ?
+                        (Object.values(props.instance.metadata.network.vhosts).map((vhost, index) => {
+                          const vhost_link = Object.keys(props.instance.metadata.network.vhosts)[index]
+                          const relevant_remarks = possible_remarks.filter((remark) => { return remark.includes(vhost_link) })
+                          return (
+                            <tr key={index}>
+                              {relevant_remarks.length > 0 ? (
+                                <td>
+                                  <ActionIcon style={{ zIndex: "1" }} color="red.7" onClick={() => { setRemarks(possible_remarks) }}>
+                                    <IconAlertTriangle size={22} />
+                                  </ActionIcon>
+                                </td>) : (<td></td>)
+                              }
+                              <td><Anchor target="_blank" href={`${vhost.https || vhost.port == 443 ? "https://" : "http://"}${vhost_link}`}>{vhost_link}</Anchor> <IconExternalLink size={16} /> </td>
+                              <td>{vhost.https ? 'No' : 'Yes'}</td>
+                              <td>{vhost.port}</td>
+                              <td>
+                                <ActionIcon variant="subtle" color="red.6" onClick={() => {
+                                  showNotification({
+                                    title: "Deleting VHost",
+                                    message: undefined,
+                                    color: "red.6"
+                                  })
+
+                                  DeleteVhost(props.instance.type, props.instance.hostname, vhost_link).then((status_code) => {
+                                    showNotification({
+                                      title: "Deleted VHost",
+                                      message: status_code,
+                                      color: "red.6"
+                                    })
+                                  })
+                                }}>
+                                  <IconTrash size={18} />
+                                </ActionIcon>
+                              </td>
+                            </tr>
+                          )
+                        })
+                        ) : (
+                          <tr>
+                            <td colSpan={5} style={{ textAlign: "center" }}>
+                              No VHosts
+                            </td>
+                          </tr>
+                        )
+                    }
+                  </tbody>
+                </Table>
+              </ScrollArea>
+            </div>
+            <>
+              <h1 style={{ fontSize: "1em", marginTop: 0 }}>TCP Ports</h1>
+              <ScrollArea sx={{ height: 200 }} onScrollPositionChange={({ y }) => setPortScrolled(y !== 0)}>
+                <Table verticalSpacing="xs">
+                  <thead className={cx(classes.header, { [classes.scrolled]: portScrolled })}>
+                    <tr>
+                      <th style={{ whiteSpace: "nowrap" }}>
+                        <Tooltip label="Port accessible by internet.">
+                          <span>External Port <IconInfoCircle size={14} /></span>
+                        </Tooltip>
+                      </th>
+                      <th style={{ whiteSpace: "nowrap" }}>
+                        <Tooltip multiline label="Port that your service is running on in the instance (example 22 for SSH).">
+                          <span>Internal Port <IconInfoCircle size={14} /></span>
+                        </Tooltip>
+                      </th>
+                      <th>
+                        <Button leftIcon={<IconPlus />} onClick={() => { setPortOpen(true) }}>
+                          Add New
+                        </Button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {
+                      Object.keys(props.instance.metadata.network.ports).length > 0 ?
+                        (Object.keys(props.instance.metadata.network.ports).map((port, index) => (
+                          <tr key={index}>
+                            <td>{port}</td>
+                            <td>{props.instance.metadata.network.ports[parseInt(port)]}</td>
+                            <td>
+                              <ActionIcon variant="subtle" color="red.6">
+                                <IconTrash size={18} />
+                              </ActionIcon>
+                            </td>
+                          </tr>
+                        ))) :
+                        (
+                          <tr>
+                            <td style={{ textAlign: "center" }} colSpan={3}>No ports</td>
+                          </tr>
+                        )}
+                  </tbody>
+                </Table>
+              </ScrollArea>
+            </>
           </div>
-          {props.instance.type === Cloud.Type.LXC && (
+          <div style={{ display: "flex" }}>
             <div style={{
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
             }}>
-
-              <ResourceRing current={props.instance.disk} max={props.instance.specs.disk_space * 10000000} size={120} longlabel={props.instance.specs.disk_space.toString() + 'G'} />
-              <Text>Storage</Text>
+              <ResourceRing current={props.instance.mem} max={props.instance.specs.memory * 10000} size={100} longlabel={(props.instance.specs.memory / 1000).toString() + 'G'} />
+              <Text>Memory</Text>
             </div>
-          )}
-        </div>
-      </div>
-      <Modal
-        opened={remarks !== null}
-        onClose={() => setRemarks(null)}
-        title="DNS Remarks"
-        centered
-        overlayColor={theme.colorScheme === 'dark' ? theme.colors.dark[9] : theme.colors.gray[2]}
-        size="45%"
-      >
-        {remarks?.map((remark, index) => (
-          <div key={index} style={{ margin: "1em", display: "flex", alignItems: "center" }}>
-            <IconAlertCircle style={{ margin: "0.6em" }}></IconAlertCircle><Text>{remark}</Text>
+            {props.instance.type === Cloud.Type.LXC && (
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+              }}>
+
+                <ResourceRing current={props.instance.disk} max={props.instance.specs.disk_space * 10000000} size={100} longlabel={props.instance.specs.disk_space.toString() + 'G'} />
+                <Text>Storage</Text>
+              </div>
+            )}
           </div>
-        ))}
-        <Text style={{ margin: "2.4em 1em 1em 1em" }} >DNS records can take some time to propagate, but if issues persist or you are confused, please ask the sysadmins in the <pre style={{ display: "inline" }}>#netsoc-cloud</pre> channel on the <Anchor>Discord</Anchor></Text>
-      </Modal>
-      </ScrollArea>
-    </>
+        </div>
+        <Modal
+          sx={{ overflowX: "hidden" }}
+          opened={remarks !== null}
+          onClose={() => setRemarks(null)}
+          title="DNS Remarks"
+          centered
+          overlayColor={theme.colorScheme === 'dark' ? theme.colors.dark[9] : theme.colors.gray[2]}
+          size="45%"
+        >
+          {remarks?.map((remark, index) => (
+            <div key={index} style={{ margin: "1em", display: "flex", alignItems: "center" }}>
+              <IconAlertCircle style={{ margin: "0.6em" }}></IconAlertCircle><Text>{remark}</Text>
+            </div>
+          ))}
+          <Text style={{ margin: "2.4em 1em 1em 1em" }} >DNS records can take some time to propagate, but if issues persist or you are confused, please ask the sysadmins in the <pre style={{ display: "inline" }}>#netsoc-cloud</pre> channel on the <Anchor>Discord</Anchor></Text>
+        </Modal>
+        <Modal fullScreen={!desktop} sx={{ padding: "2em" }} size="lg" centered opened={vhostOpen} onClose={() => { setVhostOpen(false) }}>
+          <VhostModal instance={props.instance} />
+        </Modal>
+        <Modal fullScreen={!desktop} sx={{ padding: "2em" }} size="lg" centered opened={portOpen} onClose={() => { setPortOpen(false) }}>
+          <PortModal instance={props.instance} />
+        </Modal>
+      </>
     )
   }
   else return (<></>)

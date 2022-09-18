@@ -1,7 +1,5 @@
 import { ColorScheme, ColorSchemeProvider, MantineProvider } from '@mantine/core';
-import { SpotlightAction, SpotlightProvider } from '@mantine/spotlight';
 import { NotificationsProvider } from '@mantine/notifications';
-import { IconBrandDocker, IconInfoCircle, IconPackage, IconServer, IconServer2, IconUser, IconVocabulary } from '@tabler/icons';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import Callback from './Components/Callback';
 import Layout from './Components/Layout';
@@ -13,73 +11,62 @@ import Instances from './Views/Instances';
 import CallbackSilent from './Components/CallbackSilent';
 import { useHotkeys, useLocalStorage } from '@mantine/hooks';
 import Account from './Views/Account';
+import { createContext, useEffect, useState } from 'react';
+import { Cloud } from './types';
+import { GetAllInstances } from './api';
+import { userManager } from './userManager';
+import { User } from 'oidc-client-ts';
+import SpotlightComponent from './Components/SpotlightComponent';
+
+export const DesktopContext = createContext(true)
+// export const InstanceContext = createContext([] as Cloud.Instance[] | null)
+export const InstanceContext = createContext({
+  instances: [] as Cloud.Instance[] | null,
+  setInstances: (_instances: Cloud.Instance[] | null) => { }
+});
+
+export const UserContext = createContext({
+  user: null as User | null,
+  setUser: (_user: User | null) => { }
+});
+
+export const InstanceTemplateContext = createContext({
+  instanceTemplates: [] as Cloud.Template[] | null,
+  setInstanceTemplates: (_instanceTemplates: Cloud.Template[] | null) => { }
+});
 
 export default function App() {
+  const [loading, setLoading] = useState(false);
+  const [desktop, setDesktop] = useState(true)
+  const [user, setUser] = useState<User | null>(null)
+  const [instanceRetries, setInstanceRetries] = useState(2)
+  const [instances, setInstances] = useState<Cloud.Instance[] | null>(null)
+  const [instanceTemplates, setInstanceTemplates] = useState<Cloud.Template[] | null>(null)
 
-  const actions: SpotlightAction[] = [
-    {
-      title: 'About',
-      onTrigger: () => {
-        // redirect
-        window.location.href = '/about';
-      },
-      icon: <IconInfoCircle size={18} />,
-      description: "Learn more about this project",
-    },
-    {
-      title: 'Instances',
-      onTrigger: () => {
-        // redirect
-        window.location.href = '/about';
-      },
-      icon: <IconServer2 size={18} />,
-      description: "Learn more about this project",
-    },
-    {
-      title: 'Kubernetes',
-      onTrigger: () => {
-        // redirect
-        window.location.href = '/about';
-      },
-      icon: <IconPackage size={18} />,
-      description: "Managed Kubernetes cluster"
-    },
-    {
-      title: 'Account',
-      onTrigger: () => {
-        // redirect
-        window.location.href = '/about';
-      },
-      icon: <IconUser size={18} />,
-      description: "Your account settings"
-    },
-    {
-      title: 'Wiki',
-      onTrigger: () => {
-        // redirect
-        window.location.href = '/about';
-      },
-      icon: <IconVocabulary size={18} />,
-      description: "Wiki for help with getting started"
-    },
+  useEffect(() => {
+    checkWidth()
+    if (loading) return;
+    (async () => {
+      await setLoading(true);
+      if (instanceRetries > 0 && instances == null) {
+        try {
+          setInstances(await GetAllInstances());
+          setUser(await userManager.getUser())
+        } finally {
+          setInstanceRetries(instanceRetries - 1)
+        }
+        window.addEventListener("resize", checkWidth);
+      }
+    })();
+  }, [loading])
 
-    {
-      title: "minecraft",
-      onTrigger: () => {
-        console.log("bruh")
-      },
-      icon: <IconBrandDocker size={18} />,
-      description: "Ubuntu 20.04 LXC",
-    },
-    {
-      title: "web",
-      onTrigger: () => {
-        console.log("bruh")
-      },
-      icon: <IconServer size={18} />,
-      description: "Arch VM",
+  const checkWidth = () => {
+    if (window.innerWidth < 980) {
+      setDesktop(false)
+    } else {
+      setDesktop(true)
     }
-  ]
+  }
 
   const [colorScheme, setColorScheme] = useLocalStorage<ColorScheme>({
     key: 'mantine-color-scheme',
@@ -104,24 +91,32 @@ export default function App() {
           }}
           withGlobalStyles withNormalizeCSS
         >
-          <SpotlightProvider shortcut={['mod + K']} actions={actions}>
-            <NotificationsProvider>
-              <Layout>
-                <BrowserRouter>
-                  <Routes>
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/login/silent" element={<SilentLogin />} />
-                    <Route path="/callback" element={<Callback />} />
-                    <Route path="/callback/silent" element={<CallbackSilent />} />
-                    <Route path="/" element={<Home />} />
-                    <Route path="/instances" element={<Instances />} />
-                    <Route path="/about" element={<About />} />
-                    <Route path="/account" element={<Account />} />
-                  </Routes>
-                </BrowserRouter>
-              </Layout>
-            </NotificationsProvider>
-          </SpotlightProvider>
+          <NotificationsProvider>
+            <DesktopContext.Provider value={desktop}>
+              <UserContext.Provider value={{ user, setUser }}>
+                <InstanceContext.Provider value={{ instances, setInstances }}>
+                  <InstanceTemplateContext.Provider value={{ instanceTemplates, setInstanceTemplates }}>
+                    <BrowserRouter>
+                      <SpotlightComponent>
+                        <Layout>
+                          <Routes>
+                            <Route path="/login" element={<Login />} />
+                            <Route path="/login/silent" element={<SilentLogin />} />
+                            <Route path="/callback" element={<Callback />} />
+                            <Route path="/callback/silent" element={<CallbackSilent />} />
+                            <Route path="/" element={<Home />} />
+                            <Route path="/instances" element={<Instances />} />
+                            <Route path="/about" element={<About />} />
+                            <Route path="/account" element={<Account />} />
+                          </Routes>
+                        </Layout>
+                      </SpotlightComponent>
+                    </BrowserRouter>
+                  </InstanceTemplateContext.Provider>
+                </InstanceContext.Provider>
+              </UserContext.Provider>
+            </DesktopContext.Provider>
+          </NotificationsProvider>
         </MantineProvider>
       </ColorSchemeProvider>
     </>

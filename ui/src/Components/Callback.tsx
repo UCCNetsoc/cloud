@@ -1,18 +1,19 @@
-import { useEffect } from "react"
+import { useContext, useEffect } from "react"
 import { userManager } from "../userManager"
+import AuthContext from "./AuthContextProvider";
 
 const Callback = () => {
-    useEffect(() => {
-        console.log(window.location.toString())
-        userManager.signinRedirectCallback(window.location.toString()).then((something) => {
-            console.log(something)
-        })
-        // window.location.href = "/"
+  useEffect(() => {
+    console.log(window.location.toString())
+    userManager.signinRedirectCallback(window.location.toString()).then((something) => {
+      window.location.href = "/"
+    })
+    // window.location.href = "/"
 
-    }, [])
-    return (
-        <></>
-    )
+  }, [])
+  return (
+    <></>
+  )
 }
 
 export default Callback

@@ -1,0 +1,31 @@
+.repeat {
+    background: url("../../public/assets/binary-repeat.png") rgba(22, 22, 22, 1);
+    background-repeat: round repeat;
+    height: 60px;
+    width: 100%;
+    animation: swipe 30s ease-in-out infinite;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    margin-bottom: 2em;
+    z-index: 100;
+}
+
+
+@keyframes swipe {
+    0% {
+        background-position: 0% 50%;
+        filter: invert(0)
+    }
+
+    50% {
+        background-position: 100% 50%;
+        filter: invert(1)
+    }
+
+    100% {
+        background-position: 0% 51%;
+        filter: invert(0)
+    }
+}

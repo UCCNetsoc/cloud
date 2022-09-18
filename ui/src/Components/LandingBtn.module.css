@@ -1,0 +1,12 @@
+.button {
+    text-align: center;
+}
+
+.button svg {
+    height: 30px;
+    transition: ease-in-out 0.14s;
+}
+
+.button:hover svg {
+    transform: translateY(-8px)
+}

@@ -58,7 +58,7 @@ const About = () => {
       <h1>Contributors</h1>
       <ul style={{ display: "flex", margin: "auto", padding: "0" }}>
         {contributors.map((contributor) => (
-          <Anchor href={`https://github.com/${contributor.login}`} style={{ width: `${truncateLength}ch`, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+          <Anchor key={contributor.login} href={`https://github.com/${contributor.login}`} style={{ width: `${truncateLength}ch`, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
             <Avatar src={contributor.avatar_url} radius="xl">{contributor.login}</Avatar>
             <p style={{ textAlign: "center" }}>{contributor.login.length > truncateLength ? contributor.login.slice(0, truncateLength - 3) + '...' : contributor.login}</p>
           </Anchor>

@@ -9,9 +9,9 @@ function Account() {
 
   useEffect(() => {
     (async () => {
-    const oidcUser = await userManager.getUser()
-    setAccount(oidcUser?.profile ?? null)
-  })()
+      const oidcUser = await userManager.getUser()
+      setAccount(oidcUser?.profile ?? null)
+    })()
   }, [])
 
   return (
@@ -38,7 +38,7 @@ function Account() {
             </tr>
           </tbody>
         </Table>
-        <Text sx={{ margin: "25px 0 25px 0", maxWidth: 800}}>
+        <Text sx={{ margin: "25px 0 25px 0", maxWidth: 800 }}>
           <p>
             Your account is used for logging into UCC Netsoc web services
           </p>
@@ -47,11 +47,16 @@ function Account() {
           </p>
         </Text>
 
-        <nav style={{ maxWidth: 600, display: "flex", alignItems: "center", justifyContent: "space-evenly"}}>
-          <Button color="orange.6">
+        <nav style={{ maxWidth: 500, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Button color="cyan.8" onClick={() => {
+            userManager.signoutPopup().then(() => {
+              window.location.href = "/"
+            })
+          }}>Logout</Button>
+          <Button>
             Reset Password
           </Button>
-          <Button color="yellow.6">
+          <Button color="yellow.8">
             Request GDPR Data
           </Button>
           <Button color="red.6">

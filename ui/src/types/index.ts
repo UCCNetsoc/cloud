@@ -90,7 +90,7 @@ export module Cloud {
 
   export interface VHostRequirements {
     base_domain: string;
-    user_supplied: {
+    user_domain: {
       verification_text_name: string;
       allowed_a_aaaa: string[];
     };
