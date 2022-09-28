@@ -12,7 +12,7 @@ COPY --from=dev /app .
 
 ENV REACT_APP_NETSOC_API_URL=https://api.beta.netsoc.cloud
 ENV REACT_APP_OIDC_AUTHORITY=https://keycloak.netsoc.co/auth/realms/freeipa
-ENV REACT_APP_HCAPTCHA_SITE_KEY=10000000-ffff-ffff-ffff-000000000001
+ENV REACT_APP_HCAPTCHA_SITE_KEY=82ab2e7f-4765-4cff-ab41-648eb653ac11
 ENV REACT_APP_SSH_URL=https://ssh.netsoc.cloud
 ENV REACT_APP_SFTP_URL=https://sftp.netsoc.cloud
 
