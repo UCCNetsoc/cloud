@@ -775,6 +775,8 @@ class Proxmox():
             elif current_status['status'] == 'stopped':
                 status = models.proxmox.Status.Stopped
 
+            print(current_status.keys())
+
             instance = models.proxmox.Instance(
                 type=instance_type,
                 id=vmid,
@@ -787,7 +789,10 @@ class Proxmox():
                 specs=specs,
                 remarks=[],
                 status=status,
-                active=active
+                active=active,
+                mem=current_status["mem"],
+                disk=current_status["disk"],
+                uptime=current_status["uptime"],
             )
 
             # Build remarks about the vhosts
@@ -877,7 +882,10 @@ class Proxmox():
                 specs=specs,
                 remarks=[],
                 status=status,
-                active=active
+                active=active,
+                mem=current_status["mem"],
+                disk=current_status["disk"],
+                uptime=current_status["uptime"],
             )
 
             # Build remarks about the thing, problems, etc...
@@ -926,7 +934,7 @@ class Proxmox():
         ret = { }
 
         lxcs_qemus = self.prox.cluster.resources.get(type="vm")
-        
+
         for entry in lxcs_qemus:
             if 'name' in entry and entry['name'].endswith(self._get_instance_fqdn_for_account(instance_type, account, "")):
                 if ignore_errors == True:
@@ -938,6 +946,7 @@ class Proxmox():
                 else:
                     instance = self._read_instance_on_node(instance_type, entry['node'], entry['vmid'])
                     ret[instance.hostname] = instance
+        
                         
         return ret
 
