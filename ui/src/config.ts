@@ -7,7 +7,7 @@ export interface Config {
 }
 // TODO: change defaults to netsoc.co
 export const config: Config = {
-    apiBaseUrl: (process.env.REACT_APP_NETSOC_API_URL ?? "http://localhost:8000").replace(
+    apiBaseUrl: (process.env.REACT_APP_NETSOC_API_URL ?? "https://api.beta.netsoc.cloud").replace(
         new RegExp('[/]+$'),
         ''
     ),
