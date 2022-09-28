@@ -1,6 +1,7 @@
+import config from "../config";
 import { userManager } from "../userManager";
 
-const apiPrefix = "http://localhost:8000/v1";
+const apiPrefix = config.apiBaseUrl + "/v1";
 
 const request = async (url: string, options: { method?: RequestInit["method"], body?: RequestInit["body"] }, auth = true,): Promise<[number, any]> => {
   const user = await userManager.getUser();
