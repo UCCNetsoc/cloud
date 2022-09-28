@@ -104,8 +104,10 @@ export module Cloud {
   }
 
   export interface Template {
+    id: string;
     metadata: TemplateMetadata;
     specs: Specs;
+    hostname?: string;
   }
 
   export interface File {
@@ -117,5 +119,11 @@ export module Cloud {
     st_mtime: number;
     group: string;
     owner: string;
+  }
+
+  export interface GenericResponse {
+    detail: {
+      msg: string
+    }
   }
 }

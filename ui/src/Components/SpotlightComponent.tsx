@@ -8,12 +8,13 @@ const SpotlightComponent = (props: { children: React.ReactNode }) => {
     const { instances } = useContext(InstanceContext)
     const [spotlight, setSpotlight] = useState<SpotlightAction[]>([])
 
+    const navigate = useNavigate()
     const actions: SpotlightAction[] = [
         {
             title: 'Instances',
             onTrigger: () => {
                 // redirect
-                window.location.href = '/instances';
+                navigate('/instances');
             },
             icon: <IconServer2 size={18} />,
             description: "Learn more about this project",
@@ -22,7 +23,7 @@ const SpotlightComponent = (props: { children: React.ReactNode }) => {
             title: 'Home',
             onTrigger: () => {
                 // redirect
-                window.location.href = '/';
+                navigate('/');
             },
             icon: <IconHome size={18} />,
             description: "Home",
@@ -31,7 +32,7 @@ const SpotlightComponent = (props: { children: React.ReactNode }) => {
             title: 'About',
             onTrigger: () => {
                 // redirect
-                window.location.href = '/about';
+                navigate('/about');
             },
             icon: <IconInfoCircle size={18} />,
             description: "Learn more about this project",
@@ -40,7 +41,7 @@ const SpotlightComponent = (props: { children: React.ReactNode }) => {
             title: 'Kubernetes',
             onTrigger: () => {
                 // redirect
-                window.location.href = '/about';
+                navigate('/about');
             },
             icon: <IconPackage size={18} />,
             description: "Managed Kubernetes cluster"
@@ -49,7 +50,7 @@ const SpotlightComponent = (props: { children: React.ReactNode }) => {
             title: 'Account',
             onTrigger: () => {
                 // redirect
-                window.location.href = '/about';
+                navigate('/account');
             },
             icon: <IconUser size={18} />,
             description: "Your account settings"
@@ -57,15 +58,13 @@ const SpotlightComponent = (props: { children: React.ReactNode }) => {
         {
             title: 'Wiki',
             onTrigger: () => {
-                // redirect
-                window.location.href = '/about';
+                window.open("https://wiki.netsoc.co")
             },
             icon: <IconVocabulary size={18} />,
             description: "Wiki for help with getting started"
         },
     ]
 
-    const navigate = useNavigate()
     useEffect(() => {
         if (instances) {
             const tmp = actions
@@ -74,6 +73,10 @@ const SpotlightComponent = (props: { children: React.ReactNode }) => {
                     title: instance.hostname,
                     onTrigger: () => {
                         // window.location.href = `/instances?q=${instance.id}`
+                        if (window.location.href.startsWith("/instances")) {
+
+                            window.history.replaceState(null, instance.hostname, `?q=${instance.id}`)
+                        }
                         navigate(`/instances?q=${instance.id}`)
 
                     },

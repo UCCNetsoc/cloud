@@ -4,7 +4,6 @@ import AuthContext from "./AuthContextProvider";
 
 const Callback = () => {
   useEffect(() => {
-    console.log(window.location.toString())
     userManager.signinRedirectCallback(window.location.toString()).then((something) => {
       window.location.href = "/"
     })

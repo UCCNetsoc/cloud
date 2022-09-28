@@ -1,9 +1,8 @@
-import styled from "@emotion/styled";
-import { ActionIcon, Anchor, Button, Code, createStyles, Divider, Loader, Modal, ScrollArea, Select, Switch, Table, Text, TextInput, Tooltip, useMantineTheme } from "@mantine/core";
+import { ActionIcon, Anchor, Button, createStyles, Loader, Modal, ScrollArea, Table, Text, Tooltip, useMantineTheme } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
-import { IconAlertCircle, IconAlertTriangle, IconExternalLink, IconInfoCircle, IconPlus, IconServer, IconTrash, IconWorld } from "@tabler/icons";
-import { useContext, useEffect, useState } from "react";
-import { DeleteVhost, MarkInstanceActive, StartInstance, StopInstance } from "../api";
+import { IconAlertCircle, IconAlertTriangle, IconExternalLink, IconInfoCircle, IconPlus, IconTrash } from "@tabler/icons";
+import { useContext, useState } from "react";
+import { DeleteInstance, DeleteVhost, ResetRootPassword, ShutdownInstance, StartInstance, StopInstance } from "../api";
 import { DesktopContext, UserContext } from "../App";
 import { Cloud } from "../types";
 import PortModal from "./PortModal";
@@ -40,104 +39,103 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
   const [portScrolled, setPortScrolled] = useState(false);
 
   const [vhostOpen, setVhostOpen] = useState(false);
-  const [vhostRequirements, setVhostRequirements] = useState<Cloud.VHostRequirements | null>(null);
-
   const [portOpen, setPortOpen] = useState(false);
-
   const { classes, cx } = useStyles();
-
   const theme = useMantineTheme();
-  const { user } = useContext(UserContext);
-
   const desktop = useContext(DesktopContext);
-
-  // useEffect(() => {
-  //   (async () => {
-  //     setVhostRequirements(await GetVhostRequirements());
-  //   })();
-  // }, []);
 
   const actions = [
     {
       label: "Start",
+      disabled: false,
       onClick: async () => {
-        const resp = await StartInstance(props.instance.hostname, props.instance.type);
-        if (resp) {
+        StartInstance(props.instance.hostname, props.instance.type).then((resp) => {
           showNotification({
             title:
               <span style={{ display: "flex", alignItems: "center", }}>
                 <Loader sx={{ margin: "0 1em" }} /> <span>Starting instance {props.instance.hostname}</span>
               </span>,
             autoClose: 3000,
-            message: undefined
+            message: "Started instance"
           })
-        } else {
+        }).catch((e) => {
+          console.log(e)
           showNotification({
             title:
               <span style={{ display: "flex", alignItems: "center", }}>
-                <IconAlertTriangle /> <span style={{ margin: "0 1em" }}>Failed to start instance {props.instance.hostname}</span>
+                <IconAlertTriangle /> <span style={{ margin: "0 1em" }}>Failed to start instance {props.instance.hostname}, may already be running</span>
               </span>,
             autoClose: 3000,
             message: undefined
           })
-        }
+        })
       },
       color: "green.9",
     },
     {
       label: "Terminal",
+      disabled: props.instance?.status !== Cloud.Status.Running,
       onClick: () => {
         window.open(`https://ssh.netsoc.cloud/ssh/host/${props.instance?.metadata.network.nic_allocation.addresses[0].split("/")[0]}`, "_blank");
       }
     },
     {
-      label: "Reboot",
-      onClick: () => {
-        // RebootInstance()
-      },
-      color: "cyan.8"
-    },
-    {
       label: "Shutdown",
-      onClick: async () => {
-        const resp = await StopInstance(props.instance.hostname, props.instance.type)
-        if (resp) {
+      disabled: false,
+      onClick: () => {
+        ShutdownInstance(props.instance.hostname, props.instance.type).then((resp) => {
           showNotification({
             title:
               <span style={{ display: "flex", alignItems: "center", }}>
-                <Loader sx={{ margin: "0 1em" }} /> <span>Stopping instance {props.instance.hostname}</span>
+                <Loader sx={{ margin: "0 1em" }} /> <span>Shutting down instance {props.instance.hostname}</span>
               </span>,
-            autoClose: 3000,
             message: undefined
           })
-        }
+        }).catch((e) => {
+          console.log(e)
+          showNotification({
+            title:
+              <span style={{ display: "flex", alignItems: "center", }}>
+                <IconAlertTriangle /> <span style={{ margin: "0 1em" }}>Failed to shutdown instance {props.instance.hostname}</span>
+              </span>,
+            message: "If issues persist, ask for help in netsoc-cloud channel on Discord."
+          })
+        })
       },
       color: "orange"
     },
-    // {
-    //   label: "Reactivate",
-    //   onClick: () => {
-    //     MarkInstanceActive(props.instance.hostname, props.instance.type);
-    //   }
-    // },
     {
       label: "Reset Root Password",
+      disabled: props.instance?.status !== Cloud.Status.Running,
       onClick: () => {
-        // ResetPassword()
+        ResetRootPassword(props.instance.hostname, props.instance.type as Cloud.Type).then((resp) => {
+          showNotification({
+            title: "Reset Root User",
+            message: resp.detail.msg
+          })
+        })
       },
       color: "grape.6",
     },
     {
       label: "Delete",
+      disabled: false,
       onClick: () => {
-        // DeleteInstance()
+        ShutdownInstance(props.instance.hostname, props.instance.type).then(() => {
+          DeleteInstance(props.instance.hostname, props.instance.type as Cloud.Type).then((resp) => {
+            showNotification({
+              title: "Deleted Instance",
+              message: resp.detail.msg
+            })
+          })
+        })
       },
       color: "red.8"
     }
   ]
 
   const possible_remarks = props.instance ? Object.values(props.instance?.remarks) : null;
-  if (possible_remarks !== null) {
+  if (possible_remarks !== null && props.instance !== null) {
     return (
       <>
         <div style={{
@@ -147,13 +145,16 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
           alignItems: "center",
           justifyContent: "space-between",
         }}>
-          <div style={{ minHeight: "30vh", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <div style={{ minHeight: "36vh", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
             <nav style={{ height: "5vh" }}>
-              {actions.map((action, index) => (
-                <Button size="xs" color={action.color} onClick={action.onClick} style={{ margin: "0.4em 0.6em" }} key={index}>
-                  {action.label}
-                </Button>
-              ))}
+              <Button.Group>
+                {actions.map((action, index) => (
+                  <Button disabled={action.disabled} size="xs" color={action.color} onClick={action.onClick} key={index}>
+                    {action.label}
+                  </Button>
+                ))}
+              </Button.Group>
+              {(props.instance.status !== Cloud.Status.Running) ? <small>* Some actions are unavailable while instance isn't running.</small> : null}
             </nav>
             <section style={{ height: "20vh", fontSize: "0.8em" }}>
               <h1 style={{ fontSize: "1em", margin: "0.6em 0 0.2em 0" }}>Details</h1>
@@ -282,7 +283,7 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
               </ScrollArea>
             </div>
             <>
-              <h1 style={{ fontSize: "1em", marginTop: 0 }}>TCP Ports</h1>
+              <h1 style={{ fontSize: "1em", marginTop: 0 }}>TCP/UDP Ports</h1>
               <ScrollArea sx={{ height: 200 }} onScrollPositionChange={({ y }) => setPortScrolled(y !== 0)}>
                 <Table verticalSpacing="xs">
                   <thead className={cx(classes.header, { [classes.scrolled]: portScrolled })}>
@@ -343,7 +344,6 @@ const InstanceEdit = (props: { instance: Cloud.Instance }) => {
                 flexDirection: "column",
                 alignItems: "center",
               }}>
-
                 <ResourceRing current={props.instance.disk} max={props.instance.specs.disk_space * 10000000} size={100} longlabel={props.instance.specs.disk_space.toString() + 'G'} />
                 <Text>Storage</Text>
               </div>

@@ -1,4 +1,4 @@
-import { ScrollArea, Divider, Code, TextInput, Switch, Button, Loader } from "@mantine/core";
+import { ScrollArea, Divider, Code, TextInput, Switch, Button, Loader, NumberInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { showNotification } from "@mantine/notifications";
 import { IconWorld, IconServer } from "@tabler/icons";
@@ -79,7 +79,10 @@ const VhostModal = (props: { instance: Cloud.Instance }) => {
           <form
             onSubmit={form.onSubmit((values) => {
               showNotification({
-                title: "Adding VHost...",
+                title:
+                  <span style={{ display: "flex", alignItems: "center", }}>
+                    <Loader sx={{ margin: "0 1em" }} /> <span>Adding VHost{props.instance.hostname}</span>
+                  </span>,
                 message: `Adding VHost ${values.domain} to instance ${props.instance.hostname}`,
                 autoClose: true,
                 color: "cyan",
@@ -87,12 +90,9 @@ const VhostModal = (props: { instance: Cloud.Instance }) => {
               })
               try {
                 // invert the https value as 'true' interprets it so that the internal service is using https already
-                AddVhost(props.instance.type, props.instance.hostname, values.domain, values.port, !values.https).then((status_code) => {
+                AddVhost(props.instance.type, props.instance.hostname, values.domain, values.port, !values.https).then((_status_code) => {
                   showNotification({
-                    title:
-                      <span style={{ display: "flex", alignItems: "center", }}>
-                        <Loader sx={{ margin: "0 1em" }} /> <span>Added VHost{props.instance.hostname}</span>
-                      </span>,
+                    title: "Added VHost",
                     message: `VHost ${values.domain} added to instance ${props.instance.hostname}`,
                     autoClose: true,
                     color: "teal",
@@ -110,8 +110,8 @@ const VhostModal = (props: { instance: Cloud.Instance }) => {
               }
             })}
             style={{
-              width: "80%",
-              maxWidth: "500px",
+              width: "100%",
+              maxWidth: "800px",
               margin: "auto",
               display: "flex",
               flexDirection: "column",
@@ -119,8 +119,8 @@ const VhostModal = (props: { instance: Cloud.Instance }) => {
               justifyContent: "space-evenly",
               height: "260px"
             }}>
-            <TextInput label="Domain" placeholder={`${user?.profile.preferred_username}.netsoc.cloud`} type="text" {...form.getInputProps("domain")} icon={<IconWorld />} />
-            <TextInput label="Internal Port" defaultValue={80} type="number" {...form.getInputProps("port")} icon={<IconServer />} />
+            <TextInput style={{ width: "65%" }} label="Domain" placeholder={`${user?.profile.preferred_username}.netsoc.cloud`} type="text" {...form.getInputProps("domain")} icon={<IconWorld />} />
+            <NumberInput style={{ width: "40%" }} label="Internal Port" defaultValue={80} type="number" {...form.getInputProps("port")} icon={<IconServer />} />
             <div>
               <Switch defaultChecked label="Managed SSL" {...form.getInputProps("https")} />
             </div>
@@ -134,9 +134,6 @@ const VhostModal = (props: { instance: Cloud.Instance }) => {
               <Button style={{ margin: "0 1em" }} type="submit">
                 Add VHost
               </Button>
-              {/* <Button variant="outline" color="gray">
-                Cancel
-              </Button> */}
             </div>
           </form>
         </ScrollArea>

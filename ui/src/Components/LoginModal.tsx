@@ -24,11 +24,11 @@ export const LoginModal = () => {
         <Button fullWidth color="cyan.8" style={{ marginBottom: "1em" }} onClick={() => {
           userManager.signinRedirect({ redirectMethod: "replace" }).then(function () {
             console.log('signinRedirect done');
-          }).catch(function (err) {
+          }).catch((err) => {
             console.log(err);
           });
         }}>Login</Button>
-        <Button fullWidth>Sign Up</Button>
+        <Button fullWidth component={Link} to="/signup">Sign Up</Button>
       </nav>
     </Modal >
   )

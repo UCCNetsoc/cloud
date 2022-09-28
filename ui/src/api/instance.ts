@@ -13,34 +13,34 @@ export const GetAllInstances = async (): Promise<Cloud.Instance[]> => {
   return [...lxc_instances ? Object.values(lxc_instances) : [], ...vps_instances ? Object.values(vps_instances) : []];
 }
 
-export const DeleteInstance = async (hostname: string, type: Cloud.Type): Promise<boolean> => {
+export const DeleteInstance = async (hostname: string, type: Cloud.Type): Promise<Cloud.GenericResponse> => {
   const response = await request(`/proxmox/$username/${type.toString()}/${hostname}`, { method: "DELETE" });
-  return response[0] === 200;
+  return response[1];
 }
 
-export const StartInstance = async (hostname: string, type: Cloud.Type): Promise<boolean> => {
+export const StartInstance = async (hostname: string, type: Cloud.Type): Promise<Cloud.GenericResponse> => {
   const response = await request(`/proxmox/$username/${type.toString()}/${hostname}/start`, { method: "POST" });
-  return response[0] === 201;
+  return response[1];
 }
 
-export const StopInstance = async (hostname: string, type: Cloud.Type): Promise<boolean> => {
+export const StopInstance = async (hostname: string, type: Cloud.Type): Promise<Cloud.GenericResponse> => {
   const response = await request(`/proxmox/$username/${type.toString()}/${hostname}/stop`, { method: "POST" });
-  return response[0] === 200;
+  return response[1];
 }
 
 export const ShutdownInstance = async (hostname: string, type: Cloud.Type): Promise<boolean> => {
   const response = await request(`/proxmox/$username/${type.toString()}/${hostname}/shutdown`, { method: "POST" });
-  return response[0] === 200;
+  return response[0] === 200 || response[0] === 201;
 }
 
-export const ResetRootPassword = async (hostname: string, type: Cloud.Type): Promise<boolean> => {
+export const ResetRootPassword = async (hostname: string, type: Cloud.Type): Promise<Cloud.GenericResponse> => {
   const response = await request(`/proxmox/$username/${type.toString()}/${hostname}/reset-root-user`, { method: "POST" });
-  return response[0] === 200;
+  return response[1];
 }
 
 export const MarkInstanceActive = async (hostname: string, type: Cloud.Type): Promise<boolean> => {
   const response = await request(`/proxmox/$username/${type.toString()}/${hostname}/active`, { method: "POST" });
-  return response[0] === 201;
+  return response[0] === 200 || response[0] === 201;
 }
 
 export const AddInternetPort = async (hostname: string, type: Cloud.Type, internal_port: number, external_port: number): Promise<boolean> => {

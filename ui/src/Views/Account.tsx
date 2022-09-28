@@ -47,7 +47,7 @@ function Account() {
           </p>
         </Text>
 
-        <nav style={{ maxWidth: 500, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <nav style={{ maxWidth: 600, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
           <Button color="cyan.8" onClick={() => {
             userManager.signoutPopup().then(() => {
               window.location.href = "/"

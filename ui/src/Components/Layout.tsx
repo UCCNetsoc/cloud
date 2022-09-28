@@ -1,23 +1,15 @@
-import { ThemeContext } from "@emotion/react";
-import { ActionIcon, Anchor, AppShell, Avatar, Burger, Group, Header, MantineProvider, MediaQuery, Menu, Navbar, Text, UnstyledButton } from "@mantine/core"
+import { ActionIcon, AppShell, Burger, Group, Header, MantineProvider, Navbar, Text, UnstyledButton } from "@mantine/core"
 import { useColorScheme } from "@mantine/hooks";
 import { IconBox, IconDoorExit, IconInfoCircle, IconServer2, IconUser, IconVocabulary } from "@tabler/icons";
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { DesktopContext, UserContext } from "../App";
 import { userManager } from "../userManager";
+
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const [opened, setOpened] = useState(false);
   const { user } = useContext(UserContext);
-
   const desktop = useContext(DesktopContext);
-
-  //   useEffect(() => {
-  //     if (desktop) {
-  //       setOpened(true);
-  //     }
-  //   }, [desktop]);
-  // }, [])
 
   const routes = [
     {
@@ -56,7 +48,6 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       navbar={
         useLocation()?.pathname === "/" ? <></> : (
           <Navbar
-
             hidden={!opened || desktop} width={{ base: 200 }} p="xs">
             <Group py="md">
               {routes.map((route) => (
@@ -94,11 +85,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           }}>
             <div>
               {!desktop ? (
-                < Burger
+                <Burger
                   opened={opened}
                   onClick={() => setOpened((o) => !o)}
-                  // size="sm"
-                  // color={theme.colors.gray[6]}
                   mr="lg"
                 />
               ) : <> </>}
@@ -113,7 +102,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               <Link style={{ color: useColorScheme() == "dark" ? "white" : "black", textDecoration: "none", marginRight: "1.4em" }} to="/account">
                 {user?.profile.preferred_username}
               </Link>
-              <ActionIcon onClick={() => { userManager.signoutPopup().then(() => { window.location.href = "/" }) }}>
+              <ActionIcon aria-label="Log out" onClick={() => { userManager.signoutPopup().then(() => { window.location.href = "/" }) }}>
                 <IconDoorExit />
               </ActionIcon>
             </div>

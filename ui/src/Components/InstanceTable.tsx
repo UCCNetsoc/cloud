@@ -1,13 +1,15 @@
 import { ActionIcon, Button, Drawer, Modal, Skeleton, Table, ThemeIcon, Tooltip, useMantineTheme } from "@mantine/core";
-import { IconBrandDocker, IconPlayerPlay, IconPlayerStop, IconPlus, IconRefresh, IconServer } from "@tabler/icons";
+import { IconBrandDocker, IconPlayerPlay, IconPlayerStop, IconPlus, IconRefresh, IconServer, IconTerminal } from "@tabler/icons";
 import { useContext, useEffect, useLayoutEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { GetAllTemplates, GetTemplates } from "../api/template";
+import { MarkInstanceActive, StartInstance, StopInstance } from "../api";
+import { GetAllTemplates, GetLXCTemplates, GetTemplates, GetVPSTemplates } from "../api/template";
 // import { GetInstances } from "../api";
 import { DesktopContext, InstanceContext, InstanceTemplateContext } from "../App";
 import { Cloud } from "../types";
 import InstanceEdit from "./InstanceEdit";
 import InstanceRequest from "./InstanceRequest";
+import InstanceRequestModal from "./InstanceRequestModal";
 import ResourceRing from "./ResourceRing";
 
 const InstanceTable = () => {
@@ -29,33 +31,18 @@ const InstanceTable = () => {
     past: boolean,
   }
 
-  // useEffect(() => {
-  //   console.log(instances)
-  // }, [instances])
-
-  // useEffect(() => {
-  //   (async () => {
-  //     const tmp_lxcInstances = await GetInstances(Cloud.Type.LXC);
-  //     // setLxcInstances(tmp_lxcInstances ? Object.values(tmp_lxcInstances) : []);
-
-  //     const tmp_VpsInstances = await GetInstances(Cloud.Type.VPS);
-
-  //     // setVpsInstances(tmp_VpsInstances ? Object.values(tmp_VpsInstances) : []);
-  //     setInstances([...tmp_lxcInstances ? Object.values(tmp_lxcInstances) : [], ...tmp_VpsInstances ? Object.values(tmp_VpsInstances) : []]);
-  //     setInitialLoading(false);
-  //   })();
-  // }, [])
-
-  const { instanceTemplates, setInstanceTemplates } = useContext(InstanceTemplateContext)
+  const [{ lxcInstanceTemplates, setLxcInstanceTemplates }, { vpsInstanceTemplates, setVpsInstanceTemplates }] = useContext(InstanceTemplateContext)
 
   const desktop = useContext(DesktopContext)
 
   useEffect(() => {
     (async () => {
-      if (instanceTemplates === null) {
-        setInstanceTemplates(await GetAllTemplates());
+      if (lxcInstanceTemplates === null && typeof setLxcInstanceTemplates === 'function') {
+        setLxcInstanceTemplates(await GetLXCTemplates())
       }
-      // setTemplates(tmp_templates ? Object.values(tmp_templates) : []);
+      if (vpsInstanceTemplates === null && typeof setVpsInstanceTemplates === 'function') {
+        setVpsInstanceTemplates(await GetVPSTemplates())
+      }
     })();
   }, []);
 
@@ -135,12 +122,22 @@ const InstanceTable = () => {
               }</td>
               <td>
                 <Tooltip label={!instance.active ? "Reactivate" : instance.status === "Running" ? "Stop" : "Start"}>
-                  <ActionIcon>
+                  <ActionIcon sx={{ display: "inline" }} onClick={(e: any) => {
+                    e.stopPropagation(); (instance.status === "Running") ?
+                      StopInstance(instance.hostname, instance.type) : (instance.active) ?
+                        StartInstance(instance.hostname, instance.type) :
+                          MarkInstanceActive(instance.hostname, instance.type)
+                  }} >
                     {!instance.active ?
                       <IconRefresh color={theme.colors.blue[4]} />
                       : instance.status === "Running" ?
                         <IconPlayerStop color={theme.colors.red[6]} /> : <IconPlayerPlay color={theme.colors.green[6]} />
                     }
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="Terminal">
+                  <ActionIcon onClick={(e: any) => { e.stopPropagation(); window.open(`https://ssh.netsoc.cloud/ssh/host/${instance.metadata.network.nic_allocation.gateway4}`) }} sx={{ display: "inline" }} >
+                    <IconTerminal color={theme.colorScheme === "dark" ? "white" : "black"} />
                   </ActionIcon>
                 </Tooltip>
               </td>
@@ -236,8 +233,14 @@ const InstanceTable = () => {
         >
           <InstanceEdit instance={instances[selected!]} />
         </Drawer>
-        <Modal fullScreen={!desktop} centered style={{ padding: 0, overflowX: "hidden" }} size="1000px" opened={requestOpened} onClose={() => { setRequestOpened(false) }}>
-          <InstanceRequest templates={instanceTemplates} />
+        <Modal size="xxl" fullScreen={!desktop} centered opened={requestOpened} onClose={() => {
+          setRequestOpened(false);
+          setSelected(null);
+          window.history.replaceState(null, 'foo', '?');
+        }}>
+          {lxcInstanceTemplates ? vpsInstanceTemplates ? (
+            <InstanceRequestModal templates={[lxcInstanceTemplates, vpsInstanceTemplates]} />
+          ) : null : null}
         </Modal>
       </div >
     )

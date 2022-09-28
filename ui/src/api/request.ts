@@ -23,7 +23,7 @@ const request = async (url: string, options: { method?: RequestInit["method"], b
   if (req.status < 200 || req.status >= 300) {
     throw new Error(`Request failed with status ${req.status}\n${req}`)
   }
-  return [req.status, req.json()]
+  return [req.status, await req.json()]
 }
 
 export default request;

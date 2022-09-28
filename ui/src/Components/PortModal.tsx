@@ -19,7 +19,6 @@ const PortModal = (props: { instance: Cloud.Instance }) => {
       setLoading(true);
       (async () => {
         setFreePort(await GetFreePort(props.instance.type, props.instance.hostname));
-        console.log(freePort)
         setReady(true);
       })();
     }
@@ -45,7 +44,7 @@ const PortModal = (props: { instance: Cloud.Instance }) => {
       <>
         <Dialog>
           <ScrollArea style={{ height: "700px", margin: "auto" }}>
-            <h1 style={{ textAlign: "center" }}>Add a TCP Port</h1>
+            <h1 style={{ textAlign: "center" }}>Add a TCP/UDP Port</h1>
             <p style={{ width: "90%", maxWidth: "500px", margin: "auto", textAlign: "center" }}>A VHost forwards HTTP(s) traffic into your instance using a unique domain name.</p>
             <Divider style={{
               width: "60%",

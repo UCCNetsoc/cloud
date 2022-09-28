@@ -1,5 +1,5 @@
 export * from './instance'
 export * from './network'
-export * from './user'
+export * from './account'
 export * from './other'
 

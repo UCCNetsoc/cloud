@@ -19,3 +19,7 @@ code {
 .mantine-Modal-modal {
   padding: 0;
 }
+
+.mantine-Input-rightSection {
+  width: 120px;
+}

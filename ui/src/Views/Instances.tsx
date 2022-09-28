@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { IsLoggedIn } from "../api/user";
+import { IsLoggedIn } from "../api/account";
 import InstanceTable from "../Components/InstanceTable";
 import { LoginModal } from "../Components/LoginModal";
 
