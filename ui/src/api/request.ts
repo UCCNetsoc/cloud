@@ -16,7 +16,6 @@ const request = async (url: string, options: { method?: RequestInit["method"], b
   }
 
   const req = await fetch(apiPrefix + url, {
-    credentials: 'include',
     headers,
     ...options
   })
