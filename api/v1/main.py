@@ -125,7 +125,7 @@ Disable cross-origin
 """
 api.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://beta.netsoc.cloud"],
+    allow_origins=["http://localhost:3000", "https://beta.netsoc.cloud"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
