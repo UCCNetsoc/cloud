@@ -2,9 +2,10 @@ import { Box, Button, ScrollArea, Text, Textarea, TextInput, useMantineTheme } f
 import { useForm } from "@mantine/form";
 import { showNotification } from "@mantine/notifications";
 import { IconArrowRight } from "@tabler/icons";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateInstanceRequest } from "../api/instance_request";
+import { DesktopContext } from "../App";
 import { Cloud } from "../types";
 import ModalTop from "./ModalTop";
 
@@ -15,6 +16,7 @@ const InstanceRequestModal = (props: { templates: Cloud.Template[][] | null }) =
 
   const theme = useMantineTheme()
   const navigate = useNavigate()
+  const desktop = useContext(DesktopContext)
 
   const defaultDetail = {
     title: "Select a template to continue",
@@ -39,7 +41,7 @@ const InstanceRequestModal = (props: { templates: Cloud.Template[][] | null }) =
       <div>
         <ModalTop />
         <div style={{ display: "flex", alignItems: "center", paddingTop: "18px", width: "800px" }}>
-          <ScrollArea style={{ height: "600px", width: "400px", borderRight: `1px solid ${theme.colorScheme === "dark" ? "white" : "black"}` }}>
+          <ScrollArea style={{ height: desktop ? "600px": "100vw", width: "400px", borderRight: `1px solid ${theme.colorScheme === "dark" ? "white" : "black"}` }}>
             {props.templates?.map((templates, typeIndex) => {
               return templates.map((template, index) => {
                 return (
@@ -71,7 +73,6 @@ const InstanceRequestModal = (props: { templates: Cloud.Template[][] | null }) =
                           <span style={{ opacity: "60%" }}>{template.metadata.subtitle}</span>
                         </div>
                       </div>
-                      {/* <small style={{ display: "block" }}>{template.specs.cores} CPU, {template.specs.memory} RAM, {template.specs.disk_space}GB Disk</small> */}
                     </Box>
                   </div>
                 )
@@ -79,7 +80,7 @@ const InstanceRequestModal = (props: { templates: Cloud.Template[][] | null }) =
             })}
 
           </ScrollArea>
-          <ScrollArea type="always" style={{ height: "600px", width: "600px", padding: "1em" }}>
+          <ScrollArea type="always" style={{ height: desktop ? "600px": "100vh", width: "600px", padding: "1em" }}>
             {metaData ? (
               <div style-={{ width: "300px" }}>
                 <div style={{ display: "flex", alignItems: "center" }}>
