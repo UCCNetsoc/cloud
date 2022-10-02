@@ -1,4 +1,4 @@
-FROM node:13.10.1-alpine3.11 as dev
+FROM node:14.2-alpine as dev
 
 WORKDIR /app
 COPY . .
@@ -10,16 +10,16 @@ WORKDIR /app
 
 COPY --from=dev /app .
 
-ENV VUE_APP_NETSOC_API_URL=https://api.netsoc.cloud
-ENV VUE_APP_OIDC_AUTHORITY=https://keycloak.netsoc.co/auth/realms/freeipa
-ENV VUE_APP_HCAPTCHA_SITE_KEY=0e8176fb-1fc2-4d51-a153-773cbd8b9837
-ENV VUE_APP_SSH_URL=https://ssh.netsoc.cloud
-ENV VUE_APP_SFTP_URL=https://sftp.netsoc.cloud
+ENV REACT_APP_NETSOC_API_URL=https://api.beta.netsoc.cloud
+ENV REACT_APP_OIDC_AUTHORITY=https://keycloak.netsoc.co/auth/realms/freeipa
+ENV REACT_APP_HCAPTCHA_SITE_KEY=82ab2e7f-4765-4cff-ab41-648eb653ac11
+ENV REACT_APP_SSH_URL=https://ssh.netsoc.cloud
+ENV REACT_APP_SFTP_URL=https://sftp.netsoc.cloud
 
 RUN npm run build
 
 FROM nginx:1.18.0 AS prod
 
 RUN mkdir /app
-COPY --from=prod_builder /app/dist /app
+COPY --from=prod_builder /app/build /app
 COPY nginx.conf /etc/nginx/nginx.conf
