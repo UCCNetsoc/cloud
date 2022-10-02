@@ -134,7 +134,7 @@ const InstanceTable = () => {
                   }} >
                     {!instance.active ?
                       <IconRefresh color={theme.colors.blue[4]} />
-                      : instance.status === "Running" ?
+                      : instance.status === Cloud.Status.Running ?
                         <IconPlayerStop color={theme.colors.red[6]} /> : <IconPlayerPlay color={theme.colors.green[6]} />
                     }
                   </ActionIcon>
@@ -212,9 +212,7 @@ const InstanceTable = () => {
               </tr>
             </thead>
             <tbody>
-              {/* {lxc_rows} */}
               {table_rows}
-              {/* {vps_rows} */}
             </tbody>
           </Table>
         </div >
