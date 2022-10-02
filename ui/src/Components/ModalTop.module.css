@@ -8,10 +8,8 @@
     top: 0;
     left: 0;
     right: 0;
-    margin-bottom: 2em;
     z-index: 100;
 }
-
 
 @keyframes swipe {
     0% {
