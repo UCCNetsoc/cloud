@@ -123,10 +123,14 @@ const InstanceTable = () => {
               <td>
                 <Tooltip label={!instance.active ? "Reactivate" : instance.status === "Running" ? "Stop" : "Start"}>
                   <ActionIcon sx={{ display: "inline" }} onClick={(e: any) => {
-                    e.stopPropagation(); (instance.status === "Running") ?
-                      StopInstance(instance.hostname, instance.type) : (instance.active) ?
-                        StartInstance(instance.hostname, instance.type) :
-                          MarkInstanceActive(instance.hostname, instance.type)
+                    e.stopPropagation();
+
+                    instance.active ? (
+                      (
+                        instance.status === Cloud.Status.Running) ? 
+                        StopInstance(instance.hostname, instance.type) : StartInstance(instance.hostname, instance.type
+                      )
+                    ) : MarkInstanceActive(instance.hostname, instance.type)
                   }} >
                     {!instance.active ?
                       <IconRefresh color={theme.colors.blue[4]} />
@@ -233,7 +237,7 @@ const InstanceTable = () => {
         >
           <InstanceEdit instance={instances[selected!]} />
         </Drawer>
-        <Modal size="xxl" fullScreen={!desktop} centered opened={requestOpened} onClose={() => {
+        <Modal sx={{ overfloyX: "hidden" }} size="xxl" fullScreen={!desktop} centered opened={requestOpened} onClose={() => {
           setRequestOpened(false);
           setSelected(null);
           window.history.replaceState(null, 'foo', '?');
