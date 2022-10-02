@@ -18,8 +18,11 @@ const PortModal = (props: { instance: Cloud.Instance }) => {
     if (!loading) {
       setLoading(true);
       (async () => {
-        setFreePort(await GetFreePort(props.instance.type, props.instance.hostname));
+        const free_port = await GetFreePort(props.instance.type, props.instance.hostname);
+        setFreePort(free_port)
         setReady(true);
+        form.values.external_port = free_port;
+        console.log(free_port)
       })();
     }
   }, [loading])
@@ -30,7 +33,7 @@ const PortModal = (props: { instance: Cloud.Instance }) => {
 
   const form = useForm<{ external_port: number | undefined, internal_port: number | undefined }>({
     initialValues: {
-      external_port: freePort,
+      external_port: undefined,
       internal_port: undefined,
     },
     validate: (values) => ({
@@ -54,7 +57,7 @@ const PortModal = (props: { instance: Cloud.Instance }) => {
               <section>
                 <h4 style={{ margin: 0 }}>Using your <em>free</em> Netsoc Cloud domain</h4>
                 <p>
-                  You can use any domain in the form of <Code sx={{ fontSize: "0.9em", whiteSpace: "nowrap" }}>*.netsoc.cloud</Code>
+                  You can forward a random port in the range 16384 &rarr; 17384 to an internal port in your instance.
                 </p>
               </section>
             </div>
@@ -118,6 +121,7 @@ const PortModal = (props: { instance: Cloud.Instance }) => {
               />
 
               <NumberInput
+                itemType="number"
                 label="Internal Port"
                 placeholder="Internal Port"
                 value={form.values.internal_port}

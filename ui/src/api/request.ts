@@ -3,7 +3,7 @@ import { userManager } from "../userManager";
 
 const apiPrefix = config.apiBaseUrl + "/v1";
 
-const request = async (url: string, options: { method?: RequestInit["method"], body?: RequestInit["body"] }, auth = true,): Promise<[number, any]> => {
+const request = async (url: string, options: { method?: RequestInit["method"], body?: RequestInit["body"] }, auth = true,): Promise<[number, any, Response]> => {
   const user = await userManager.getUser();
   url = url.replace("$username", user?.profile.preferred_username || "");
 
@@ -23,7 +23,10 @@ const request = async (url: string, options: { method?: RequestInit["method"], b
   if (req.status < 200 || req.status >= 300) {
     throw new Error(`Request failed with status ${req.status}\n${req}`)
   }
-  return [req.status, await req.json()]
+
+  // must clone the response, so as to open it as json response 
+  // (second element) and as a standalone response (third element)
+  return [req.status, await req.clone().json(), req]
 }
 
 export default request;

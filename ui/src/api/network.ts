@@ -18,8 +18,8 @@ export const DeleteVhost = async (type: Cloud.Type, hostname: string, domain: st
 
 export const GetFreePort = async (type: Cloud.Type, hostname: string): Promise<number> => {
     const response = await request(`/proxmox/$username/${type}/${hostname}/free-external-port`, { method: "GET" }, true);
-    return response[1];
-};
+    return parseInt(await response[2].text());
+}
 
 export const AddInstancePort = async (type: Cloud.Type, hostname: string, external_port: number, internal_port: number): Promise<number> => {
     const response = await request(`/proxmox/$username/${type}/${hostname}/port/${external_port}/${internal_port}`, { method: "POST" }, true);
