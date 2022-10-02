@@ -10,7 +10,20 @@ export const GetAllInstances = async (): Promise<Cloud.Instance[]> => {
   const lxc_instances = await GetInstances(Cloud.Type.LXC)
   const vps_instances = await GetInstances(Cloud.Type.VPS)
 
-  return [...lxc_instances ? Object.values(lxc_instances) : [], ...vps_instances ? Object.values(vps_instances) : []];
+  var lxc_instance_arr: Cloud.Instance[] = [] as Cloud.Instance[]
+  var vps_instance_arr: Cloud.Instance[] = [] as Cloud.Instance[]
+
+  if (lxc_instances) {
+    lxc_instance_arr = Object.values(lxc_instances).sort((a, b) => 
+    (a.id < b.id ? -1 : 1))
+  }
+
+  if (vps_instances) {
+    vps_instance_arr = Object.values(vps_instances).sort((a, b) => 
+    (a.id < b.id ? -1 : 1))
+  }
+
+  return [...lxc_instance_arr, ...vps_instance_arr]
 }
 
 export const DeleteInstance = async (hostname: string, type: Cloud.Type): Promise<Cloud.GenericResponse> => {
