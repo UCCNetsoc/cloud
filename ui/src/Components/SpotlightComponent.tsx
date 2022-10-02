@@ -58,7 +58,7 @@ const SpotlightComponent = (props: { children: React.ReactNode }) => {
         {
             title: 'Wiki',
             onTrigger: () => {
-                window.open("https://wiki.netsoc.co")
+                window.open("https://wiki.netsoc.co/en/services/tutorial")
             },
             icon: <IconVocabulary size={18} />,
             description: "Wiki for help with getting started"
