@@ -1,7 +1,8 @@
 import { ActionIcon, Button, Drawer, Modal, Skeleton, Table, ThemeIcon, Tooltip, useMantineTheme } from "@mantine/core";
+import { useWindowEvent } from "@mantine/hooks";
 import { IconBrandDocker, IconPlayerPlay, IconPlayerStop, IconPlus, IconRefresh, IconServer, IconTerminal } from "@tabler/icons";
 import { useContext, useEffect, useLayoutEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { MarkInstanceActive, StartInstance, StopInstance } from "../api";
 import { GetAllTemplates, GetLXCTemplates, GetTemplates, GetVPSTemplates } from "../api/template";
 // import { GetInstances } from "../api";
@@ -17,7 +18,8 @@ const InstanceTable = () => {
   const [opened, setOpened] = useState(false);
   const [requestOpened, setRequestOpened] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
-  // const [templates, setTemplates] = useState<Cloud.Template[]>([] as Cloud.Template[]);
+
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { instances, setInstances } = useContext(InstanceContext);
   const [deactivations, setDeactivations] = useState<Deactivation[]>([])
@@ -48,8 +50,11 @@ const InstanceTable = () => {
 
   useEffect(() => {
     if (instances) {
-      const params = location.search;
-      const instance_id = parseInt(params.split("q=")[1])
+      // const params = location.search;
+      // const instance_id = parseInt(params.split("q=")[1])
+
+      const instance_id_string = searchParams.get("q")
+      const instance_id = parseInt(instance_id_string ? instance_id_string : "0");
 
       if (instance_id) {
         const instance_index = instances.findIndex((instance) => instance.id === instance_id)
@@ -91,7 +96,9 @@ const InstanceTable = () => {
               () => {
                 setSelected(index);
                 setOpened(true);
-                window.history.replaceState(null, instance.hostname, `?q=${instance.id}`)
+                searchParams.set("q", instance.id.toString())
+                setSearchParams(searchParams)
+                // window.history.replaceState(null, instance.hostname, `?q=${instance.id}`)
               } : () => { }
             } key={instance.id} style={{ borderLeft: "1px solid", borderColor: instance.status === "Running" ? '#0000' : theme.colors.red[7], cursor: instance.active ? "pointer" : "default", padding: "4em", color: !instance.active ? theme.colorScheme == "dark" ? theme.colors.gray[7] : theme.colors.gray[4] : "unset" }}
             >
@@ -229,7 +236,9 @@ const InstanceTable = () => {
           opened={opened}
           onClose={() => {
             setOpened(false);
-            setSelected(null)
+            setSelected(null);
+            searchParams.delete("q")
+            setSearchParams(searchParams)
           }}
           padding="xs"
         >
@@ -237,8 +246,6 @@ const InstanceTable = () => {
         </Drawer>
         <Modal sx={{ overfloyX: "hidden" }} size="xxl" fullScreen={!desktop} centered opened={requestOpened} onClose={() => {
           setRequestOpened(false);
-          setSelected(null);
-          window.history.replaceState(null, 'foo', '?');
         }}>
           {lxcInstanceTemplates ? vpsInstanceTemplates ? (
             <InstanceRequestModal templates={[lxcInstanceTemplates, vpsInstanceTemplates]} />
