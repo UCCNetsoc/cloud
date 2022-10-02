@@ -78,8 +78,8 @@ const InstanceRequestModal = (props: { templates: Cloud.Template[][] | null }) =
                 )
               })
             })}
-
           </ScrollArea>
+
           <ScrollArea type="always" style={{ height: desktop ? "600px": "100vh", width: "600px", padding: "1em" }}>
             {metaData ? (
               <div style-={{ width: "300px" }}>
@@ -104,7 +104,7 @@ const InstanceRequestModal = (props: { templates: Cloud.Template[][] | null }) =
                           title: "Requested Instance",
                           message: item.detail.msg
                         })
-                        navigate("/instances")
+                        navigate("/")
                       })
                     } catch {
                       showNotification({
